@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM面试官 - 技术面试系统</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💼</text></svg>">
+</head>
+<body>
+    <!-- 应用容器 -->
+    <div class="app-container">
+        <!-- 头部 -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <span class="logo-icon">💼</span>
+                    <span class="logo-text">LLM面试官</span>
+                </div>
+                <div class="status-indicator">
+                    <div class="connection-status" id="connectionStatus">
+                        <div class="status-dot"></div>
+                        <span class="status-text">连接中...</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- 主体内容 -->
+        <main class="main-content">
+            <!-- 聊天区域 -->
+            <div class="chat-container">
+                <div class="chat-messages" id="chatMessages">
+                    <!-- 欢迎消息 -->
+                    <div class="welcome-message">
+                        <div class="welcome-content">
+                            <h2>🎯 欢迎参加技术面试</h2>
+                            <p>我是您的AI面试官，将为您提供专业的技术面试体验。</p>
+                            <p>请放轻松，我们即将开始...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 输入区域 -->
+                <div class="chat-input-container">
+                    <div class="chat-input-wrapper">
+                        <textarea 
+                            id="messageInput" 
+                            class="message-input" 
+                            placeholder="请输入您的回答..."
+                            rows="1"
+                            disabled
+                        ></textarea>
+                        <button id="sendButton" class="send-button" disabled>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M2 21L23 12L2 3V10L17 12L2 14V21Z" fill="currentColor"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="input-hint">
+                        <span id="inputHint">正在连接面试官...</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner">
+            <div class="spinner-ring"></div>
+            <div class="loading-text">正在连接面试官...</div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="/static/app.js"></script>
+</body>
+</html> 
