@@ -10,105 +10,203 @@
 <body>
     <!-- 应用容器 -->
     <div class="app-container">
-        <!-- 头部 -->
-        <header class="header">
-            <div class="header-content">
-                <div class="logo">
+        <!-- 导航栏 -->
+        <nav class="navbar" id="navbar" style="display: none;">
+            <div class="nav-content">
+                <div class="nav-logo">
                     <span class="logo-icon">💼</span>
                     <span class="logo-text">LLM面试官</span>
                 </div>
-                <div class="status-indicator">
+                <div class="nav-menu">
+                    <button class="nav-btn" id="navInterview" data-page="interview">
+                        <span class="nav-icon">🎯</span>
+                        <span class="nav-text">面试</span>
+                    </button>
+                    <button class="nav-btn" id="navHistory" data-page="history">
+                        <span class="nav-icon">📋</span>
+                        <span class="nav-text">历史记录</span>
+                    </button>
+                    <button class="nav-btn" id="navResume" data-page="resume">
+                        <span class="nav-icon">📄</span>
+                        <span class="nav-text">简历设置</span>
+                    </button>
+                </div>
+                <div class="nav-status">
                     <div class="connection-status" id="connectionStatus">
                         <div class="status-dot"></div>
                         <span class="status-text">连接中...</span>
                     </div>
                 </div>
             </div>
-        </header>
+        </nav>
 
-        <!-- 主体内容 -->
-        <main class="main-content">
-            <!-- 简历上传区域 -->
-            <div class="resume-upload-section" id="resumeUploadSection">
-                <div class="upload-container">
-                    <div class="upload-header">
-                        <h3>📄 上传简历（可选）</h3>
-                        <p>上传您的简历，我将基于您的背景进行个性化面试</p>
-                    </div>
-                    
-                    <!-- 文件上传区域 -->
-                    <div class="file-upload-area" id="fileUploadArea">
-                        <div class="upload-content">
-                            <div class="upload-icon">📁</div>
-                            <div class="upload-text">
-                                <p class="upload-main-text">拖拽文件到此处，或点击选择文件</p>
-                                <p class="upload-sub-text">支持 PDF、Word (.doc/.docx) 格式，最大 10MB</p>
-                            </div>
-                            <input type="file" id="fileInput" class="file-input" accept=".pdf,.doc,.docx" />
+        <!-- 页面路由容器 -->
+        <div class="page-router" id="pageRouter">
+            
+            <!-- 面试页面 -->
+            <div class="page" id="interviewPage">
+                <!-- 头部（初始状态） -->
+                <header class="header" id="initialHeader">
+                    <div class="header-content">
+                        <div class="logo">
+                            <span class="logo-icon">💼</span>
+                            <span class="logo-text">LLM面试官</span>
                         </div>
-                        
-                        <!-- 上传进度 -->
-                        <div class="upload-progress" id="uploadProgress" style="display: none;">
-                            <div class="progress-bar">
-                                <div class="progress-fill" id="progressFill"></div>
+                        <div class="status-indicator">
+                            <div class="connection-status" id="initialConnectionStatus">
+                                <div class="status-dot"></div>
+                                <span class="status-text">连接中...</span>
                             </div>
-                            <div class="progress-text" id="progressText">上传中...</div>
-                        </div>
-                        
-                        <!-- 上传结果 -->
-                        <div class="upload-result" id="uploadResult" style="display: none;">
-                            <div class="result-icon">✅</div>
-                            <div class="result-text">
-                                <p class="result-main">简历上传成功！</p>
-                                <p class="result-sub" id="resultDetails"></p>
-                            </div>
-                            <button class="btn-remove" id="removeResumeBtn">移除简历</button>
                         </div>
                     </div>
+                </header>
+
+                <!-- 主体内容 -->
+                <main class="main-content">
+                    <!-- 聊天区域 -->
+                    <div class="chat-container" id="chatContainer">
+                        <div class="chat-messages" id="chatMessages">
+                            <!-- 欢迎消息 -->
+                            <div class="welcome-message">
+                                <div class="welcome-content">
+                                    <h2>🎯 欢迎参加技术面试</h2>
+                                    <p>我是您的AI面试官，将为您提供专业的技术面试体验。</p>
+                                    <p>如需个性化面试，请先通过导航栏的"简历设置"上传简历。</p>
+                                    <p>请放轻松，我们即将开始...</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 聊天操作按钮 -->
+                        <div class="chat-actions" style="display: none;" id="chatActions">
+                            <button class="btn-icon btn-primary" id="newInterviewBtn" title="开始新面试">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                    <path d="M19 13H13V19H11V13H5V11H11V5H13V11H19V13Z" fill="currentColor"/>
+                                </svg>
+                            </button>
+                            <button class="btn-icon" id="saveInterviewBtn" title="保存面试记录">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                    <path d="M17 3H5C3.89 3 3 3.9 3 5V19C3 20.1 3.89 21 5 21H19C20.1 21 21 20.1 21 19V7L17 3ZM12 19C10.34 19 9 17.66 9 16S10.34 13 12 13 15 14.34 15 16 13.66 19 12 19ZM15 9H5V5H15V9Z" fill="currentColor"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- 输入区域 -->
+                        <div class="chat-input-container">
+                            <div class="chat-input-wrapper">
+                                <textarea 
+                                    id="messageInput" 
+                                    class="message-input" 
+                                    placeholder="请输入您的回答..."
+                                    rows="1"
+                                    disabled
+                                ></textarea>
+                                <!-- 语音通话按钮 -->
+                                <button id="voiceCallButton" class="voice-call-button" title="语音通话">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                        <path d="M6.62 10.79C8.06 13.62 10.38 15.94 13.21 17.38L15.41 15.18C15.69 14.9 16.08 14.82 16.43 14.93C17.55 15.3 18.75 15.5 20 15.5C20.55 15.5 21 15.95 21 16.5V20C21 20.55 20.55 21 20 21C10.61 21 3 13.39 3 4C3 3.45 3.45 3 4 3H7.5C8.05 3 8.5 3.45 8.5 4C8.5 5.25 8.7 6.45 9.07 7.57C9.18 7.92 9.1 8.31 8.82 8.59L6.62 10.79Z" fill="currentColor"/>
+                                    </svg>
+                                </button>
+                                <button id="sendButton" class="send-button" disabled>
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                        <path d="M2 21L23 12L2 3V10L17 12L2 14V21Z" fill="currentColor"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="input-hint">
+                                <span id="inputHint">正在连接面试官...</span>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+
+            <!-- 历史记录页面 -->
+            <div class="page" id="historyPage" style="display: none;">
+                <div class="page-content">
+                    <div class="page-header">
+                        <h1>📋 面试历史记录</h1>
+                        <p>查看您的历史面试记录，可以基于历史记录重新开始面试</p>
+                    </div>
                     
-                    <!-- 操作按钮 -->
-                    <div class="upload-actions">
-                        <button class="btn-secondary" id="skipUploadBtn">跳过，直接面试</button>
-                        <button class="btn-primary" id="startInterviewBtn" style="display: none;">开始面试</button>
+                    <div class="history-container">
+                        <!-- 筛选和排序 -->
+                        <div class="history-filters">
+                            <div class="filter-group">
+                                <label for="sortBy">排序方式：</label>
+                                <select id="sortBy">
+                                    <option value="date-desc">时间倒序</option>
+                                    <option value="date-asc">时间正序</option>
+                                    <option value="duration-desc">时长倒序</option>
+                                </select>
+                            </div>
+                            <div class="filter-actions">
+                                <button class="btn-secondary" id="clearHistoryBtn">清空历史记录</button>
+                            </div>
+                        </div>
+
+                        <!-- 历史记录列表 -->
+                        <div class="history-list" id="historyList">
+                            <!-- 空状态 -->
+                            <div class="empty-history" id="emptyHistory">
+                                <div class="empty-icon">📝</div>
+                                <h3>暂无面试记录</h3>
+                                <p>开始您的第一次面试，记录将自动保存在这里</p>
+                                <button class="btn-primary" id="startFirstInterviewBtn">开始面试</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 聊天区域 -->
-            <div class="chat-container" id="chatContainer" style="display: none;">
-                <div class="chat-messages" id="chatMessages">
-                    <!-- 欢迎消息 -->
-                    <div class="welcome-message">
-                        <div class="welcome-content">
-                            <h2>🎯 欢迎参加技术面试</h2>
-                            <p>我是您的AI面试官，将为您提供专业的技术面试体验。</p>
-                            <p>请放轻松，我们即将开始...</p>
+            <!-- 简历设置页面 -->
+            <div class="page" id="resumePage" style="display: none;">
+                <div class="page-content">
+                    <div class="page-header">
+                        <h1>📄 简历设置</h1>
+                        <p>上传和管理您的简历文件，系统将基于简历内容进行个性化面试</p>
+                    </div>
+                    
+                    <div class="resume-manager">
+                        <!-- 当前简历 -->
+                        <div class="current-resume" id="currentResume">
+                            <h3>当前简历</h3>
+                            <div class="resume-info" id="resumeInfo">
+                                <div class="no-resume" id="noResume">
+                                    <div class="no-resume-icon">📄</div>
+                                    <p>暂未上传简历</p>
+                                    <p class="sub-text">上传简历后，系统将基于您的背景生成个性化面试问题</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 简历上传 -->
+                        <div class="resume-upload">
+                            <h3>上传新简历</h3>
+                            <div class="file-upload-area" id="resumeFileUploadArea">
+                                <div class="upload-content">
+                                    <div class="upload-icon">📁</div>
+                                    <div class="upload-text">
+                                        <p class="upload-main-text">拖拽简历文件到此处，或点击选择文件</p>
+                                        <p class="upload-sub-text">支持 PDF、Word (.doc/.docx) 格式，最大 10MB</p>
+                                    </div>
+                                    <input type="file" id="resumeFileInput" class="file-input" accept=".pdf,.doc,.docx" />
+                                </div>
+                                
+                                <!-- 上传进度 -->
+                                <div class="upload-progress" id="resumeUploadProgress" style="display: none;">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" id="resumeProgressFill"></div>
+                                    </div>
+                                    <div class="progress-text" id="resumeProgressText">上传中...</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-
-                <!-- 输入区域 -->
-                <div class="chat-input-container">
-                    <div class="chat-input-wrapper">
-                        <textarea 
-                            id="messageInput" 
-                            class="message-input" 
-                            placeholder="请输入您的回答..."
-                            rows="1"
-                            disabled
-                        ></textarea>
-                        <button id="sendButton" class="send-button" disabled>
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                                <path d="M2 21L23 12L2 3V10L17 12L2 14V21Z" fill="currentColor"/>
-                            </svg>
-                        </button>
-                    </div>
-                    <div class="input-hint">
-                        <span id="inputHint">正在连接面试官...</span>
-                    </div>
-                </div>
             </div>
-        </main>
+
+        </div>
     </div>
 
     <!-- 加载动画 -->
@@ -116,6 +214,82 @@
         <div class="loading-spinner">
             <div class="spinner-ring"></div>
             <div class="loading-text">正在连接面试官...</div>
+        </div>
+    </div>
+
+    <!-- 语音通话弹窗 -->
+    <div class="voice-call-overlay" id="voiceCallOverlay" style="display: none;">
+        <div class="voice-call-modal">
+            <!-- 通话头部 -->
+            <div class="call-header">
+                <div class="call-info">
+                    <div class="caller-avatar">
+                        <span class="avatar-icon">🤖</span>
+                    </div>
+                    <div class="caller-details">
+                        <h3 class="caller-name">AI面试官</h3>
+                        <p class="call-status" id="callStatus">准备通话中...</p>
+                    </div>
+                </div>
+                <button class="call-minimize" id="callMinimize" title="最小化">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <path d="M19 13H5V11H19V13Z" fill="currentColor"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- 通话内容区域 -->
+            <div class="call-content">
+                <!-- 语音可视化 -->
+                <div class="voice-visualizer" id="voiceVisualizer">
+                    <div class="voice-wave">
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                    </div>
+                </div>
+
+                <!-- 实时转录 -->
+                <div class="call-transcript" id="callTranscript">
+                    <div class="transcript-section">
+                        <h4>实时转录</h4>
+                        <div class="transcript-content" id="transcriptContent">
+                            <p class="transcript-hint">开始说话，您的语音将实时转录...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 通话时长 -->
+                <div class="call-duration">
+                    <span id="callTimer">00:00</span>
+                </div>
+            </div>
+
+            <!-- 通话控制按钮 -->
+            <div class="call-controls">
+                <button class="control-btn mute-btn" id="muteButton" title="静音">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2C13.1 2 14 2.9 14 4V12C14 13.1 13.1 14 12 14C10.9 14 10 13.1 10 12V4C10 2.9 10.9 2 12 2ZM19 10V12C19 15.3 16.3 18 13 18V20H11V18C7.7 18 5 15.3 5 12V10H7V12C7 14.2 8.8 16 11 16H13C15.2 16 17 14.2 17 12V10H19Z" fill="currentColor"/>
+                    </svg>
+                </button>
+                
+                <button class="control-btn speaker-btn" id="speakerButton" title="扬声器">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M3 9V15H7L12 20V4L7 9H3ZM16.5 12C16.5 10.23 15.48 8.71 14 7.97V16.02C15.48 15.29 16.5 13.77 16.5 12ZM14 3.23V5.29C16.89 6.15 19 8.83 19 12S16.89 17.85 14 18.71V20.77C18.01 19.86 21 16.28 21 12S18.01 4.14 14 3.23Z" fill="currentColor"/>
+                    </svg>
+                </button>
+
+                <button class="control-btn end-call-btn" id="endCallButton" title="结束通话">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 9C10.5 9 9.19 9.5 8.17 10.35L6.04 8.22C7.6 6.67 9.71 5.78 12 5.78S16.4 6.67 17.96 8.22L15.83 10.35C14.81 9.5 13.5 9 12 9ZM20.5 6.5L19.09 7.91C17.1 5.92 14.66 4.78 12 4.78S6.9 5.92 4.91 7.91L3.5 6.5C6.05 3.95 9.76 2.78 12 2.78S17.95 3.95 20.5 6.5ZM6.62 10.79C8.06 13.62 10.38 15.94 13.21 17.38L15.41 15.18C15.69 14.9 16.08 14.82 16.43 14.93C17.55 15.3 18.75 15.5 20 15.5C20.55 15.5 21 15.95 21 16.5V20C21 20.55 20.55 21 20 21C10.61 21 3 13.39 3 4C3 3.45 3.45 3 4 3H7.5C8.05 3 8.5 3.45 8.5 4C8.5 5.25 8.7 6.45 9.07 7.57C9.18 7.92 9.1 8.31 8.82 8.59L6.62 10.79Z" fill="currentColor" transform="rotate(135 12 12)"/>
+                    </svg>
+                </button>
+            </div>
         </div>
     </div>
 
