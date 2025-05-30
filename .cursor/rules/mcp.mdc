@@ -5,6 +5,7 @@ alwaysApply: true
 ---
 # MCP (Message Control & Processing) 服务调用规范
 
+# **强制要求你在必须每次修改代码（edit_file）之前使用自身内部工具read_file阅读一次code_modification_plan.md文档再进行下个代码的修改**
 ## 引言
 本规范旨在明确 MCP (Message Control & Processing) 服务的统一调用标准与 SOP（Standard Operating Procedure），确保 Cursor 在与 MCP 服务交互过程中的一致性、可靠性与合规性。所有涉及 MCP 服务的开发与集成工作，均须严格遵守本规范。
 
