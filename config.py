@@ -53,5 +53,25 @@ def get_default_model() -> str:
     return os.environ.get("DEFAULT_MODEL", "deepseek-v3-250324")
 
 
+def get_GEMINI_API_KEY() -> Optional[str]:
+    """
+    获取Google AI API密钥
+    
+    Returns:
+        Google AI API密钥字符串，如果未设置则返回None
+    """
+    return os.environ.get("GEMINI_API_KEY")
+
+
+def get_gemini_model() -> str:
+    """
+    获取Gemini模型名称
+    
+    Returns:
+        Gemini模型名称
+    """
+    return os.environ.get("GEMINI_MODEL", "gemini-2.0-flash-exp")
+
+
 # 在模块导入时加载环境变量
 load_env() 

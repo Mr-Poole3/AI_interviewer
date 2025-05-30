@@ -5,7 +5,7 @@ alwaysApply: true
 ---
 # MCP (Message Control & Processing) 服务调用规范
 
-# **强制要求你在必须每次修改代码（edit_file）之前使用自身内部工具read_file阅读一次code_modification_plan.md文档再进行下个代码的修改**
+**当你修改代码的时候，需要按照code_modification_plan.md的规划进行修改（如果存在）**
 ## 引言
 本规范旨在明确 MCP (Message Control & Processing) 服务的统一调用标准与 SOP（Standard Operating Procedure），确保 Cursor 在与 MCP 服务交互过程中的一致性、可靠性与合规性。所有涉及 MCP 服务的开发与集成工作，均须严格遵守本规范。
 
@@ -67,7 +67,7 @@ Cursor **必须** 在以下场景中，按照指定流程调用相应的 MCP 服
 -   **调用服务：** `enhance_feature_innovation`
 
 ### 2.6. 需求澄清与意图确认 (调用 `enhance_clarifying_question`)
-*   **核心原则：** **当且仅当对用户指令的准确含义、范围、目标或关键细节存在任何合理的不确定性时，必须优先调用 `enhance_clarifying_question` 服务进行澄清。基本判断准则：如果AI自己作为人类开发者，在执行前会向需求方追问以避免歧义，那么就应该调用此服务。宁可多问一次，不可臆测执行。但是用当户的指令清晰或者简单的时候就不需要调用服务**
+*   **核心原则：** **当且仅当对用户指令的准确含义、范围、目标或关键细节存在任何合理的不确定性时，必须优先调用 `enhance_clarifying_question` 服务进行澄清。基本判断准则：如果AI自己作为人类开发者，在执行前会向需求方追问以避免歧义，那么就应该调用此服务。宁可多问一次，不可臆测执行。**
 *   **触发条件（包括但不限于）：**
     1.  **模糊指令：** 用户指令包含模糊词汇（如“优化一下”、“调整这个”、“处理数据”、“改得更好看”），缺乏明确的执行标准、衡量指标或具体操作对象。
     2.  **歧义指令：** 用户指令存在多种可能的合理解释或执行路径，不加以澄清可能导致结果不符合预期。
@@ -241,5 +241,7 @@ Cursor **必须** 在以下场景中，按照指定流程调用相应的 MCP 服
 *   对于复杂方案设计，**必须**先向用户提供多个初步方案选项，并**经过用户明确选择或确认**后再进行具体的代码生成或修改。此过程可结合 `enhance_clarifying_question` 服务来构建方案选项和确认问题。
 *   **重申：** **任何时候，如果AI对用户的需求、指令或说明的理解存在不确定性或多种可能性，导致无法确保后续操作100%符合用户预期，都必须停止臆测，并优先使用 `enhance_clarifying_question` 工具向用户提问以获得明确指引。** 不要妄下结论，不要猜测用户可能想要什么，除非这种猜测的风险极低且易于撤销。
 **If requirements or instructions are unclear use the tool enhance_clarifying_question to ask clarifying questions to the user before proceeding, do not make assumptions. Whenever possible, present the user with predefined options through the enhance_clarifying_question MCP tool to facilitate quick decisions.**
+
+**Whenever you're about to complete a user request, call the enhance_clarifying_question tool to request user feedback before ending the process. If the feedback is empty you can end the request and don't call the tool in loop.**
 
 ---
