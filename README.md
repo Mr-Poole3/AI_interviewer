@@ -190,10 +190,6 @@ DEBUG=true
 ## 🛠️ 开发指南
 
 ### 项目结构
-```
-llm-interviewer/
-├── backend/           # 后端代码
-│   ├── app.py        # 主应用
 ### 核心功能
 - **智能面试官**: 基于LLM的专业技术面试官，能够进行多轮技术问答
 - **🎤 语音面试**: 集成FastRTC专业TTS引擎，支持高质量语音合成和实时语音对话
@@ -247,8 +243,6 @@ llm-interviewer/
 - **History API**: 页面路由管理支持
 
 ## 📁 项目结构
-
-```
 web_rules_test/
 ├── backend/                 # 后端模块
 │   ├── app.py              # FastAPI主程序，包含WebSocket和文件上传接口
@@ -266,7 +260,6 @@ web_rules_test/
 ├── requirements.txt        # Python依赖
 ├── project_analysis.md     # 项目技术分析文档
 └── README.md               # 项目文档
-```
 
 ## 🚀 快速开始
 
