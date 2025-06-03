@@ -230,7 +230,6 @@ DEBUG=true
 
 ## 📁 项目结构
 
-```
 web_rules_test/
 ├── backend/                 # 后端模块
 │   ├── app.py              # FastAPI主程序，包含WebSocket和文件上传接口
