@@ -1470,28 +1470,9 @@ class VoiceCallManager {
             this.audioAnalyser.fftSize = 256;
             this.audioDataArray = new Uint8Array(this.audioAnalyser.frequencyBinCount);
             
-            // 创建回音消除相关的音频节点
-            this.setupEchoCancellation();
-            
             console.log('音频上下文初始化成功');
         } catch (error) {
             console.error('音频上下文初始化失败:', error);
-        }
-    }
-
-    setupEchoCancellation() {
-        try {
-            // 创建音频输出节点用于回音消除
-            this.outputGainNode = this.audioContext.createGain();
-            this.outputGainNode.connect(this.audioContext.destination);
-            
-            // TTS播放状态跟踪
-            this.ttsPlaybackActive = false;
-            this.ttsVolumeThreshold = 0.1; // TTS音量阈值
-            
-            console.log('回音消除设置完成');
-        } catch (error) {
-            console.error('回音消除设置失败:', error);
         }
     }
 
@@ -1724,14 +1705,14 @@ class VoiceCallManager {
                 return;
             }
 
-            // 请求麦克风权限，启用回音消除和噪音抑制
+            // 请求麦克风权限，保留基本的音频优化
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 audio: {
-                    echoCancellation: true,      // 启用回音消除
-                    noiseSuppression: true,      // 启用噪音抑制
-                    autoGainControl: true,       // 启用自动增益控制
-                    sampleRate: 16000,           // 设置采样率
-                    channelCount: 1              // 单声道
+                    echoCancellation: true,      // 保留基本回音消除
+                    noiseSuppression: true,      // 保留噪音抑制
+                    autoGainControl: true,       // 保留自动增益控制
+                    sampleRate: 16000,
+                    channelCount: 1
                 }
             });
             
@@ -1740,8 +1721,8 @@ class VoiceCallManager {
                 this.microphoneSource = this.audioContext.createMediaStreamSource(stream);
                 this.microphoneSource.connect(this.audioAnalyser);
                 
-                // 创建音频处理器用于实时监控
-                this.setupAudioMonitoring();
+                // 简化的音频监控
+                this.setupSimpleAudioMonitoring();
             }
             
             // 设置通话状态
@@ -1764,7 +1745,7 @@ class VoiceCallManager {
                 }
             }, 500);
 
-            console.log('语音通话已开始（已启用回音消除）');
+            console.log('语音通话已开始');
 
         } catch (error) {
             console.error('启动语音通话失败:', error);
@@ -2066,7 +2047,7 @@ class VoiceCallManager {
 
     async playTextToSpeech(text) {
         /**
-         * 使用浏览器的语音合成API播放文本（带回音消除）
+         * 使用浏览器的语音合成API播放文本
          * @param {string} text - 要播放的文本
          */
         if (!this.isCallActive || !text) {
@@ -2080,9 +2061,6 @@ class VoiceCallManager {
             // 在TTS播放期间暂停语音识别
             if (this.isListening) {
                 this.stopListening();
-                this.wasListeningBeforeTTS = true;
-            } else {
-                this.wasListeningBeforeTTS = false;
             }
 
             // 标记TTS播放状态
@@ -2091,11 +2069,11 @@ class VoiceCallManager {
             // 创建语音合成utterance
             const utterance = new SpeechSynthesisUtterance(text);
             
-            // 设置语音参数 - 提高语速
-            utterance.lang = 'zh-CN'; // 中文
+            // 设置语音参数
+            utterance.lang = 'zh-CN';
             utterance.rate = 2.0; // 提高语速到2倍
-            utterance.pitch = 1.0; // 音调
-            utterance.volume = 0.7; // 进一步降低音量减少回音
+            utterance.pitch = 1.0;
+            utterance.volume = 0.8; // 正常音量
 
             // 尝试选择中文语音
             const voices = speechSynthesis.getVoices();
@@ -2111,7 +2089,7 @@ class VoiceCallManager {
                 this.isPlaying = true;
                 this.ttsPlaybackActive = true;
                 this.updateVoiceStatus('speaking', 'AI正在回答...');
-                console.log('开始播放TTS（回音消除模式，语音识别已暂停）');
+                console.log('开始播放TTS（语音识别已暂停）');
             };
 
             utterance.onend = () => {
@@ -2174,7 +2152,7 @@ class VoiceCallManager {
 
     async playAudioChunk(audioData) {
         /**
-         * 播放音频数据块（带回音消除）
+         * 播放音频数据块
          * @param {ArrayBuffer|Float32Array} audioData - 音频数据
          */
         if (!this.audioContext || !this.isCallActive) {
@@ -2188,9 +2166,6 @@ class VoiceCallManager {
             // 在音频播放期间暂停语音识别
             if (this.isListening) {
                 this.stopListening();
-                this.wasListeningBeforeTTS = true;
-            } else {
-                this.wasListeningBeforeTTS = false;
             }
 
             // 标记TTS播放状态
@@ -2200,11 +2175,9 @@ class VoiceCallManager {
             
             // 处理不同格式的音频数据
             if (audioData instanceof ArrayBuffer) {
-                // 如果是ArrayBuffer，尝试解码
                 audioBuffer = await this.audioContext.decodeAudioData(audioData.slice());
             } else if (audioData instanceof Float32Array) {
-                // 如果是Float32Array，直接创建AudioBuffer
-                const sampleRate = 16000; // FastRTC默认采样率
+                const sampleRate = 16000;
                 audioBuffer = this.audioContext.createBuffer(1, audioData.length, sampleRate);
                 audioBuffer.getChannelData(0).set(audioData);
             } else {
@@ -2215,12 +2188,7 @@ class VoiceCallManager {
             // 创建音频源
             const source = this.audioContext.createBufferSource();
             source.buffer = audioBuffer;
-            
-            // 连接到输出增益节点（用于回音消除）
-            const gainNode = this.audioContext.createGain();
-            gainNode.gain.value = 0.7; // 进一步降低音量减少回音
-            source.connect(gainNode);
-            gainNode.connect(this.outputGainNode);
+            source.connect(this.audioContext.destination);
 
             // 播放状态管理
             source.onended = () => {
@@ -2244,7 +2212,7 @@ class VoiceCallManager {
             this.ttsPlaybackActive = true;
             this.currentAudioSource = source;
             this.updateVoiceStatus('speaking', 'AI正在回答...');
-            console.log('开始播放音频（回音消除模式，语音识别已暂停）');
+            console.log('开始播放音频（语音识别已暂停）');
             
             source.start();
 
@@ -2263,7 +2231,7 @@ class VoiceCallManager {
 
     stopAllAudio() {
         /**
-         * 停止所有音频播放（Web Audio API + Speech Synthesis）
+         * 停止所有音频播放
          */
         // 停止Web Audio API音频源
         if (this.currentAudioSource) {
@@ -2280,28 +2248,28 @@ class VoiceCallManager {
             speechSynthesis.cancel();
         }
 
-        // 清除utterance引用
+        // 清除引用
         this.currentUtterance = null;
 
         // 重置TTS播放状态
         this.ttsPlaybackActive = false;
 
-        // 清除用户语音检测计时器
-        if (this.userSpeechDetectionTimer) {
-            clearTimeout(this.userSpeechDetectionTimer);
-            this.userSpeechDetectionTimer = null;
+        // 清除用户打断检测计时器
+        if (this.userInterruptTimer) {
+            clearTimeout(this.userInterruptTimer);
+            this.userInterruptTimer = null;
         }
 
         this.isPlaying = false;
-        console.log('所有音频已停止（回音消除模式）');
+        console.log('所有音频已停止');
     }
 
-    setupAudioMonitoring() {
-        // 创建音频处理器来监控麦克风输入
+    setupSimpleAudioMonitoring() {
+        // 简化的音频监控，只用于用户打断检测
         this.audioProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
         
         this.audioProcessor.onaudioprocess = (event) => {
-            if (!this.isCallActive) return;
+            if (!this.isCallActive || !this.ttsPlaybackActive) return;
             
             const inputBuffer = event.inputBuffer.getChannelData(0);
             
@@ -2312,30 +2280,29 @@ class VoiceCallManager {
             }
             const rms = Math.sqrt(sum / inputBuffer.length);
             
-            // 检测是否是真实的用户语音（而非TTS回音）
-            this.detectRealUserSpeech(rms);
+            // 检测用户打断
+            this.detectUserInterrupt(rms);
         };
         
         this.microphoneSource.connect(this.audioProcessor);
         this.audioProcessor.connect(this.audioContext.destination);
     }
 
-    detectRealUserSpeech(micVolume) {
+    detectUserInterrupt(micVolume) {
         // 只在TTS播放期间检测用户打断
         if (!this.ttsPlaybackActive || !this.isPlaying) {
             return;
         }
 
-        // 提高音量阈值，确保是明确的用户语音
-        const volumeThreshold = 0.08; // 提高阈值
+        // 设置合理的音量阈值
+        const volumeThreshold = 0.06;
         
-        // 检测到用户语音且TTS正在播放时的处理
         if (micVolume > volumeThreshold) {
-            // 延迟检测，确保不是瞬间的噪音
-            if (!this.userSpeechDetectionTimer) {
-                this.userSpeechDetectionTimer = setTimeout(() => {
+            // 延迟检测，避免误触发
+            if (!this.userInterruptTimer) {
+                this.userInterruptTimer = setTimeout(() => {
                     if (this.isPlaying && this.ttsPlaybackActive) {
-                        console.log('检测到用户强烈语音信号，中断TTS');
+                        console.log('检测到用户打断，停止TTS');
                         this.stopAllAudio();
                         
                         // 立即开始语音识别
@@ -2345,14 +2312,14 @@ class VoiceCallManager {
                             }
                         }, 200);
                     }
-                    this.userSpeechDetectionTimer = null;
-                }, 500); // 增加延迟到500ms
+                    this.userInterruptTimer = null;
+                }, 400);
             }
         } else {
             // 清除检测计时器
-            if (this.userSpeechDetectionTimer) {
-                clearTimeout(this.userSpeechDetectionTimer);
-                this.userSpeechDetectionTimer = null;
+            if (this.userInterruptTimer) {
+                clearTimeout(this.userInterruptTimer);
+                this.userInterruptTimer = null;
             }
         }
     }
