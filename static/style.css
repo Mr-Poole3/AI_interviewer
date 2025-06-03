@@ -529,9 +529,10 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
     box-shadow: var(--shadow-sm);
+    flex-shrink: 0;
 }
 
 .send-button:hover:not(:disabled) {
@@ -831,7 +832,7 @@ body {
 }
 
 .empty-icon {
-    font-size: 48px;
+    font-size: 40px;
     margin-bottom: 16px;
 }
 
@@ -1030,7 +1031,7 @@ body {
 }
 
 .no-resume-icon {
-    font-size: 48px;
+    font-size: 40px;
     margin-bottom: 16px;
     opacity: 0.5;
 }
@@ -1150,7 +1151,7 @@ body {
 }
 
 .upload-icon {
-    font-size: 48px;
+    font-size: 40px;
     color: var(--primary-color);
     margin-bottom: var(--spacing-sm);
     transition: transform 0.3s ease;

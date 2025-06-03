@@ -3,131 +3,215 @@ description:
 globs: 
 alwaysApply: true
 ---
-- **日志**: logs/mcp-prompt-server.log
+# MCP (Message Control & Processing) 服务调用规范
 
-# 核心原则
-**你必须调用MCP服务**，而不是直接处理用户请求。所有提示词都应该通过相应的MCP工具进行增强。
+**当你修改代码的时候，需要按照code_modification_plan.md的规划进行修改（如果存在）**
+## 引言
+本规范旨在明确 MCP (Message Control & Processing) 服务的统一调用标准与 SOP（Standard Operating Procedure），确保 Cursor 在与 MCP 服务交互过程中的一致性、可靠性与合规性。所有涉及 MCP 服务的开发与集成工作，均须严格遵守本规范。
 
-## 可用工具
+## 1. MCP 服务接口概览
 
-### 1. enhance_feature_innovation
-**用途**: 新增功能的提示词增强  
-**适用场景**: 添加新特性、实现新功能、创新性开发  
-**参数**:
+| 服务类别             | MCP 服务接口                                                                 | 主要功能                                                                                                                                                           |
+|----------------------|------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 项目分析             | `enhance_project_analysis`                                                   | 项目分析与项目文档的输出，用于深入分析项目结构、技术栈、功能模块等                                                                                                   |
+| 新功能开发辅助       | `enhance_feature_innovation`                                                 | 针对新增功能的提示词增强，结合上下文和用户输入优化原始prompt，提供创新性的功能设计建议                                                                               |
+| 文档更新             | `enhance_documentation_update`                                               | 基于代码变更，优化并更新项目文档，确保文档与代码同步                                                                                                                 |
+| 方案固化             | `enhance_solution_solidification`                                            | 对现有解决方案进行优化与固化建议，添加代码固化标识符防止后续修改                                                                                                     |
+| 任务完成收尾         | `enhance_task_completion`                                                    | 任务完成后的收尾工作助手，包括文档更新、changelog记录、git提交等完整的项目管理流程                                                                                   |
+| Bug分析修复          | `enhance_bug_analysis_and_fix`                                              | Bug分析和修复专家，提供系统性的问题分析、根因定位和精确修复方案                                                                                                       |
+
+## 2. 强制调用场景与核心流程
+
+Cursor **必须** 在以下场景中，按照指定流程调用相应的 MCP 服务。
+
+### 2.1. 项目分析阶段
+-   **触发条件：** 需要深入了解项目结构、技术栈、功能模块时。
+-   **调用服务：** `enhance_project_analysis`
+-   **核心流程：**
+    1.  调用 `enhance_project_analysis` MCP 服务，提交项目分析需求与上下文信息。
+    2.  等待并接收 MCP 服务返回的项目分析报告。
+    3.  基于 MCP 返回结果，形成完整的项目理解。
+
+### 2.2. 新功能开发辅助
+-   **触发条件：** 开发新功能、添加新模块、设计新API时。
+-   **调用服务：** `enhance_feature_innovation`
+-   **核心流程：**
+    1.  调用 `enhance_feature_innovation` MCP 服务，传递功能需求和上下文信息。
+    2.  **必须**等待并采纳 MCP 服务返回的优化后提示词。
+    3.  使用优化后的提示词执行功能开发操作。
+
+### 2.3. 代码变更与文档同步 (`enhance_documentation_update`)
+-   **触发条件：** 任何代码变更（包括但不限于文件的新建、编辑、删除）完成之后，且**必须**在提交代码前。
+-   **调用服务：** `enhance_documentation_update`
+-   **核心流程：**
+    1.  严禁在无实际代码变更的情况下调用本服务。
+    2.  代码变更完成后，立即调用 `enhance_documentation_update` MCP 服务。
+    3.  参数**必须**包含：变更文件路径列表 (`changed_files`)、项目 README 文件路径 (`readme_path`)、本次代码变更的摘要描述 (`code_changes`)等。
+    4.  若涉及多文件批量变更，应在单次调用中传递所有相关的变更文件信息。
+    5.  **必须**等待 MCP 服务返回优化后的文档内容。
+    6.  **必须**基于 MCP 服务返回的完整内容更新项目文档（如 `README.md`）。严禁对 MCP 返回的文档内容进行任何形式的自行修改或删减。
+    7.  代码变更与相应的文档更新**必须**成对出现并同步完成，此流程方视为合规。
+-   **禁止行为：**
+    -   跳过或延迟调用 `enhance_documentation_update` 服务。
+    -   在未进行代码修改时调用此服务。
+
+### 2.4. 解决方案固化
+-   **触发条件：** 功能开发完成，需要固化关键代码防止后续误修改时。
+-   **调用服务：** `enhance_solution_solidification`
+-   **核心流程：**
+    1.  调用 `enhance_solution_solidification` MCP 服务，传递需要固化的代码和上下文。
+    2.  **必须**等待并采纳 MCP 服务返回的固化建议。
+    3.  按照建议添加代码固化标识符。
+
+### 2.5. 任务完成收尾工作
+-   **触发条件：** 功能开发、Bug修复、代码重构等任务完成后。
+-   **调用服务：** `enhance_task_completion`
+-   **核心流程：**
+    1.  调用 `enhance_task_completion` MCP 服务，传递任务完成信息和变更文件列表。
+    2.  **必须**等待 MCP 服务返回完整的收尾工作建议。
+    3.  按照建议执行文档更新、changelog记录、git提交等操作。
+
+### 2.6. Bug分析与修复
+-   **触发条件：** 遇到Bug、错误、异常或性能问题时。
+-   **调用服务：** `enhance_bug_analysis_and_fix`
+-   **核心流程：**
+    1.  调用 `enhance_bug_analysis_and_fix` MCP 服务，传递Bug描述和相关上下文。
+    2.  **必须**等待 MCP 服务返回系统性的分析和修复方案。
+    3.  按照分析结果进行根因定位和精确修复。
+
+## 3. 调用参数规范
+
+### 3.1. 通用上下文参数 (`context`)
+每次调用任何 MCP 服务时，请求中**必须**包含符合以下结构的 `context` 对象：
 ```json
 {
-  "prompt": "用户的原始功能需求描述",
-  "context": {
-    "file_type": "python|typescript|...",
-    "current_file": "当前文件路径",
-    "project_type": "项目类型",
-    "feature_type": "API|UI|数据处理等",
-    "priority": "优先级",
-    "reason": "调用原因"
-  }
+    "file_type": "当前操作文件的主要语言或类型 (例如: 'python', 'typescript', 'markdown')",
+    "current_file": "当前用户焦点所在或正在操作的文件绝对路径 (若适用)",
+    "project_type": "项目所属的领域或框架类型 (例如: 'web_application', 'data_analysis', 'llm_agent')",
+    "feature_type": "当前操作涉及的功能模块或特性分类 (例如: 'ui_component', 'api_endpoint', 'data_processing_pipeline')",
+    "priority": "任务或请求的优先级 (例如: 'high', 'medium', 'low')",
+    "reason": "调用该工具的原因和目的"
 }
 ```
 
-### 2. enhance_documentation_update
-**用途**: 项目文档更新提示词增强  
-**适用场景**: 修改核心代码后自动更新README、文档同步  
-**参数**:
+### 3.2. 特定参数
+
+#### `enhance_project_analysis` 服务参数
 ```json
 {
-  "prompt": "代码变更和文档更新需求描述",
-  "context": {
-    "file_type": "文件类型",
-    "current_file": "当前文件路径",
-    "project_type": "项目类型",
-    "changed_files": ["修改的文件列表"],
-    "readme_path": "README文件路径(必需)",
-    "code_changes": "代码变更描述",
-    "reason": "调用原因"
-  }
+    "file_type": "str",      // 可选，文件类型
+    "current_file": "str",   // 可选，当前文件路径
+    "project_type": "str",   // 可选，项目类型
+    "feature_type": "str",   // 可选，功能类型
+    "reason": "str"          // 可选，调用原因
 }
 ```
 
-### 3. enhance_solution_solidification
-**用途**: 方案固化提示词增强  
-**适用场景**: 将已验证的解决方案固化，防止后续修改破坏  
-**参数**:
+#### `enhance_feature_innovation` 服务参数
 ```json
 {
-  "prompt": "功能优化/调整内容描述",
-  "context": {
-    "file_type": "文件类型",
-    "current_file": "当前文件路径",
-    "project_type": "项目类型",
-    "feature_type": "功能类型",
-    "priority": "优先级",
-    "reason": "调用原因"
-  }
+    "file_type": "str",      // 可选，文件类型
+    "current_file": "str",   // 可选，当前文件路径
+    "project_type": "str",   // 可选，项目类型
+    "feature_type": "str",   // 可选，功能类型（如API、UI、数据处理等）
+    "priority": "str",       // 可选，优先级
+    "reason": "str"          // 可选，调用原因
 }
 ```
 
-### 4. enhance_project_analysis
-**用途**: 项目分析提示词增强  
-**适用场景**: 项目结构分析、技术架构评估、项目概览  
-**参数**:
+#### `enhance_documentation_update` 服务参数
 ```json
 {
-  "prompt": "项目分析内容描述",
-  "context": {
-    "file_type": "文件类型",
-    "current_file": "当前文件路径",
-    "project_type": "项目类型",
-    "feature_type": "功能类型",
-    "reason": "调用原因"
-  }
+    "file_type": "str",      // 可选，文件类型
+    "current_file": "str",   // 可选，当前文件路径
+    "project_type": "str",   // 可选，项目类型
+    "changed_files": ["str"], // 可选，已修改的文件列表
+    "readme_path": "str",    // 必选，README文件路径
+    "code_changes": "str",   // 可选，代码变更描述
+    "reason": "str"          // 可选，调用原因
 }
 ```
 
-### 5. enhance_task_completion
-**用途**: 任务完成收尾工作助手  
-**适用场景**: 功能开发完成后的文档更新、changelog记录、git提交等  
-**参数**:
+#### `enhance_solution_solidification` 服务参数
 ```json
 {
-  "prompt": "任务完成描述",
-  "context": {
-    "file_type": "主要文件类型",
-    "current_file": "当前文件路径",
-    "project_type": "项目类型",
-    "task_type": "feature|bugfix|refactor|optimization|docs",
-    "changed_files": ["修改的文件列表(必需)"],
-    "task_description": "任务详细描述(必需)",
-    "impact_scope": "minor|major|breaking",
-    "version": "版本号",
-    "testing_status": "passed|pending|failed",
-    "breaking_changes": true|false,
-    "migration_required": true|false,
-    "reason": "调用原因"
-  }
+    "file_type": "str",      // 可选，文件类型
+    "current_file": "str",   // 可选，当前文件路径
+    "project_type": "str",   // 可选，项目类型
+    "feature_type": "str",   // 可选，功能类型
+    "priority": "str",       // 可选，优先级
+    "reason": "str"          // 可选，调用原因
 }
 ```
 
-### 6. enhance_bug_analysis_and_fix
-**用途**: Bug分析和修复专家  
-**适用场景**: 系统性问题分析、根因定位、精确修复方案  
-**参数**:
+#### `enhance_task_completion` 服务参数
 ```json
 {
-  "prompt": "Bug描述，包含错误现象、触发条件等",
-  "context": {
-    "file_type": "主要文件类型",
-    "current_file": "出问题的文件路径",
-    "project_type": "项目类型",
-    "bug_type": "logic_error|runtime_error|performance|ui_issue|data_issue",
-    "severity": "critical|high|medium|low",
-    "error_message": "具体错误信息",
-    "reproduction_steps": ["重现步骤列表"],
-    "environment": {"环境信息"},
-    "affected_features": ["受影响功能列表"],
-    "logs": "相关日志信息",
-    "stack_trace": "堆栈跟踪信息",
-    "expected_behavior": "预期行为",
-    "actual_behavior": "实际错误行为",
-    "reason": "调用原因"
-  }
+    "file_type": "str",           // 可选，主要文件类型
+    "current_file": "str",        // 可选，当前文件路径
+    "project_type": "str",        // 可选，项目类型
+    "task_type": "str",           // 必选，任务类型（"feature", "bugfix", "refactor", "optimization", "docs"等）
+    "changed_files": ["str"],     // 必选，本次修改的文件列表
+    "task_description": "str",    // 必选，任务的详细描述
+    "impact_scope": "str",        // 可选，影响范围（"minor", "major", "breaking"）
+    "version": "str",             // 可选，版本号
+    "testing_status": "str",      // 可选，测试状态（"passed", "pending", "failed"）
+    "breaking_changes": "bool",   // 可选，是否包含破坏性变更
+    "migration_required": "bool", // 可选，是否需要数据迁移
+    "reason": "str"               // 可选，调用原因
 }
 ```
+
+#### `enhance_bug_analysis_and_fix` 服务参数
+```json
+{
+    "file_type": "str",           // 可选，主要文件类型
+    "current_file": "str",        // 可选，当前出问题的文件路径
+    "project_type": "str",        // 可选，项目类型
+    "bug_type": "str",            // 可选，bug类型（"logic_error", "runtime_error", "performance", "ui_issue", "data_issue"等）
+    "severity": "str",            // 可选，严重程度（"critical", "high", "medium", "low"）
+    "error_message": "str",       // 可选，具体的错误信息或异常
+    "reproduction_steps": ["str"], // 可选，重现步骤列表
+    "environment": {},            // 可选，环境信息（OS、浏览器、版本等）
+    "affected_features": ["str"], // 可选，受影响的功能列表
+    "logs": "str",                // 可选，相关的日志信息
+    "stack_trace": "str",         // 可选，堆栈跟踪信息
+    "expected_behavior": "str",   // 可选，预期的正确行为
+    "actual_behavior": "str",     // 可选，实际的错误行为
+    "reason": "str"               // 可选，调用原因
+}
+```
+
+## 4. 强制执行细则
+
+### 4.1. 调用时机与顺序
+-   严禁在任何规定场景下跳过或遗漏 MCP 服务的调用。
+-   **必须**严格按照本规范定义的顺序和时机执行调用。
+-   **必须**等待 MCP 服务成功响应后，方可继续执行依赖其结果的后续操作。
+
+### 4.2. 参数完整性与准确性
+-   严禁省略任何在"调用参数规范"中声明为必需的参数。
+-   所有参数值**必须**真实、准确地反映当前的操作上下文，不得使用占位符、伪造或不相关的数据。
+-   对于可选参数，建议尽可能完整提供，以期获得更佳的 MCP 服务效果。
+
+### 4.3. 响应结果处理
+-   对于提示词优化类服务，**必须**采纳并使用 MCP 服务返回的优化后提示词。
+-   对于文档更新 (`enhance_documentation_update`)，**必须**严格使用 MCP 返回的完整内容更新文档，严禁任何形式的自行修改或节选。
+-   不得擅自修改、忽略或曲解 MCP 服务的任何优化建议或返回结果。
+
+### 4.4. 失败处理
+-   若 MCP 服务调用失败（例如：网络错误、服务内部错误），**必须**将此失败情况及相关错误信息明确报告给用户。
+-   应提供必要的错误上下文，辅助用户理解问题或进行重试。
+
+## 5. 代码固化区域保护规则
+
+在 Cursor 进行代码编辑或重构操作时：
+-   若目标代码文件中存在由特定注释标识符界定的"代码固化区域"，Cursor **严禁**修改该区域内的任何代码内容。
+-   **必须**向用户明确提示此区域的不可修改性。
+-   用户仅可修改固化区域以外的代码。
+-   代码固化区域通过以下成对的注释标识符进行定义：
+    ```
+    // @fixed_implementation_start (或适用于对应语言的注释符号)
+    [此区域内的代码片段内容不可修改]
+    // @fixed_implementation_end (或适用于对应语言的注释符号)
+    ```

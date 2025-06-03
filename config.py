@@ -40,7 +40,7 @@ def get_base_url() -> str:
     Returns:
         API基础URL
     """
-    return os.environ.get("OPENAI_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3")
+    return os.environ.get("OPENAI_BASE_URL", "https://ds.yovole.com/api")
 
 
 def get_default_model() -> str:
@@ -50,7 +50,7 @@ def get_default_model() -> str:
     Returns:
         默认模型名称
     """
-    return os.environ.get("DEFAULT_MODEL", "deepseek-v3-250324")
+    return os.environ.get("DEFAULT_MODEL", "DeepSeek-V3")
 
 
 def get_GEMINI_API_KEY() -> Optional[str]:
