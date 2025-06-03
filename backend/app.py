@@ -10,6 +10,7 @@ import os
 import tempfile
 import io
 import base64
+import hashlib
 from typing import Dict, List, Optional
 from pathlib import Path
 
@@ -52,6 +53,65 @@ llm_client: LLMClient = None
 
 # 存储用户会话的简历内容
 user_sessions: Dict[str, str] = {}
+
+# 简历存储目录
+RESUME_STORAGE_DIR = Path("resume_storage")
+RESUME_STORAGE_DIR.mkdir(exist_ok=True)
+
+def save_resume_to_file(resume_text: str, session_id: str) -> bool:
+    """
+    将简历文本保存到文件
+    
+    Args:
+        resume_text: 简历文本内容
+        session_id: 会话ID
+        
+    Returns:
+        保存是否成功
+    """
+    try:
+        resume_file = RESUME_STORAGE_DIR / f"{session_id}.txt"
+        with open(resume_file, 'w', encoding='utf-8') as f:
+            f.write(resume_text)
+        logger.info(f"简历已保存到文件: {resume_file}")
+        return True
+    except Exception as e:
+        logger.error(f"保存简历文件失败: {e}")
+        return False
+
+def load_resume_from_file(session_id: str) -> Optional[str]:
+    """
+    从文件加载简历文本
+    
+    Args:
+        session_id: 会话ID
+        
+    Returns:
+        简历文本内容，如果文件不存在则返回None
+    """
+    try:
+        resume_file = RESUME_STORAGE_DIR / f"{session_id}.txt"
+        if resume_file.exists():
+            with open(resume_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+            logger.info(f"从文件加载简历: {resume_file}")
+            return content
+        return None
+    except Exception as e:
+        logger.error(f"加载简历文件失败: {e}")
+        return None
+
+def generate_resume_hash(resume_text: str) -> str:
+    """
+    生成简历内容的哈希值，用于去重和验证
+    
+    Args:
+        resume_text: 简历文本内容
+        
+    Returns:
+        简历内容的MD5哈希值
+    """
+    return hashlib.md5(resume_text.encode('utf-8')).hexdigest()[:16]
 
 def extract_pdf_text(file_content: bytes) -> str:
     """
@@ -184,9 +244,15 @@ async def upload_resume(file: UploadFile = File(...)) -> JSONResponse:
         if not resume_text or len(resume_text.strip()) < 10:
             raise HTTPException(status_code=400, detail="文件内容为空或解析失败，请检查文件是否损坏")
         
-        # 简单的会话管理（实际项目中应该使用更安全的方式）
-        session_id = f"session_{len(user_sessions)}"
+        # 生成更安全的会话ID（基于内容哈希和时间戳）
+        content_hash = generate_resume_hash(resume_text)
+        session_id = f"resume_{content_hash}_{len(user_sessions)}"
+        
+        # 保存到内存（用于当前会话）
         user_sessions[session_id] = resume_text
+        
+        # 保存到文件（用于持久化存储）
+        save_resume_to_file(resume_text, session_id)
         
         logger.info(f"简历解析成功，提取文本长度: {len(resume_text)} 字符")
         
@@ -195,7 +261,9 @@ async def upload_resume(file: UploadFile = File(...)) -> JSONResponse:
             "message": "简历上传并解析成功",
             "session_id": session_id,
             "resume_preview": resume_text[:200] + "..." if len(resume_text) > 200 else resume_text,
-            "text_length": len(resume_text)
+            "full_text": resume_text,
+            "text_length": len(resume_text),
+            "content_hash": content_hash
         })
         
     except HTTPException:
@@ -368,8 +436,26 @@ async def websocket_chat(websocket: WebSocket):
                 # 处理简历上传通知
                 if message_data.get("type") == "resume_uploaded":
                     session_id = message_data.get("session_id")
-                    if session_id and session_id in user_sessions:
-                        current_resume_content = user_sessions[session_id]
+                    
+                    # 优先使用前端发送的完整简历内容
+                    resume_content = message_data.get("resume_content")
+                    
+                    # 如果前端没有发送完整内容，尝试从session中获取（向后兼容）
+                    if not resume_content and session_id and session_id in user_sessions:
+                        resume_content = user_sessions[session_id]
+                        logger.info("从后端session中获取简历内容")
+                    
+                    # 如果内存中也没有，尝试从文件中加载
+                    if not resume_content and session_id:
+                        resume_content = load_resume_from_file(session_id)
+                        if resume_content:
+                            logger.info("从文件存储中恢复简历内容")
+                            # 重新加载到内存中
+                            user_sessions[session_id] = resume_content
+                    
+                    if resume_content:
+                        current_resume_content = resume_content
+                        logger.info(f"收到简历内容，长度: {len(resume_content)} 字符")
                         
                         # 更新系统prompt为基于简历的面试官
                         messages[0]["content"] = llm_client.create_interview_system_prompt(current_resume_content)
@@ -393,6 +479,12 @@ async def websocket_chat(websocket: WebSocket):
                         }))
                         
                         messages.append({"role": "assistant", "content": confirm_msg})
+                    else:
+                        logger.warning("未找到简历内容，无法进行个性化面试")
+                        await websocket.send_text(json.dumps({
+                            "type": "error",
+                            "message": "简历数据不完整，请重新上传简历"
+                        }))
                     continue
                 
                 # 处理普通聊天消息

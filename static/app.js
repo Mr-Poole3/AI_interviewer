@@ -88,7 +88,21 @@ class LocalStorageManager {
     // 保存当前简历信息
     saveCurrentResume(resumeData) {
         try {
-            localStorage.setItem(this.KEYS.CURRENT_RESUME, JSON.stringify(resumeData));
+            // 增强数据结构，确保包含完整信息
+            const enhancedResumeData = {
+                fileName: resumeData.fileName,
+                sessionId: resumeData.sessionId,
+                preview: resumeData.preview,
+                textLength: resumeData.textLength,
+                uploadedAt: resumeData.uploadedAt || new Date().toISOString(),
+                // 新增：保存完整简历文本内容
+                fullText: resumeData.fullText || resumeData.preview,
+                // 新增：数据版本号，用于兼容性检查
+                version: '1.1'
+            };
+            
+            localStorage.setItem(this.KEYS.CURRENT_RESUME, JSON.stringify(enhancedResumeData));
+            console.log('简历信息已保存到本地存储，包含完整文本内容');
             return true;
         } catch (e) {
             console.error('保存简历信息失败:', e);
@@ -100,7 +114,18 @@ class LocalStorageManager {
     getCurrentResume() {
         try {
             const data = localStorage.getItem(this.KEYS.CURRENT_RESUME);
-            return data ? JSON.parse(data) : null;
+            if (!data) return null;
+            
+            const resumeData = JSON.parse(data);
+            
+            // 数据版本兼容性检查
+            if (!resumeData.version || resumeData.version < '1.1') {
+                console.warn('检测到旧版本简历数据，可能缺少完整文本内容');
+                // 如果是旧版本数据，标记需要重新上传
+                resumeData.needsReupload = true;
+            }
+            
+            return resumeData;
         } catch (e) {
             console.error('读取简历信息失败:', e);
             return null;
@@ -699,13 +724,16 @@ class ResumeManager {
     handleUploadSuccess(response, fileName) {
         this.hideUploadProgress();
         
-        // 保存简历信息到localStorage
+        // 保存简历信息到localStorage，包含完整文本内容
         const resumeData = {
             fileName: fileName,
             sessionId: response.session_id,
             preview: response.resume_preview,
             textLength: response.text_length,
-            uploadedAt: new Date().toISOString()
+            uploadedAt: new Date().toISOString(),
+            // 新增：保存完整简历文本内容
+            fullText: response.full_text || response.resume_preview,
+            version: '1.1'
         };
 
         if (this.storage.saveCurrentResume(resumeData)) {
@@ -716,6 +744,7 @@ class ResumeManager {
             if (window.interviewApp) {
                 window.interviewApp.resumeSessionId = response.session_id;
                 window.interviewApp.isResumeUploaded = true;
+                window.interviewApp.currentResumeData = resumeData; // 保存完整数据引用
                 
                 // 如果WebSocket已连接，立即通知后端
                 if (window.interviewApp.isConnected) {
@@ -954,9 +983,31 @@ class InterviewApp {
     loadSavedResume() {
         const savedResume = this.storageManager.getCurrentResume();
         if (savedResume) {
+            // 检查数据完整性
+            if (savedResume.needsReupload) {
+                console.warn('检测到不完整的简历数据，建议重新上传');
+                // 可以在UI上显示提示，建议用户重新上传
+                this.showResumeReuploadHint();
+                return;
+            }
+            
             this.resumeSessionId = savedResume.sessionId;
             this.isResumeUploaded = true;
+            this.currentResumeData = savedResume; // 保存完整数据引用
+            
+            console.log('已恢复保存的简历信息:', {
+                fileName: savedResume.fileName,
+                textLength: savedResume.textLength,
+                hasFullText: !!savedResume.fullText
+            });
         }
+    }
+    
+    // 新增：显示简历重新上传提示
+    showResumeReuploadHint() {
+        // 可以在界面上显示一个温和的提示
+        console.log('建议重新上传简历以获得更好的面试体验');
+        // 这里可以添加UI提示逻辑
     }
     
     showChatInterface() {
@@ -991,12 +1042,24 @@ class InterviewApp {
         
         // 发送特殊消息通知后端简历已上传
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            // 优化：直接发送完整简历文本内容，不依赖后端session存储
+            const resumeContent = this.currentResumeData?.fullText || 
+                                 this.storageManager.getCurrentResume()?.fullText;
+            
+            if (!resumeContent) {
+                console.warn('未找到简历文本内容，无法进行个性化面试');
+                this.showError('简历数据不完整，请重新上传简历');
+                return;
+            }
+            
             const message = {
                 type: 'resume_uploaded',
                 session_id: this.resumeSessionId,
+                resume_content: resumeContent, // 直接发送完整文本内容
                 message: '请基于我的简历开始面试'
             };
             
+            console.log('发送简历内容到后端，文本长度:', resumeContent.length);
             this.socket.send(JSON.stringify(message));
         }
     }
