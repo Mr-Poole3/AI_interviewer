@@ -2,12 +2,14 @@
 LLM面试官FastAPI后端服务
 
 提供WebSocket流式聊天接口和静态文件服务
+支持语音聊天和音频流传输
 """
 import json
 import logging
 import os
 import tempfile
 import io
+import base64
 from typing import Dict, List, Optional
 from pathlib import Path
 
@@ -22,6 +24,7 @@ import PyPDF2
 from docx import Document
 
 from backend.llm import LLMClient
+from backend.voice_chat import GeminiVoiceChat
 
 # 配置日志
 logging.basicConfig(
@@ -203,7 +206,7 @@ async def upload_resume(file: UploadFile = File(...)) -> JSONResponse:
 
 @app.websocket("/ws/chat")
 async def websocket_chat(websocket: WebSocket):
-    """WebSocket聊天接口，支持流式传输"""
+    """WebSocket聊天接口，支持流式传输和语音聊天"""
     await websocket.accept()
     logger.info("WebSocket连接已建立")
     
@@ -223,6 +226,10 @@ async def websocket_chat(websocket: WebSocket):
     
     # 当前会话的简历内容
     current_resume_content: Optional[str] = None
+    
+    # 语音聊天客户端（按需初始化）
+    voice_chat_client: Optional[GeminiVoiceChat] = None
+    is_voice_mode: bool = False
     
     try:
         # 发送初始欢迎消息
@@ -252,6 +259,111 @@ async def websocket_chat(websocket: WebSocket):
             data = await websocket.receive_text()
             try:
                 message_data = json.loads(data)
+                
+                # 处理语音消息
+                if message_data.get("type") == "voice_message":
+                    # 前端发送的语音消息实际上是语音识别的文本结果
+                    voice_text = message_data.get("content", "").strip()
+                    
+                    if not voice_text:
+                        await websocket.send_text(json.dumps({
+                            "type": "error",
+                            "message": "语音消息内容为空"
+                        }))
+                        continue
+                    
+                    logger.info(f"收到语音识别消息: {voice_text}")
+                    
+                    # 将语音识别的文本当作普通用户消息处理
+                    messages.append({"role": "user", "content": voice_text})
+                    
+                    # 发送消息开始标识
+                    await websocket.send_text(json.dumps({
+                        "type": "message_start",
+                        "role": "assistant"
+                    }))
+                    
+                    # 流式生成AI回复
+                    assistant_reply = ""
+                    try:
+                        for content_chunk in llm_client.chat_stream(messages, resume_content=current_resume_content):
+                            assistant_reply += content_chunk
+                            await websocket.send_text(json.dumps({
+                                "type": "content_delta",
+                                "content": content_chunk
+                            }))
+                            
+                        # 发送消息结束标识
+                        await websocket.send_text(json.dumps({
+                            "type": "message_end",
+                            "content": assistant_reply  # 传递完整内容给前端
+                        }))
+                        
+                        # 将完整的AI回复添加到对话历史
+                        messages.append({"role": "assistant", "content": assistant_reply})
+                        logger.info(f"AI回复完成，长度: {len(assistant_reply)}字符")
+                        
+                    except Exception as llm_error:
+                        logger.error(f"LLM生成回复时出错: {llm_error}")
+                        await websocket.send_text(json.dumps({
+                            "type": "error",
+                            "message": "生成回复时发生错误，请稍后重试"
+                        }))
+                    
+                    continue
+                
+                # 处理语音模式切换
+                if message_data.get("type") == "voice_mode_toggle":
+                    is_voice_mode = message_data.get("enabled", False)
+                    
+                    if is_voice_mode and not voice_chat_client:
+                        try:
+                            voice_chat_client = GeminiVoiceChat()
+                            logger.info("语音聊天客户端初始化成功")
+                        except Exception as e:
+                            logger.error(f"语音聊天客户端初始化失败: {e}")
+                            await websocket.send_text(json.dumps({
+                                "type": "error",
+                                "message": "语音功能初始化失败，请稍后重试"
+                            }))
+                            continue
+                    
+                    await websocket.send_text(json.dumps({
+                        "type": "voice_mode_status",
+                        "enabled": is_voice_mode,
+                        "message": f"语音模式已{'开启' if is_voice_mode else '关闭'}"
+                    }))
+                    continue
+                
+                # 处理音频数据的语音消息（用于真正的语音流）
+                if message_data.get("type") == "voice_audio":
+                    if not is_voice_mode or not voice_chat_client:
+                        await websocket.send_text(json.dumps({
+                            "type": "error",
+                            "message": "语音模式未启用"
+                        }))
+                        continue
+                    
+                    # 处理语音数据（这里假设前端发送的是base64编码的音频）
+                    audio_data_b64 = message_data.get("audio_data")
+                    if not audio_data_b64:
+                        continue
+                    
+                    try:
+                        # 解码音频数据
+                        audio_bytes = base64.b64decode(audio_data_b64)
+                        # 这里需要根据实际的音频格式进行处理
+                        # 暂时跳过语音处理，直接处理文本
+                        logger.info("收到语音音频数据，暂时跳过处理")
+                        continue
+                        
+                    except Exception as e:
+                        logger.error(f"语音音频处理失败: {e}")
+                        await websocket.send_text(json.dumps({
+                            "type": "error",
+                            "message": "语音音频处理失败"
+                        }))
+                        continue
                 
                 # 处理简历上传通知
                 if message_data.get("type") == "resume_uploaded":
@@ -312,8 +424,35 @@ async def websocket_chat(websocket: WebSocket):
                         
                     # 发送消息结束标识
                     await websocket.send_text(json.dumps({
-                        "type": "message_end"
+                        "type": "message_end",
+                        "content": assistant_reply  # 传递完整内容给前端
                     }))
+                    
+                    # 如果是语音模式，生成并发送音频
+                    if is_voice_mode and voice_chat_client and assistant_reply:
+                        try:
+                            logger.info("开始生成语音回复...")
+                            
+                            # 使用语音聊天客户端生成TTS音频
+                            async for audio_chunk in voice_chat_client._text_to_speech(assistant_reply):
+                                sample_rate, audio_array = audio_chunk
+                                
+                                # 将音频数据转换为base64发送给前端
+                                # 注意：这里需要根据前端期望的格式进行调整
+                                audio_bytes = audio_array.tobytes()
+                                audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
+                                
+                                await websocket.send_text(json.dumps({
+                                    "type": "audio_chunk",
+                                    "audio_data": audio_b64,
+                                    "sample_rate": sample_rate
+                                }))
+                            
+                            logger.info("语音回复生成完成")
+                            
+                        except Exception as tts_error:
+                            logger.error(f"TTS生成失败: {tts_error}")
+                            # TTS失败不影响文本回复
                     
                     # 将完整的AI回复添加到对话历史
                     messages.append({"role": "assistant", "content": assistant_reply})

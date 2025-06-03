@@ -4,8 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LLM面试官 - 技术面试系统</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v=2024010102">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💼</text></svg>">
+    <!-- Lottie动画库 -->
+    <script
+      src="https://unpkg.com/@dotlottie/player-component@2.7.12/dist/dotlottie-player.mjs"
+      type="module"
+    ></script>
 </head>
 <body>
     <!-- 应用容器 -->
@@ -217,7 +222,53 @@
         </div>
     </div>
 
-    <!-- 语音通话弹窗 -->
+    <!-- 语音通话全屏界面 -->
+    <div class="voice-call-fullscreen" id="voiceCallFullscreen" style="display: none;">
+        <!-- 模糊背景 -->
+        <div class="voice-call-backdrop" id="voiceCallBackdrop"></div>
+        
+        <!-- 语音界面内容 -->
+        <div class="voice-call-content">
+            <!-- Lottie动画容器 -->
+            <div class="voice-animation-container" id="voiceAnimationContainer">
+                <dotlottie-player
+                    id="voiceLottiePlayer"
+                    src="https://lottie.host/8778427b-2d8c-477b-99c7-18fd22c3de7b/32za1oZNzw.lottie"
+                    background="transparent"
+                    speed="1"
+                    style="width: 300px; height: 300px"
+                    loop
+                    autoplay
+                ></dotlottie-player>
+            </div>
+            
+            <!-- 状态文本 -->
+            <div class="voice-status-display">
+                <p class="voice-status-text" id="voiceStatusDisplay">正在聆听您的声音...</p>
+                <div class="voice-timer" id="voiceTimer">00:00</div>
+            </div>
+            
+            <!-- 控制按钮 -->
+            <div class="voice-controls">
+                <button class="voice-control-btn mute-btn" id="voiceMuteBtn" title="静音/取消静音">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="mic-icon">
+                        <path d="M12 14C13.66 14 15 12.66 15 11V5C15 3.34 13.66 2 12 2S9 3.34 9 5V11C9 12.66 10.34 14 12 14ZM19.07 11C19.07 15 15.54 18.26 11.93 18.72V21H12.93C13.48 21 13.93 21.45 13.93 22S13.48 23 12.93 23H11.07C10.52 23 10.07 22.55 10.07 22S10.52 21 11.07 21H11.93V18.72C8.32 18.26 4.79 15 4.79 11H6.07C6.07 14.42 8.86 17.21 12.28 17.21S18.49 14.42 18.49 11H19.07Z" fill="currentColor"/>
+                    </svg>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="mic-off-icon" style="display: none;">
+                        <path d="M19 11H17.3C17.3 11.74 17.14 12.43 16.87 13.05L18.1 14.28C18.66 13.3 19 12.19 19 11ZM14.98 11.17C14.98 11.11 15 11.06 15 11V5C15 3.34 13.66 2 12 2S9 3.34 9 5V5.18L14.98 11.17ZM4.27 3L3 4.27L9.01 10.28V11C9.01 12.66 10.34 14 12 14C12.22 14 12.44 13.97 12.65 13.92L14.31 15.58C13.6 15.91 12.81 16.1 12 16.1C8.24 16.1 5.3 13 5.3 11H4C4 13.76 6.46 16.05 9.69 16.72V21H11.69V16.72C12.4 16.63 13.06 16.43 13.67 16.15L18.73 21.21L20 19.94L4.27 3Z" fill="currentColor"/>
+                    </svg>
+                </button>
+                
+                <button class="voice-control-btn end-btn" id="voiceEndBtn" title="结束语音通话">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 9C10.5 9 9.19 9.5 8.17 10.35L6.04 8.22C7.6 6.67 9.71 5.78 12 5.78S16.4 6.67 17.96 8.22L15.83 10.35C14.81 9.5 13.5 9 12 9ZM20.5 6.5L19.09 7.91C17.1 5.92 14.66 4.78 12 4.78S6.9 5.92 4.91 7.91L3.5 6.5C6.05 3.95 9.76 2.78 12 2.78S17.95 3.95 20.5 6.5ZM6.62 10.79C8.06 13.62 10.38 15.94 13.21 17.38L15.41 15.18C15.69 14.9 16.08 14.82 16.43 14.93C17.55 15.3 18.75 15.5 20 15.5C20.55 15.5 21 15.95 21 16.5V20C21 20.55 20.55 21 20 21C10.61 21 3 13.39 3 4C3 3.45 3.45 3 4 3H7.5C8.05 3 8.5 3.45 8.5 4C8.5 5.25 8.7 6.45 9.07 7.57C9.18 7.92 9.1 8.31 8.82 8.59L6.62 10.79Z" fill="currentColor" transform="rotate(135 12 12)"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 语音通话弹窗 (保留原有的，作为备用) -->
     <div class="voice-call-overlay" id="voiceCallOverlay" style="display: none;">
         <div class="voice-call-modal">
             <!-- 通话头部 -->
@@ -252,15 +303,8 @@
                         <div class="wave-bar"></div>
                         <div class="wave-bar"></div>
                     </div>
-                </div>
-
-                <!-- 实时转录 -->
-                <div class="call-transcript" id="callTranscript">
-                    <div class="transcript-section">
-                        <h4>实时转录</h4>
-                        <div class="transcript-content" id="transcriptContent">
-                            <p class="transcript-hint">开始说话，您的语音将实时转录...</p>
-                        </div>
+                    <div class="voice-status-text" id="voiceStatusText">
+                        正在聆听您的声音...
                     </div>
                 </div>
 
@@ -272,18 +316,6 @@
 
             <!-- 通话控制按钮 -->
             <div class="call-controls">
-                <button class="control-btn mute-btn" id="muteButton" title="静音">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <path d="M12 2C13.1 2 14 2.9 14 4V12C14 13.1 13.1 14 12 14C10.9 14 10 13.1 10 12V4C10 2.9 10.9 2 12 2ZM19 10V12C19 15.3 16.3 18 13 18V20H11V18C7.7 18 5 15.3 5 12V10H7V12C7 14.2 8.8 16 11 16H13C15.2 16 17 14.2 17 12V10H19Z" fill="currentColor"/>
-                    </svg>
-                </button>
-                
-                <button class="control-btn speaker-btn" id="speakerButton" title="扬声器">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <path d="M3 9V15H7L12 20V4L7 9H3ZM16.5 12C16.5 10.23 15.48 8.71 14 7.97V16.02C15.48 15.29 16.5 13.77 16.5 12ZM14 3.23V5.29C16.89 6.15 19 8.83 19 12S16.89 17.85 14 18.71V20.77C18.01 19.86 21 16.28 21 12S18.01 4.14 14 3.23Z" fill="currentColor"/>
-                    </svg>
-                </button>
-
                 <button class="control-btn end-call-btn" id="endCallButton" title="结束通话">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                         <path d="M12 9C10.5 9 9.19 9.5 8.17 10.35L6.04 8.22C7.6 6.67 9.71 5.78 12 5.78S16.4 6.67 17.96 8.22L15.83 10.35C14.81 9.5 13.5 9 12 9ZM20.5 6.5L19.09 7.91C17.1 5.92 14.66 4.78 12 4.78S6.9 5.92 4.91 7.91L3.5 6.5C6.05 3.95 9.76 2.78 12 2.78S17.95 3.95 20.5 6.5ZM6.62 10.79C8.06 13.62 10.38 15.94 13.21 17.38L15.41 15.18C15.69 14.9 16.08 14.82 16.43 14.93C17.55 15.3 18.75 15.5 20 15.5C20.55 15.5 21 15.95 21 16.5V20C21 20.55 20.55 21 20 21C10.61 21 3 13.39 3 4C3 3.45 3.45 3 4 3H7.5C8.05 3 8.5 3.45 8.5 4C8.5 5.25 8.7 6.45 9.07 7.57C9.18 7.92 9.1 8.31 8.82 8.59L6.62 10.79Z" fill="currentColor" transform="rotate(135 12 12)"/>
@@ -294,6 +326,6 @@
     </div>
 
     <!-- JavaScript -->
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=2024010102"></script>
 </body>
 </html> 

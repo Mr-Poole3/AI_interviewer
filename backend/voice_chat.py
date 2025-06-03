@@ -9,7 +9,7 @@ import asyncio
 from typing import Optional, AsyncGenerator, Tuple
 import numpy as np
 import google.generativeai as genai
-from fastrtc import Stream, ReplyOnPause, audio_to_bytes, aggregate_bytes_to_16bit
+from fastrtc import Stream, ReplyOnPause, audio_to_bytes, aggregate_bytes_to_16bit, get_tts_model
 import io
 import wave
 
@@ -31,7 +31,7 @@ class GeminiVoiceChat:
     提供实时语音交互功能，包括：
     - 语音转文字（通过Gemini Live API）
     - 智能对话生成
-    - 文字转语音输出
+    - 文字转语音输出（使用FastRTC TTS）
     - 自动暂停检测
     """
     
@@ -54,6 +54,14 @@ class GeminiVoiceChat:
         
         # 初始化模型
         self.model = genai.GenerativeModel(self.model_name)
+        
+        # 初始化FastRTC TTS模型
+        try:
+            self.tts_model = get_tts_model()
+            logger.info("FastRTC TTS模型初始化成功")
+        except Exception as e:
+            logger.error(f"FastRTC TTS模型初始化失败: {e}")
+            self.tts_model = None
         
         # 对话历史
         self.chat_history = []
@@ -171,42 +179,61 @@ class GeminiVoiceChat:
     
     async def _text_to_speech(self, text: str) -> AsyncGenerator[Tuple[int, np.ndarray], None]:
         """
-        文字转语音
+        文字转语音 - 使用FastRTC TTS
         
         Args:
             text: 要转换的文本
             
         Yields:
-            音频数据块
+            音频数据块 (sample_rate, audio_array)
         """
         try:
-            # 这里使用简单的TTS实现
-            # 在实际应用中，可以集成Google Cloud Text-to-Speech或其他TTS服务
+            if not self.tts_model:
+                logger.error("TTS模型未初始化，无法进行语音合成")
+                return
             
-            # 模拟TTS输出 - 生成简单的音频信号
-            sample_rate = 16000
-            duration = len(text) * 0.1  # 根据文本长度估算时长
+            logger.info(f"开始TTS转换: {text[:50]}...")
             
-            # 生成简单的音频波形（实际应用中应该使用真实的TTS）
-            t = np.linspace(0, duration, int(sample_rate * duration))
-            frequency = 440  # A4音符
-            audio_signal = np.sin(2 * np.pi * frequency * t) * 0.3
+            # 使用FastRTC的流式TTS
+            async for audio_chunk in self.tts_model.stream_tts(text):
+                # FastRTC返回的音频格式可能需要转换
+                if isinstance(audio_chunk, tuple) and len(audio_chunk) == 2:
+                    # 如果已经是(sample_rate, audio_array)格式
+                    yield audio_chunk
+                else:
+                    # 如果是其他格式，需要转换
+                    # 假设返回的是16kHz的音频数据
+                    sample_rate = 16000
+                    if isinstance(audio_chunk, np.ndarray):
+                        yield (sample_rate, audio_chunk)
+                    else:
+                        # 转换为numpy数组
+                        audio_array = np.array(audio_chunk, dtype=np.float32)
+                        # 确保是正确的形状
+                        if audio_array.ndim == 1:
+                            audio_array = audio_array.reshape(1, -1)
+                        yield (sample_rate, audio_array)
             
-            # 转换为16位整数
-            audio_int16 = (audio_signal * 32767).astype(np.int16)
-            
-            # 分块返回音频数据
-            chunk_size = sample_rate // 10  # 100ms chunks
-            for i in range(0, len(audio_int16), chunk_size):
-                chunk = audio_int16[i:i + chunk_size]
-                if len(chunk) > 0:
-                    yield (sample_rate, chunk.reshape(1, -1))
-                    await asyncio.sleep(0.1)  # 模拟实时播放
-            
-            logger.info(f"TTS完成: {text}")
+            logger.info(f"TTS转换完成: {text[:50]}...")
             
         except Exception as e:
-            logger.error(f"TTS失败: {e}")
+            logger.error(f"FastRTC TTS转换失败: {e}")
+            # 降级到简单的错误提示音频
+            try:
+                sample_rate = 16000
+                duration = 1.0  # 1秒错误提示音
+                t = np.linspace(0, duration, int(sample_rate * duration))
+                # 生成简单的提示音（两个音调）
+                frequency1, frequency2 = 800, 400
+                audio_signal = (np.sin(2 * np.pi * frequency1 * t[:len(t)//2]) * 0.3 + 
+                               np.sin(2 * np.pi * frequency2 * t[len(t)//2:]) * 0.3)
+                
+                # 转换为正确格式
+                audio_array = audio_signal.astype(np.float32).reshape(1, -1)
+                yield (sample_rate, audio_array)
+                
+            except Exception as fallback_error:
+                logger.error(f"错误提示音生成也失败: {fallback_error}")
     
     async def process_voice_input(self, audio_data: Tuple[int, np.ndarray]) -> AsyncGenerator[Tuple[int, np.ndarray], None]:
         """
