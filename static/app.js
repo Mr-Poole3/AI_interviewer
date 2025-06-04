@@ -236,6 +236,7 @@ class AzureVoiceChat {
         this.currentSessionId = '';
         
         this.initElements();
+        this.bindEvents();
         this.initAudio();
         this.setInitialStatus();
     }
@@ -243,6 +244,7 @@ class AzureVoiceChat {
     initElements() {
         this.chatMessages = document.getElementById('chatMessages');
         this.voiceCallButton = document.getElementById('voiceCallButton');
+        this.heroStartButton = document.getElementById('heroStartButton');
         this.connectionStatus = document.getElementById('connectionStatus');
         this.loadingOverlay = document.getElementById('loadingOverlay');
         this.voiceHint = document.getElementById('voiceHint');
@@ -262,22 +264,53 @@ class AzureVoiceChat {
                 this.startInterview();
             });
         }
+        
+        // 欢迎界面开始面试按钮事件
+        if (this.heroStartButton) {
+            this.heroStartButton.addEventListener('click', () => {
+                this.startInterview();
+            });
+        }
     }
     
     startInterview() {
+        console.log('开始面试按钮被点击');
+        
+        // 检查连接状态
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            console.log('WebSocket未连接，显示连接提示');
+            alert('正在连接语音服务，请稍候...');
+            return;
+        }
+        
         // 切换到聊天界面
         const welcomeSection = document.querySelector('.interview-welcome');
         const chatSection = document.querySelector('.interview-chat');
         
         if (welcomeSection && chatSection) {
+            console.log('切换到聊天界面');
             welcomeSection.style.display = 'none';
             chatSection.style.display = 'flex';
             chatSection.classList.add('active');
         }
         
         // 启动语音通话
+        if (window.voiceCallManager) {
+            console.log('启动语音通话管理器');
+            window.voiceCallManager.startVoiceCall();
+        } else {
+            console.log('语音通话管理器未初始化，等待初始化完成...');
+            // 等待语音通话管理器初始化完成
+            const checkVoiceManager = () => {
                 if (window.voiceCallManager) {
+                    console.log('语音通话管理器已初始化，启动语音通话');
                     window.voiceCallManager.startVoiceCall();
+                } else {
+                    console.log('继续等待语音通话管理器初始化...');
+                    setTimeout(checkVoiceManager, 100);
+                }
+            };
+            checkVoiceManager();
         }
     }
     
@@ -364,7 +397,7 @@ class AzureVoiceChat {
         }
     }
     
-    showLoadingOverlay(text = '正在连接AI面试官') {
+    showLoadingOverlay(text = '正在连接天汇AI面试官') {
         const overlay = document.getElementById('loadingOverlay');
         const loadingTitle = overlay?.querySelector('.loading-title');
         const loadingSubtitle = overlay?.querySelector('.loading-subtitle');
@@ -1055,7 +1088,7 @@ class ResumeManager {
                         <i class="fas fa-file-upload"></i>
                     </div>
                     <h3>暂未上传简历</h3>
-                    <p>上传简历后，AI面试官将基于您的背景生成个性化面试问题</p>
+                    <p>上传简历后，天汇AI面试官将基于您的背景生成个性化面试问题</p>
                     <div class="resume-benefits">
                         <div class="benefit-item">
                             <i class="fas fa-bullseye"></i>
@@ -1254,6 +1287,9 @@ class AzureVoiceInterviewApp {
     }
 
     init() {
+        // 立即显示导航栏
+        this.router.showNavigation();
+        
         // 显示加载动画
         this.voiceChat.showLoadingOverlay('正在连接Azure语音服务...');
         
@@ -1266,7 +1302,7 @@ class AzureVoiceInterviewApp {
         // 加载保存的简历
         this.loadSavedResume();
         
-        // 监听连接成功事件，显示导航栏
+        // 监听连接成功事件，初始化语音通话管理器
         this.waitForConnection();
         
         console.log('Azure语音面试系统初始化完成');
@@ -1275,13 +1311,10 @@ class AzureVoiceInterviewApp {
     waitForConnection() {
         const checkConnection = () => {
             if (this.voiceChat.ws && this.voiceChat.ws.readyState === WebSocket.OPEN) {
-                // 连接成功，显示导航栏
-                this.router.showNavigation();
-                
-                // 初始化语音通话管理器
+                // 连接成功，初始化语音通话管理器
                 this.initVoiceCallManager();
                 
-                console.log('Azure语音服务连接成功，显示导航栏');
+                console.log('Azure语音服务连接成功');
             } else {
                 // 继续等待连接
                 setTimeout(checkConnection, 100);
@@ -1350,7 +1383,8 @@ let historyManager, resumeManager, voiceCallManager;
 document.addEventListener('DOMContentLoaded', () => {
     const app = new AzureVoiceInterviewApp();
     
-    // 设置全局变量
+    // 设置全局变量，使应用实例可以在全局访问
+    window.app = app;
     historyManager = app.historyManager;
     resumeManager = app.resumeManager;
     
@@ -1630,34 +1664,28 @@ function addQuickActions() {
             
             // 根据按钮执行不同操作
             switch(index) {
-                case 0: // 开始面试
-                    startQuickInterview();
+                case 0: // 上传简历 - 切换到简历页面
+                    if (window.app && window.app.router) {
+                        window.app.router.navigateTo('resume');
+                    }
                     break;
-                case 1: // 暂停面试
-                    pauseInterview();
+                case 1: // 查看历史 - 切换到历史页面
+                    if (window.app && window.app.router) {
+                        window.app.router.navigateTo('history');
+                    }
                     break;
-                case 2: // 结束面试
-                    endInterview();
+                case 2: // 设置 - 显示设置面板
+                    showSettingsPanel();
                     break;
             }
         });
     });
 }
 
-// 快速面试功能
-function startQuickInterview() {
-    updateVoiceStatus('listening', '正在准备面试...');
-    console.log('开始快速面试');
-}
-
-function pauseInterview() {
-    updateVoiceStatus('processing', '面试已暂停');
-    console.log('暂停面试');
-}
-
-function endInterview() {
-    updateVoiceStatus('', '面试已结束');
-    console.log('结束面试');
+// 设置面板功能
+function showSettingsPanel() {
+    showNotification('设置', '设置功能开发中，敬请期待！', 'info', 3000);
+    console.log('显示设置面板');
 }
 
 // 页面加载完成后初始化
@@ -1950,8 +1978,7 @@ function initializeApp() {
     console.log('AI智能面试官应用已完全初始化');
 }
 
-// 更新原有的DOMContentLoaded事件监听器
-document.addEventListener('DOMContentLoaded', initializeApp);
+// 删除重复的DOMContentLoaded监听器，使用主应用初始化
 
 // 导出常用函数到全局作用域
 window.showNotification = showNotification;

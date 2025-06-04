@@ -18,7 +18,7 @@
     <!-- 主应用容器 -->
     <div class="app-container">
         <!-- 顶部导航栏 -->
-        <nav class="modern-navbar" id="navbar" style="display: none;">
+        <nav class="modern-navbar" id="navbar">
             <div class="nav-container">
                 <!-- 品牌logo -->
                 <div class="nav-brand">
@@ -26,7 +26,7 @@
                         <i class="fas fa-user-tie"></i>
                     </div>
                     <div class="brand-info">
-                        <h1 class="brand-title">AI面试官</h1>
+                        <h1 class="brand-title">天汇AI</h1>
                         <span class="brand-subtitle">智能语音面试系统</span>
                     </div>
                 </div>
@@ -70,7 +70,6 @@
                         <div class="status-dot"></div>
                         <div class="status-info">
                         <span class="status-text">连接中...</span>
-                            <span class="status-desc">Azure语音服务</span>
                         </div>
                     </div>
                 </div>
@@ -92,8 +91,8 @@
                             <div class="hero-icon">
                                 <i class="fas fa-robot"></i>
                             </div>
-                            <h1 class="hero-title">欢迎来到AI智能面试官</h1>
-                            <p class="hero-subtitle">基于Azure OpenAI的专业语音面试系统，为您提供个性化的面试体验</p>
+                            <h1 class="hero-title">欢迎使用天汇AI智能面试系统</h1>
+                            <p class="hero-subtitle">基于人工智能的专业语音面试系统，为您提供个性化的面试体验</p>
                             
                             <div class="hero-features">
                                 <div class="feature-item">
@@ -126,6 +125,18 @@
                                     </div>
                                 </div>
                             </div>
+                            
+                            <!-- 开始面试按钮 -->
+                            <div class="hero-actions">
+                                <button class="hero-start-btn" id="heroStartButton" title="开始语音面试">
+                                    <div class="btn-icon">
+                                        <i class="fas fa-microphone"></i>
+                                    </div>
+                                    <span class="btn-text">开始面试</span>
+                                    <div class="btn-glow"></div>
+                                </button>
+                                <p class="hero-hint">点击开始您的AI语音面试体验</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -140,17 +151,12 @@
                                     <i class="fas fa-user-tie"></i>
                                 </div>
                                 <div class="interviewer-details">
-                                    <h3>AI面试官</h3>
+                                    <h3>天汇AI面试官</h3>
                                     <p class="interviewer-status">在线 - 准备就绪</p>
                                 </div>
                             </div>
                             <div class="chat-actions">
-                                <button class="action-btn" title="清空对话">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                                <button class="action-btn" title="全屏模式">
-                                    <i class="fas fa-expand"></i>
-                                </button>
+                                <!-- 已删除清空对话和全屏模式按钮 -->
                             </div>
                         </div>
 
@@ -317,7 +323,7 @@
                                         <i class="fas fa-file-upload"></i>
                                     </div>
                                     <h3>暂未上传简历</h3>
-                                    <p>上传简历后，AI面试官将基于您的背景生成个性化面试问题</p>
+                                    <p>上传简历后，天汇AI面试官将基于您的背景生成个性化面试问题</p>
                                     <div class="resume-benefits">
                                         <div class="benefit-item">
                                             <i class="fas fa-bullseye"></i>
@@ -391,7 +397,7 @@
                 <div class="loading-ring"></div>
                 <div class="loading-ring"></div>
             </div>
-            <h3 class="loading-title">正在连接AI面试官</h3>
+            <h3 class="loading-title">正在连接天汇AI面试官</h3>
             <p class="loading-subtitle">请稍候，正在初始化语音服务...</p>
         </div>
     </div>
@@ -413,7 +419,7 @@
                         <i class="fas fa-robot"></i>
                     </div>
                 </div>
-                <h2 class="interviewer-name">AI面试官</h2>
+                <h2 class="interviewer-name">天汇AI面试官</h2>
                 <p class="interviewer-title">专业技术面试官</p>
             </div>
             

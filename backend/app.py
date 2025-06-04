@@ -146,7 +146,7 @@ class AzureVoiceService:
     
     def _build_system_prompt(self, resume_context: str) -> str:
         """构建系统提示词"""
-        base_prompt = """你是一位专业的AI面试官，负责进行技术面试。请遵循以下原则：
+        base_prompt = """你是一位专业的天汇天汇天汇AI面试官，负责进行技术面试。请遵循以下原则：
 
 1. 保持专业、友好的态度
 2. 根据候选人的回答进行深入追问
