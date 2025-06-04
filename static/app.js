@@ -1060,106 +1060,72 @@ class ResumeManager {
             } else {
                 this.handleUploadError(result.message || '上传失败');
             }
+        } catch (error) {
+            console.error('上传错误:', error);
+            this.handleUploadError('网络错误，请稍后重试');
+        } finally {
+            this.hideUploadProgress();
         }
     }
 
-    async playTextToSpeech(text) {
-        /**
-         * 使用浏览器的语音合成API播放文本
-         * @param {string} text - 要播放的文本
-         */
-        if (!this.isCallActive || !text) {
-            return;
+    showUploadProgress() {
+        if (this.uploadArea) {
+            this.uploadArea.innerHTML = `
+                <div class="upload-progress">
+                    <div class="loading-spinner"></div>
+                    <p>正在上传和解析简历...</p>
+                </div>
+            `;
         }
+    }
 
-        try {
-            // 停止当前播放的语音
-            this.stopAllAudio();
-
-            // 在TTS播放期间暂停语音识别
-            if (this.isListening) {
-                this.stopListening();
-            }
-
-            // 标记TTS播放状态
-            this.ttsPlaybackActive = true;
-
-            // 创建语音合成utterance
-            const utterance = new SpeechSynthesisUtterance(text);
+    hideUploadProgress() {
+        if (this.uploadArea) {
+            this.uploadArea.innerHTML = `
+                <div class="upload-content">
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">
+                        <p class="upload-main-text">拖拽简历文件到此处，或点击选择文件</p>
+                        <p class="upload-sub-text">支持 PDF、Word (.doc/.docx) 格式，最大 10MB</p>
+                    </div>
+                    <input type="file" id="resumeFileInput" class="file-input" accept=".pdf,.doc,.docx" />
+                </div>
+            `;
             
-            // 设置语音参数
-            utterance.lang = 'zh-CN';
-            utterance.rate = 2.0; // 提高语速到2倍
-            utterance.pitch = 1.0;
-            utterance.volume = 0.8; // 正常音量
+            // 重新绑定事件
+            this.fileInput = document.getElementById('resumeFileInput');
+            this.bindResumeEvents();
+        }
+    }
 
-            // 尝试选择中文语音
-            const voices = speechSynthesis.getVoices();
-            const chineseVoice = voices.find(voice => 
-                voice.lang.includes('zh') || voice.name.includes('Chinese')
-            );
-            if (chineseVoice) {
-                utterance.voice = chineseVoice;
-            }
+    handleUploadSuccess(response, fileName) {
+        const resumeData = {
+            fileName: fileName,
+            sessionId: response.session_id,
+            preview: response.preview,
+            textLength: response.content_length,
+            uploadedAt: new Date().toISOString()
+        };
 
-            // 设置事件监听器
-            utterance.onstart = () => {
-                this.isPlaying = true;
-                this.ttsPlaybackActive = true;
-                this.updateVoiceStatus('speaking', 'AI正在回答...');
-                console.log('开始播放TTS（语音识别已暂停）');
-            };
+        this.storageManager.saveCurrentResume(resumeData);
+        this.refreshResumeInfo();
 
-            utterance.onend = () => {
-                this.isPlaying = false;
-                this.ttsPlaybackActive = false;
-                this.updateVoiceStatus('idle', '请继续说话...');
-                console.log('TTS播放完成，恢复语音识别');
-                
-                // TTS播放完成后恢复语音识别
-                if (this.isCallActive && !this.isMuted) {
-                    setTimeout(() => {
-                        if (this.isCallActive && !this.isMuted && !this.isListening) {
-                            this.startListening();
-                        }
-                    }, 500);
-                }
-            };
+        // 通知主应用简历已上传
+        window.dispatchEvent(new CustomEvent('resumeUploaded', { 
+            detail: { resumeData, sessionId: response.session_id } 
+        }));
 
-            utterance.onerror = (event) => {
-                console.error('TTS播放失败:', event.error);
-                this.isPlaying = false;
-                this.ttsPlaybackActive = false;
-                
-                // 只有非中断错误才提示
-                if (event.error !== 'interrupted' && event.error !== 'canceled') {
-                    this.updateVoiceStatus('idle', 'TTS播放失败，请重试');
-                } else {
-                    this.updateVoiceStatus('idle', '请继续说话...');
-                    console.log('TTS被用户中断');
-                }
-                
-                // 错误后恢复语音识别
-                if (this.isCallActive && !this.isMuted) {
-                    setTimeout(() => {
-                        if (this.isCallActive && !this.isMuted && !this.isListening) {
-                            this.startListening();
-                        }
-                    }, 300);
-                }
-            };
+        alert('简历上传成功！系统将基于您的简历进行个性化面试。');
+    }
 
-            // 保存当前的utterance引用
-            this.currentUtterance = utterance;
+    handleUploadError(errorMessage) {
+        alert(`简历上传失败: ${errorMessage}`);
+    }
 
-            // 开始播放
-            speechSynthesis.speak(utterance);
-
-        } catch (error) {
-            console.error('TTS初始化失败:', error);
-            this.isPlaying = false;
-            this.ttsPlaybackActive = false;
-            this.updateVoiceStatus('idle', 'TTS不可用，请重试');
+    removeResume() {
+        if (confirm('确定要删除当前简历吗？')) {
+            this.storageManager.removeCurrentResume();
+            this.refreshResumeInfo();
             
             // 通知主应用简历已删除
             window.dispatchEvent(new CustomEvent('resumeRemoved'));
