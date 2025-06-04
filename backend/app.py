@@ -1,8 +1,8 @@
 """
 LLM面试官FastAPI后端服务
 
-提供WebSocket流式聊天接口和静态文件服务
-支持语音聊天和音频流传输
+基于Azure OpenAI实时语音模型的智能面试系统
+支持文本聊天、语音输入输出和简历上传功能
 """
 import json
 import logging
@@ -11,7 +11,8 @@ import tempfile
 import io
 import base64
 import hashlib
-from typing import Dict, List, Optional
+import asyncio
+from typing import Dict, List, Optional, Any
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File
@@ -24,8 +25,8 @@ import uvicorn
 import PyPDF2
 from docx import Document
 
-from backend.llm import LLMClient
-from backend.voice_chat import GeminiVoiceChat
+# Azure OpenAI实时语音客户端
+from openai import AsyncAzureOpenAI
 
 # 配置日志
 logging.basicConfig(
@@ -34,7 +35,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="LLM面试官系统", description="基于FastAPI和WebSocket的LLM面试官")
+app = FastAPI(title="Azure语音面试官系统", description="基于Azure OpenAI实时语音模型的智能面试系统")
 
 # 添加CORS中间件
 app.add_middleware(
@@ -48,8 +49,267 @@ app.add_middleware(
 # 挂载静态文件
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# 全局LLM客户端
-llm_client: LLMClient = None
+
+class AzureVoiceService:
+    """Azure语音服务类"""
+    
+    def __init__(self):
+        """初始化Azure语音服务"""
+        self.client: Optional[AsyncAzureOpenAI] = None
+        self._init_client()
+    
+    def _init_client(self) -> None:
+        """初始化Azure OpenAI客户端"""
+        try:
+            # 从环境变量获取配置
+            azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "https://gpt-realtime-4o-mini.openai.azure.com")
+            api_key = os.getenv("AZURE_OPENAI_API_KEY")
+            api_version = os.getenv("AZURE_API_VERSION", "2025-04-01-preview")
+            
+            if not api_key:
+                logger.error("Azure OpenAI API密钥未设置！")
+                return
+            
+            self.client = AsyncAzureOpenAI(
+                azure_endpoint=azure_endpoint,
+                api_key=api_key,
+                api_version=api_version,
+            )
+            logger.info("Azure OpenAI客户端初始化成功")
+            
+        except Exception as e:
+            logger.error(f"Azure OpenAI客户端初始化失败: {e}")
+    
+    async def chat_with_voice(self, message: str, websocket: WebSocket, resume_context: str = "") -> None:
+        """
+        发送消息并接收语音回复
+        
+        Args:
+            message: 用户消息
+            websocket: WebSocket连接
+            resume_context: 简历上下文
+        """
+        if not self.client:
+            await websocket.send_json({
+                "type": "error",
+                "message": "Azure客户端未初始化"
+            })
+            return
+        
+        try:
+            async with self.client.beta.realtime.connect(
+                model="gpt-4o-mini-realtime-preview"
+            ) as connection:
+                # 配置会话支持文本和音频
+                await connection.session.update(
+                    session={"modalities": ["text", "audio"]}
+                )
+                
+                # 构建系统提示词
+                system_prompt = self._build_system_prompt(resume_context)
+                
+                # 发送系统消息（如果有简历上下文）
+                if resume_context:
+                    await connection.conversation.item.create(
+                        item={
+                            "type": "message",
+                            "role": "system",
+                            "content": [{"type": "input_text", "text": system_prompt}],
+                        }
+                    )
+                
+                # 发送用户消息
+                await connection.conversation.item.create(
+                    item={
+                        "type": "message",
+                        "role": "user",
+                        "content": [{"type": "input_text", "text": message}],
+                    }
+                )
+                
+                # 请求回复
+                await connection.response.create()
+                
+                # 处理响应事件
+                async for event in connection:
+                    await self._handle_response_event(event, websocket)
+                    
+                    if event.type == "response.done":
+                        break
+                        
+        except Exception as e:
+            logger.error(f"语音聊天错误: {e}")
+            await websocket.send_json({
+                "type": "error",
+                "message": f"语音聊天错误: {str(e)}"
+            })
+    
+    def _build_system_prompt(self, resume_context: str) -> str:
+        """构建系统提示词"""
+        base_prompt = """你是一位专业的AI面试官，负责进行技术面试。请遵循以下原则：
+
+1. 保持专业、友好的态度
+2. 根据候选人的回答进行深入追问
+3. 评估技术能力、解决问题的思路和沟通能力
+4. 提供建设性的反馈
+5. 语音回复要简洁明了，适合口语交流"""
+
+        if resume_context:
+            return f"""{base_prompt}
+
+候选人简历信息：
+{resume_context}
+
+请根据简历内容进行针对性的面试提问。"""
+        
+        return base_prompt
+    
+    async def _handle_response_event(self, event: Any, websocket: WebSocket) -> None:
+        """
+        处理响应事件
+        
+        Args:
+            event: 响应事件
+            websocket: WebSocket连接
+        """
+        try:
+            if event.type == "response.text.delta":
+                # 文本增量
+                await websocket.send_json({
+                    "type": "text_delta",
+                    "content": event.delta
+                })
+                
+            elif event.type == "response.audio.delta":
+                # 音频增量 - 发送base64编码的音频数据
+                await websocket.send_json({
+                    "type": "audio_delta",
+                    "audio_data": event.delta,  # 已经是base64编码
+                    "content_type": "audio/pcm"
+                })
+                
+            elif event.type == "response.audio_transcript.delta":
+                # 音频转录增量
+                await websocket.send_json({
+                    "type": "transcript_delta",
+                    "content": event.delta
+                })
+                
+            elif event.type == "response.text.done":
+                # 文本完成
+                await websocket.send_json({
+                    "type": "text_done"
+                })
+                
+            elif event.type == "response.audio.done":
+                # 音频完成
+                await websocket.send_json({
+                    "type": "audio_done"
+                })
+                
+            elif event.type == "response.done":
+                # 响应完成
+                await websocket.send_json({
+                    "type": "response_done"
+                })
+                
+        except Exception as e:
+            logger.error(f"处理响应事件错误: {e}")
+
+    async def process_fastrtc_audio(
+        self, 
+        audio_data: str, 
+        websocket: WebSocket, 
+        resume_context: str = "",
+        audio_format: str = "pcm_s16le",
+        sample_rate: int = 24000,
+        channels: int = 1,
+        vad_confidence: float = 0.0
+    ) -> None:
+        """
+        处理FastRTC增强的音频数据
+        
+        Args:
+            audio_data: base64编码的音频数据
+            websocket: WebSocket连接
+            resume_context: 简历上下文
+            audio_format: 音频格式
+            sample_rate: 采样率
+            channels: 声道数
+            vad_confidence: 语音活动检测置信度
+        """
+        if not self.client:
+            await websocket.send_json({
+                "type": "error",
+                "message": "Azure客户端未初始化"
+            })
+            return
+        
+        try:
+            # 解码base64音频数据
+            audio_bytes = base64.b64decode(audio_data)
+            
+            # 记录音频质量信息
+            logger.info(f"FastRTC音频处理: 格式={audio_format}, 采样率={sample_rate}Hz, "
+                       f"声道={channels}, 数据长度={len(audio_bytes)}字节, VAD置信度={vad_confidence:.3f}")
+            
+            # 只有当VAD置信度足够高时才处理音频
+            if vad_confidence < 0.01:  # 阈值可调整
+                logger.debug(f"VAD置信度过低({vad_confidence:.3f})，跳过音频处理")
+                return
+            
+            async with self.client.beta.realtime.connect(
+                model="gpt-4o-mini-realtime-preview"
+            ) as connection:
+                # 配置会话支持音频输入
+                await connection.session.update(
+                    session={
+                        "modalities": ["text", "audio"],
+                        "input_audio_format": "pcm16",  # Azure支持的格式
+                        "output_audio_format": "pcm16",
+                        "input_audio_transcription": {
+                            "model": "whisper-1"
+                        }
+                    }
+                )
+                
+                # 构建系统提示词
+                if resume_context:
+                    system_prompt = self._build_system_prompt(resume_context)
+                    await connection.conversation.item.create(
+                        item={
+                            "type": "message",
+                            "role": "system",
+                            "content": [{"type": "input_text", "text": system_prompt}],
+                        }
+                    )
+                
+                # 发送音频数据
+                await connection.input_audio_buffer.append(audio=audio_data)
+                
+                # 提交音频输入
+                await connection.input_audio_buffer.commit()
+                
+                # 请求回复
+                await connection.response.create()
+                
+                # 处理响应事件
+                async for event in connection:
+                    await self._handle_response_event(event, websocket)
+                    
+                    if event.type == "response.done":
+                        break
+                        
+        except Exception as e:
+            logger.error(f"FastRTC音频处理错误: {e}")
+            await websocket.send_json({
+                "type": "error",
+                "message": f"音频处理错误: {str(e)}"
+            })
+
+
+# 全局Azure语音服务实例
+azure_voice_service: AzureVoiceService = None
 
 # 存储用户会话的简历内容
 user_sessions: Dict[str, str] = {}
@@ -197,13 +457,12 @@ def validate_file(file: UploadFile) -> None:
 @app.on_event("startup")
 async def startup_event():
     """应用启动时的初始化"""
-    global llm_client
+    global azure_voice_service
     try:
-        llm_client = LLMClient()
-        logger.info("LLM客户端初始化成功")
+        azure_voice_service = AzureVoiceService()
+        logger.info("Azure语音服务初始化完成")
     except Exception as e:
-        logger.error(f"LLM客户端初始化失败: {e}")
-        raise e
+        logger.error(f"Azure语音服务初始化失败: {e}")
 
 @app.get("/")
 async def read_root():
@@ -216,10 +475,10 @@ async def upload_resume(file: UploadFile = File(...)) -> JSONResponse:
     上传并解析简历文件
     
     Args:
-        file: 上传的简历文件 (PDF或Word格式)
+        file: 上传的简历文件
         
     Returns:
-        解析结果和状态信息
+        解析结果和会话ID
     """
     try:
         # 验证文件
@@ -228,9 +487,7 @@ async def upload_resume(file: UploadFile = File(...)) -> JSONResponse:
         # 读取文件内容
         file_content = await file.read()
         
-        logger.info(f"开始解析简历文件: {file.filename}, 大小: {len(file_content)} bytes")
-        
-        # 根据文件扩展名选择解析方法
+        # 根据文件类型解析文本
         file_extension = Path(file.filename).suffix.lower()
         
         if file_extension == '.pdf':
@@ -240,346 +497,163 @@ async def upload_resume(file: UploadFile = File(...)) -> JSONResponse:
         else:
             raise HTTPException(status_code=400, detail="不支持的文件格式")
         
-        # 检查解析结果
-        if not resume_text or len(resume_text.strip()) < 10:
-            raise HTTPException(status_code=400, detail="文件内容为空或解析失败，请检查文件是否损坏")
+        # 验证解析结果
+        if not resume_text or len(resume_text.strip()) < 50:
+            raise HTTPException(status_code=400, detail="简历内容过少或解析失败，请检查文件内容")
         
-        # 生成更安全的会话ID（基于内容哈希和时间戳）
-        content_hash = generate_resume_hash(resume_text)
-        session_id = f"resume_{content_hash}_{len(user_sessions)}"
+        # 生成会话ID
+        session_id = generate_resume_hash(resume_text)
         
-        # 保存到内存（用于当前会话）
+        # 保存简历内容
         user_sessions[session_id] = resume_text
-        
-        # 保存到文件（用于持久化存储）
         save_resume_to_file(resume_text, session_id)
         
-        logger.info(f"简历解析成功，提取文本长度: {len(resume_text)} 字符")
+        logger.info(f"简历上传成功: {file.filename}, 会话ID: {session_id}, 内容长度: {len(resume_text)}")
         
-        return JSONResponse({
+        return JSONResponse(content={
             "success": True,
             "message": "简历上传并解析成功",
             "session_id": session_id,
-            "resume_preview": resume_text[:200] + "..." if len(resume_text) > 200 else resume_text,
-            "full_text": resume_text,
-            "text_length": len(resume_text),
-            "content_hash": content_hash
+            "filename": file.filename,
+            "content_length": len(resume_text),
+            "preview": resume_text[:200] + "..." if len(resume_text) > 200 else resume_text
         })
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"简历上传处理失败: {e}")
-        raise HTTPException(status_code=500, detail=f"文件处理失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
 
-@app.websocket("/ws/chat")
-async def websocket_chat(websocket: WebSocket):
-    """WebSocket聊天接口，支持流式传输和语音聊天"""
+@app.websocket("/ws/voice")
+async def websocket_voice_endpoint(websocket: WebSocket):
+    """Azure语音聊天WebSocket端点 - FastRTC增强版"""
     await websocket.accept()
-    logger.info("WebSocket连接已建立")
+    logger.info("Azure语音WebSocket连接已建立 - FastRTC增强模式")
     
-    # 面试官系统提示词（默认）
-    system_prompt = """你是一个专业的技术面试官。你的任务是：
-
-1. 进行技术面试，评估候选人的技术能力
-2. 根据候选人的回答提出有针对性的追问
-3. 保持专业、友好的态度
-4. 给出建设性的反馈
-
-请开始面试，首先询问候选人想要面试的技术方向（如前端、后端、全栈等），然后开始相应的技术提问。"""
-
-    messages: List[Dict[str, str]] = [
-        {"role": "system", "content": system_prompt}
-    ]
-    
-    # 当前会话的简历内容
-    current_resume_content: Optional[str] = None
-    
-    # 语音聊天客户端（按需初始化）
-    voice_chat_client: Optional[GeminiVoiceChat] = None
-    is_voice_mode: bool = False
+    # 存储当前活跃的Azure连接，用于打断处理
+    current_azure_connection = None
     
     try:
-        # 发送初始欢迎消息
-        welcome_msg = "欢迎来到LLM技术面试系统！我是您的面试官。您可以选择直接开始面试，或者先上传简历进行个性化面试。如果选择直接面试，请告诉我您想要面试的技术方向。"
-        
-        await websocket.send_text(json.dumps({
-            "type": "message_start",
-            "role": "assistant"
-        }))
-        
-        # 逐字符发送欢迎消息模拟流式效果
-        for char in welcome_msg:
-            await websocket.send_text(json.dumps({
-                "type": "content_delta", 
-                "content": char
-            }))
-        
-        await websocket.send_text(json.dumps({
-            "type": "message_end"
-        }))
-        
-        # 将欢迎消息添加到对话历史
-        messages.append({"role": "assistant", "content": welcome_msg})
-        
         while True:
-            # 接收用户消息
-            data = await websocket.receive_text()
-            try:
-                message_data = json.loads(data)
+            # 接收消息
+            data = await websocket.receive_json()
+            message_type = data.get("type")
+            
+            if message_type == "chat":
+                message = data.get("message", "")
+                session_id = data.get("session_id", "")
                 
-                # 处理语音消息
-                if message_data.get("type") == "voice_message":
-                    # 前端发送的语音消息实际上是语音识别的文本结果
-                    voice_text = message_data.get("content", "").strip()
+                if message.strip():
+                    logger.info(f"收到语音聊天消息: {message}")
                     
-                    if not voice_text:
-                        await websocket.send_text(json.dumps({
-                            "type": "error",
-                            "message": "语音消息内容为空"
-                        }))
-                        continue
+                    # 获取简历上下文
+                    resume_context = ""
+                    if session_id:
+                        resume_context = user_sessions.get(session_id) or load_resume_from_file(session_id)
                     
-                    logger.info(f"收到语音识别消息: {voice_text}")
+                    await azure_voice_service.chat_with_voice(message, websocket, resume_context)
                     
-                    # 将语音识别的文本当作普通用户消息处理
-                    messages.append({"role": "user", "content": voice_text})
+            elif message_type == "voice_input":
+                # FastRTC增强的语音输入处理
+                audio_data = data.get("audio_data", "")
+                audio_format = data.get("audio_format", "pcm_s16le")
+                sample_rate = data.get("sample_rate", 24000)
+                channels = data.get("channels", 1)
+                vad_confidence = data.get("vad_confidence", 0.0)
+                session_id = data.get("session_id", "")
+                
+                if audio_data:
+                    logger.info(f"收到FastRTC音频数据: 格式={audio_format}, 采样率={sample_rate}, VAD置信度={vad_confidence:.3f}")
                     
-                    # 发送消息开始标识
-                    await websocket.send_text(json.dumps({
-                        "type": "message_start",
-                        "role": "assistant"
-                    }))
+                    # 获取简历上下文
+                    resume_context = ""
+                    if session_id:
+                        resume_context = user_sessions.get(session_id) or load_resume_from_file(session_id)
                     
-                    # 流式生成AI回复
-                    assistant_reply = ""
+                    # 处理FastRTC音频输入
+                    await azure_voice_service.process_fastrtc_audio(
+                        audio_data, 
+                        websocket, 
+                        resume_context,
+                        audio_format=audio_format,
+                        sample_rate=sample_rate,
+                        channels=channels,
+                        vad_confidence=vad_confidence
+                    )
+                    
+            elif message_type == "interrupt_request":
+                # 处理打断请求
+                session_id = data.get("session_id", "")
+                reason = data.get("reason", "user_request")
+                timestamp = data.get("timestamp", 0)
+                
+                logger.info(f"收到打断请求: 会话ID={session_id}, 原因={reason}, 时间戳={timestamp}")
+                
+                # 中断当前Azure连接（如果存在）
+                if current_azure_connection:
                     try:
-                        for content_chunk in llm_client.chat_stream(messages, resume_content=current_resume_content):
-                            assistant_reply += content_chunk
-                            await websocket.send_text(json.dumps({
-                                "type": "content_delta",
-                                "content": content_chunk
-                            }))
-                            
-                        # 发送消息结束标识
-                        await websocket.send_text(json.dumps({
-                            "type": "message_end",
-                            "content": assistant_reply  # 传递完整内容给前端
-                        }))
-                        
-                        # 将完整的AI回复添加到对话历史
-                        messages.append({"role": "assistant", "content": assistant_reply})
-                        logger.info(f"AI回复完成，长度: {len(assistant_reply)}字符")
-                        
-                    except Exception as llm_error:
-                        logger.error(f"LLM生成回复时出错: {llm_error}")
-                        await websocket.send_text(json.dumps({
-                            "type": "error",
-                            "message": "生成回复时发生错误，请稍后重试"
-                        }))
-                    
-                    continue
-                
-                # 处理语音模式切换
-                if message_data.get("type") == "voice_mode_toggle":
-                    is_voice_mode = message_data.get("enabled", False)
-                    
-                    if is_voice_mode and not voice_chat_client:
-                        try:
-                            voice_chat_client = GeminiVoiceChat()
-                            logger.info("语音聊天客户端初始化成功")
-                        except Exception as e:
-                            logger.error(f"语音聊天客户端初始化失败: {e}")
-                            await websocket.send_text(json.dumps({
-                                "type": "error",
-                                "message": "语音功能初始化失败，请稍后重试"
-                            }))
-                            continue
-                    
-                    await websocket.send_text(json.dumps({
-                        "type": "voice_mode_status",
-                        "enabled": is_voice_mode,
-                        "message": f"语音模式已{'开启' if is_voice_mode else '关闭'}"
-                    }))
-                    continue
-                
-                # 处理音频数据的语音消息（用于真正的语音流）
-                if message_data.get("type") == "voice_audio":
-                    if not is_voice_mode or not voice_chat_client:
-                        await websocket.send_text(json.dumps({
-                            "type": "error",
-                            "message": "语音模式未启用"
-                        }))
-                        continue
-                    
-                    # 处理语音数据（这里假设前端发送的是base64编码的音频）
-                    audio_data_b64 = message_data.get("audio_data")
-                    if not audio_data_b64:
-                        continue
-                    
-                    try:
-                        # 解码音频数据
-                        audio_bytes = base64.b64decode(audio_data_b64)
-                        # 这里需要根据实际的音频格式进行处理
-                        # 暂时跳过语音处理，直接处理文本
-                        logger.info("收到语音音频数据，暂时跳过处理")
-                        continue
-                        
+                        # 这里可以添加具体的连接中断逻辑
+                        # Azure实时API可能需要特定的中断方法
+                        logger.info("正在中断Azure连接...")
+                        current_azure_connection = None
                     except Exception as e:
-                        logger.error(f"语音音频处理失败: {e}")
-                        await websocket.send_text(json.dumps({
-                            "type": "error",
-                            "message": "语音音频处理失败"
-                        }))
-                        continue
+                        logger.error(f"中断Azure连接失败: {e}")
                 
-                # 处理简历上传通知
-                if message_data.get("type") == "resume_uploaded":
-                    session_id = message_data.get("session_id")
-                    
-                    # 优先使用前端发送的完整简历内容
-                    resume_content = message_data.get("resume_content")
-                    
-                    # 如果前端没有发送完整内容，尝试从session中获取（向后兼容）
-                    if not resume_content and session_id and session_id in user_sessions:
-                        resume_content = user_sessions[session_id]
-                        logger.info("从后端session中获取简历内容")
-                    
-                    # 如果内存中也没有，尝试从文件中加载
-                    if not resume_content and session_id:
-                        resume_content = load_resume_from_file(session_id)
-                        if resume_content:
-                            logger.info("从文件存储中恢复简历内容")
-                            # 重新加载到内存中
-                            user_sessions[session_id] = resume_content
-                    
-                    if resume_content:
-                        current_resume_content = resume_content
-                        logger.info(f"收到简历内容，长度: {len(resume_content)} 字符")
-                        
-                        # 更新系统prompt为基于简历的面试官
-                        messages[0]["content"] = llm_client.create_interview_system_prompt(current_resume_content)
-                        
-                        # 发送确认消息
-                        confirm_msg = "我已经收到并分析了您的简历。让我基于您的背景开始面试。"
-                        
-                        await websocket.send_text(json.dumps({
-                            "type": "message_start",
-                            "role": "assistant"
-                        }))
-                        
-                        for char in confirm_msg:
-                            await websocket.send_text(json.dumps({
-                                "type": "content_delta",
-                                "content": char
-                            }))
-                        
-                        await websocket.send_text(json.dumps({
-                            "type": "message_end"
-                        }))
-                        
-                        messages.append({"role": "assistant", "content": confirm_msg})
-                    else:
-                        logger.warning("未找到简历内容，无法进行个性化面试")
-                        await websocket.send_text(json.dumps({
-                            "type": "error",
-                            "message": "简历数据不完整，请重新上传简历"
-                        }))
-                    continue
+                # 发送打断确认
+                await websocket.send_json({
+                    "type": "interrupt_acknowledged",
+                    "session_id": session_id,
+                    "timestamp": timestamp,
+                    "reason": reason,
+                    "message": "打断请求已处理"
+                })
                 
-                # 处理普通聊天消息
-                user_message = message_data.get("message", "").strip()
+                logger.info(f"打断请求处理完成: 会话ID={session_id}")
+                    
+            elif message_type == "voice_input_end":
+                # 语音输入结束
+                session_id = data.get("session_id", "")
+                logger.info(f"语音输入结束: 会话ID={session_id}")
                 
-                if not user_message:
-                    continue
-                    
-                logger.info(f"收到用户消息: {user_message}")
+                await websocket.send_json({
+                    "type": "voice_input_complete",
+                    "message": "语音输入处理完成"
+                })
                 
-                # 添加用户消息到对话历史
-                messages.append({"role": "user", "content": user_message})
-                
-                # 发送消息开始标识
-                await websocket.send_text(json.dumps({
-                    "type": "message_start",
-                    "role": "assistant"
-                }))
-                
-                # 流式生成AI回复
-                assistant_reply = ""
-                try:
-                    for content_chunk in llm_client.chat_stream(messages, resume_content=current_resume_content):
-                        assistant_reply += content_chunk
-                        await websocket.send_text(json.dumps({
-                            "type": "content_delta",
-                            "content": content_chunk
-                        }))
-                        
-                    # 发送消息结束标识
-                    await websocket.send_text(json.dumps({
-                        "type": "message_end",
-                        "content": assistant_reply  # 传递完整内容给前端
-                    }))
-                    
-                    # 如果是语音模式，生成并发送音频
-                    if is_voice_mode and voice_chat_client and assistant_reply:
-                        try:
-                            logger.info("开始生成语音回复...")
-                            
-                            # 使用语音聊天客户端生成TTS音频
-                            async for audio_chunk in voice_chat_client._text_to_speech(assistant_reply):
-                                sample_rate, audio_array = audio_chunk
-                                
-                                # 将音频数据转换为base64发送给前端
-                                # 注意：这里需要根据前端期望的格式进行调整
-                                audio_bytes = audio_array.tobytes()
-                                audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
-                                
-                                await websocket.send_text(json.dumps({
-                                    "type": "audio_chunk",
-                                    "audio_data": audio_b64,
-                                    "sample_rate": sample_rate
-                                }))
-                            
-                            logger.info("语音回复生成完成")
-                            
-                        except Exception as tts_error:
-                            logger.error(f"TTS生成失败: {tts_error}")
-                            # TTS失败不影响文本回复
-                    
-                    # 将完整的AI回复添加到对话历史
-                    messages.append({"role": "assistant", "content": assistant_reply})
-                    logger.info(f"AI回复完成，长度: {len(assistant_reply)}字符")
-                    
-                except Exception as llm_error:
-                    logger.error(f"LLM生成回复时出错: {llm_error}")
-                    await websocket.send_text(json.dumps({
-                        "type": "error",
-                        "message": "生成回复时发生错误，请稍后重试"
-                    }))
-                    
-            except json.JSONDecodeError:
-                logger.error(f"收到无效的JSON消息: {data}")
-                await websocket.send_text(json.dumps({
-                    "type": "error", 
-                    "message": "消息格式错误"
-                }))
+            elif message_type == "ping":
+                await websocket.send_json({"type": "pong"})
                 
     except WebSocketDisconnect:
-        logger.info("WebSocket连接已断开")
+        logger.info("Azure语音WebSocket连接已断开")
     except Exception as e:
-        logger.error(f"WebSocket处理出错: {e}")
+        logger.error(f"Azure语音WebSocket错误: {e}")
         try:
-            await websocket.send_text(json.dumps({
+            await websocket.send_json({
                 "type": "error",
-                "message": "服务器内部错误"
-            }))
+                "message": f"服务器错误: {str(e)}"
+            })
         except:
             pass
 
+@app.get("/health")
+async def health_check():
+    """健康检查端点"""
+    return {
+        "status": "healthy", 
+        "service": "Azure Voice Interview System",
+        "azure_client_ready": azure_voice_service.client is not None if azure_voice_service else False
+    }
+
 if __name__ == "__main__":
+    
+    print("🚀 启动Azure语音面试官系统...")
+    print("📡 服务地址: http://localhost:8000")
+    print("🎤 支持实时语音面试功能")
+    
     uvicorn.run(
-        "app:app",
-        host="0.0.0.0", 
+        app,
+        host="localhost",
         port=8000,
         reload=True,
         log_level="info"
