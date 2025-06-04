@@ -2134,7 +2134,7 @@ class VoiceCallManager {
             
             // 设置语音参数
             utterance.lang = 'zh-CN';
-            utterance.rate = 2.0; // 提高语速到2倍
+            utterance.rate = 1.5; // 提高语速到2倍
             utterance.pitch = 1.0;
             utterance.volume = 0.8; // 正常音量
 
