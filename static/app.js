@@ -259,10 +259,25 @@ class AzureVoiceChat {
         // 语音通话按钮事件
         if (this.voiceCallButton) {
             this.voiceCallButton.addEventListener('click', () => {
+                this.startInterview();
+            });
+        }
+    }
+    
+    startInterview() {
+        // 切换到聊天界面
+        const welcomeSection = document.querySelector('.interview-welcome');
+        const chatSection = document.querySelector('.interview-chat');
+        
+        if (welcomeSection && chatSection) {
+            welcomeSection.style.display = 'none';
+            chatSection.style.display = 'flex';
+            chatSection.classList.add('active');
+        }
+        
+        // 启动语音通话
                 if (window.voiceCallManager) {
                     window.voiceCallManager.startVoiceCall();
-                }
-            });
         }
     }
     
@@ -329,24 +344,36 @@ class AzureVoiceChat {
             if (statusText) {
                 statusText.textContent = text;
             }
-            navStatus.className = `connection-status ${className}`;
+            navStatus.className = `connection-indicator ${className}`;
             if (statusDot) {
                 statusDot.className = `status-dot ${className}`;
+                // 根据状态更新点的样式
+                if (className === 'connected') {
+                    statusDot.classList.add('connected');
+                } else if (className === 'error') {
+                    statusDot.classList.add('error');
+                } else {
+                    statusDot.classList.remove('connected', 'error');
+                }
             }
         }
         
-        // 更新输入提示
+        // 更新语音提示
         if (this.voiceHint) {
             this.voiceHint.textContent = text;
         }
     }
     
-    showLoadingOverlay(text = '正在连接面试官...') {
+    showLoadingOverlay(text = '正在连接AI面试官') {
         const overlay = document.getElementById('loadingOverlay');
-        const loadingText = overlay?.querySelector('.loading-text');
+        const loadingTitle = overlay?.querySelector('.loading-title');
+        const loadingSubtitle = overlay?.querySelector('.loading-subtitle');
         if (overlay) {
-            if (loadingText) {
-                loadingText.textContent = text;
+            if (loadingTitle) {
+                loadingTitle.textContent = text;
+            }
+            if (loadingSubtitle) {
+                loadingSubtitle.textContent = '请稍候，正在初始化语音服务...';
             }
             overlay.style.display = 'flex';
             overlay.classList.remove('hidden');
@@ -384,18 +411,46 @@ class AzureVoiceChat {
         this.lastPlayTime = 0;
     }
 
-    addMessage(content, type = 'ai') {
-        // 只处理AI消息
-        if (type !== 'ai') {
-            return;
+    addMessage(content, type = 'assistant') {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${type}`;
+        
+        // 创建头像
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'message-avatar';
+        if (type === 'assistant') {
+            avatarDiv.innerHTML = '<i class="fas fa-robot"></i>';
+        } else {
+            avatarDiv.innerHTML = '<i class="fas fa-user"></i>';
         }
         
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${type}-message`;
+        // 创建消息内容容器
+        const contentContainer = document.createElement('div');
+        contentContainer.className = 'message-content';
         
-        const contentDiv = document.createElement('div');
-        contentDiv.textContent = content;
-        messageDiv.appendChild(contentDiv);
+        // 创建消息气泡
+        const bubbleDiv = document.createElement('div');
+        bubbleDiv.className = 'message-bubble';
+        
+        // 创建消息文本
+        const textDiv = document.createElement('p');
+        textDiv.className = 'message-text';
+        textDiv.textContent = content;
+        
+        // 创建时间戳
+        const timeDiv = document.createElement('div');
+        timeDiv.className = 'message-time';
+        timeDiv.textContent = new Date().toLocaleTimeString('zh-CN', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
+        
+        // 组装消息结构
+        bubbleDiv.appendChild(textDiv);
+        contentContainer.appendChild(bubbleDiv);
+        contentContainer.appendChild(timeDiv);
+        messageDiv.appendChild(avatarDiv);
+        messageDiv.appendChild(contentContainer);
         
         this.chatMessages.appendChild(messageDiv);
         this.scrollToBottom();
@@ -430,10 +485,10 @@ class AzureVoiceChat {
     }
     
     handleTextDelta(content) {
-        // 查找最后一个AI消息或创建新的
-        let lastMessage = this.chatMessages.querySelector('.ai-message:last-of-type');
+        // 查找最后一个助手消息或创建新的
+        let lastMessage = this.chatMessages.querySelector('.message.assistant:last-of-type');
         if (!lastMessage || lastMessage.dataset.completed === 'true') {
-            lastMessage = this.addMessage('', 'ai');
+            lastMessage = this.addMessage('', 'assistant');
             
             // 添加流式指示器
             const streamingIndicator = document.createElement('span');
@@ -446,8 +501,10 @@ class AzureVoiceChat {
         }
         
         // 更新文本内容
-        const textDiv = lastMessage.querySelector('div');
+        const textDiv = lastMessage.querySelector('.message-text');
+        if (textDiv) {
         textDiv.textContent += content;
+        }
         
         this.scrollToBottom();
     }
@@ -539,7 +596,7 @@ class AzureVoiceChat {
         }
         
         // 移除流式指示器并添加最终的音频播放器
-        const lastMessage = this.chatMessages.querySelector('.ai-message:last-of-type');
+        const lastMessage = this.chatMessages.querySelector('.message.assistant:last-of-type');
         if (lastMessage) {
             // 移除流式指示器
             const indicator = lastMessage.querySelector('.streaming-indicator');
@@ -847,22 +904,34 @@ class HistoryManager {
     createHistoryItemHTML(interview) {
         const date = new Date(interview.createdAt).toLocaleString('zh-CN');
         const duration = interview.duration ? `${Math.floor(interview.duration / 60)}分${interview.duration % 60}秒` : '未知';
+        const messageCount = interview.messages?.length || 0;
         
         return `
             <div class="history-item" data-id="${interview.id}">
+                <div class="history-icon">
+                    <i class="fas fa-microphone"></i>
+                </div>
                 <div class="history-content">
-                    <div class="history-header">
-                        <h3 class="history-title">语音面试记录</h3>
-                        <span class="history-date">${date}</span>
+                    <div class="history-title">
+                        AI语音面试记录
+                        <span class="history-badge">完成</span>
                     </div>
                     <div class="history-meta">
-                        <span class="history-duration">时长: ${duration}</span>
-                        <span class="history-messages">消息数: ${interview.messages?.length || 0}</span>
+                        <span><i class="fas fa-clock"></i> ${date}</span>
+                        <span><i class="fas fa-stopwatch"></i> ${duration}</span>
+                        <span><i class="fas fa-comments"></i> ${messageCount}条对话</span>
+                    </div>
+                    <div class="history-summary">
+                        ${interview.summary || '本次面试涵盖了技术能力、项目经验等多个方面的深入交流...'}
                     </div>
                 </div>
                 <div class="history-actions">
-                    <button class="btn-primary" onclick="historyManager.continueInterview('${interview.id}')">继续面试</button>
-                    <button class="btn-secondary" onclick="historyManager.deleteInterview('${interview.id}')">删除</button>
+                    <button class="history-action-btn" onclick="historyManager.continueInterview('${interview.id}')" title="继续面试">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button class="history-action-btn" onclick="historyManager.deleteInterview('${interview.id}')" title="删除记录">
+                        <i class="fas fa-trash"></i>
+                    </button>
                 </div>
             </div>
         `;
@@ -982,9 +1051,25 @@ class ResumeManager {
         if (this.resumeInfo) {
             this.resumeInfo.innerHTML = `
                 <div class="no-resume" id="noResume">
-                    <div class="no-resume-icon">📄</div>
-                    <p>暂未上传简历</p>
-                    <p class="sub-text">上传简历后，系统将基于您的背景生成个性化语音面试问题</p>
+                    <div class="no-resume-illustration">
+                        <i class="fas fa-file-upload"></i>
+                    </div>
+                    <h3>暂未上传简历</h3>
+                    <p>上传简历后，AI面试官将基于您的背景生成个性化面试问题</p>
+                    <div class="resume-benefits">
+                        <div class="benefit-item">
+                            <i class="fas fa-bullseye"></i>
+                            <span>针对性问题</span>
+                        </div>
+                        <div class="benefit-item">
+                            <i class="fas fa-star"></i>
+                            <span>技能匹配</span>
+                        </div>
+                        <div class="benefit-item">
+                            <i class="fas fa-chart-bar"></i>
+                            <span>深度分析</span>
+                        </div>
+                    </div>
                 </div>
             `;
         }
@@ -996,19 +1081,34 @@ class ResumeManager {
         return `
             <div class="resume-card">
                 <div class="resume-header">
-                    <div class="resume-icon">📄</div>
+                    <div class="resume-icon">
+                        <i class="fas fa-file-alt"></i>
+                    </div>
                     <div class="resume-details">
                         <h4>${resumeData.fileName}</h4>
-                        <p class="resume-meta">上传时间: ${uploadDate}</p>
-                        <p class="resume-meta">文本长度: ${resumeData.textLength} 字符</p>
+                        <div class="resume-meta">
+                            <span><i class="fas fa-calendar"></i> ${uploadDate}</span>
+                            <span><i class="fas fa-file-text"></i> ${resumeData.textLength} 字符</span>
+                        </div>
+                        <div class="resume-status">
+                            <span class="status-badge success">
+                                <i class="fas fa-check"></i>
+                                已解析
+                            </span>
+                        </div>
                     </div>
                 </div>
                 <div class="resume-preview">
-                    <h5>简历预览:</h5>
+                    <h5><i class="fas fa-eye"></i> 简历预览</h5>
+                    <div class="preview-content">
                     <p class="preview-text">${resumeData.preview}</p>
+                    </div>
                 </div>
                 <div class="resume-actions">
-                    <button class="btn-secondary" onclick="resumeManager.removeResume()">删除简历</button>
+                    <button class="btn-secondary" onclick="resumeManager.removeResume()">
+                        <i class="fas fa-trash"></i>
+                        删除简历
+                    </button>
                 </div>
             </div>
         `;
@@ -1263,3 +1363,600 @@ document.addEventListener('DOMContentLoaded', () => {
     
     console.log('Azure语音面试官应用已启动');
 });
+
+// 拖拽上传功能
+function initDragAndDrop() {
+    const uploadZone = document.querySelector('.upload-content');
+    if (!uploadZone) return;
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        uploadZone.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        uploadZone.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        uploadZone.addEventListener(eventName, unhighlight, false);
+    });
+
+    uploadZone.addEventListener('drop', handleDrop, false);
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    function highlight(e) {
+        uploadZone.classList.add('dragover');
+    }
+
+    function unhighlight(e) {
+        uploadZone.classList.remove('dragover');
+    }
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        handleFiles(files);
+    }
+
+    function handleFiles(files) {
+        ([...files]).forEach(uploadFile);
+    }
+
+    function uploadFile(file) {
+        // 这里可以添加文件上传逻辑
+        console.log('上传文件:', file.name);
+        
+        // 显示上传进度
+        showUploadProgress(file.name);
+    }
+}
+
+// 显示上传进度
+function showUploadProgress(fileName) {
+    const progressHtml = `
+        <div class="upload-progress">
+            <div class="progress-info">
+                <i class="fas fa-file-upload"></i>
+                <span>正在上传: ${fileName}</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill"></div>
+            </div>
+        </div>
+    `;
+    
+    // 可以添加到适当的容器中显示进度
+    console.log('上传进度:', fileName);
+}
+
+// 语音状态动画增强
+function updateVoiceStatus(status, text) {
+    const statusElement = document.querySelector('.voice-status-text');
+    if (!statusElement) return;
+
+    // 移除所有状态类
+    statusElement.classList.remove('listening', 'processing', 'speaking');
+    
+    // 添加新状态类
+    if (status) {
+        statusElement.classList.add(status);
+    }
+    
+    // 更新文本
+    if (text) {
+        statusElement.textContent = text;
+    }
+}
+
+// 消息流式显示增强
+function displayMessageWithStreaming(message, isUser = false) {
+    const messagesContainer = document.getElementById('messages');
+    if (!messagesContainer) return;
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
+    
+    const avatar = document.createElement('div');
+    avatar.className = 'message-avatar';
+    avatar.innerHTML = isUser ? 
+        '<i class="fas fa-user"></i>' : 
+        '<i class="fas fa-robot"></i>';
+    
+    const content = document.createElement('div');
+    content.className = 'message-content';
+    
+    const bubble = document.createElement('div');
+    bubble.className = 'message-bubble';
+    
+    const text = document.createElement('div');
+    text.className = 'message-text';
+    
+    const timestamp = document.createElement('div');
+    timestamp.className = 'message-timestamp';
+    timestamp.textContent = new Date().toLocaleTimeString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    
+    bubble.appendChild(text);
+    bubble.appendChild(timestamp);
+    content.appendChild(bubble);
+    messageDiv.appendChild(avatar);
+    messageDiv.appendChild(content);
+    messagesContainer.appendChild(messageDiv);
+    
+    // 如果不是用户消息，添加流式显示效果
+    if (!isUser) {
+        const indicator = document.createElement('span');
+        indicator.className = 'streaming-indicator';
+        text.appendChild(indicator);
+        
+        // 模拟流式显示
+        let currentText = '';
+        let index = 0;
+        
+        function typeWriter() {
+            if (index < message.length) {
+                currentText += message.charAt(index);
+                text.innerHTML = currentText + '<span class="streaming-indicator"></span>';
+                index++;
+                setTimeout(typeWriter, 30); // 调整打字速度
+            } else {
+                text.innerHTML = currentText; // 移除指示器
+            }
+        }
+        
+        typeWriter();
+    } else {
+        text.textContent = message;
+    }
+    
+    // 滚动到底部
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// 统计数据更新
+function updateStats(stats) {
+    const statElements = {
+        total: document.querySelector('.stat-item:nth-child(1) .stat-number'),
+        today: document.querySelector('.stat-item:nth-child(2) .stat-number'),
+        success: document.querySelector('.stat-item:nth-child(3) .stat-number')
+    };
+    
+    if (stats.total && statElements.total) {
+        statElements.total.textContent = stats.total;
+    }
+    if (stats.today && statElements.today) {
+        statElements.today.textContent = stats.today;
+    }
+    if (stats.success && statElements.success) {
+        statElements.success.textContent = stats.success;
+    }
+}
+
+// 简历卡片生成
+function generateResumeCard(resume) {
+    return `
+        <div class="resume-card">
+            <div class="resume-header">
+                <div class="resume-icon">
+                    <i class="fas fa-file-alt"></i>
+                </div>
+                <div class="resume-details">
+                    <h4>${resume.name || '未命名简历'}</h4>
+                    <div class="resume-meta">
+                        <span><i class="fas fa-calendar"></i> ${resume.uploadDate || '未知日期'}</span>
+                        <span><i class="fas fa-file-text"></i> ${resume.size || '未知大小'}</span>
+                        <span><i class="fas fa-eye"></i> ${resume.views || 0} 次查看</span>
+                    </div>
+                    <div class="resume-status">
+                        <span class="status-badge ${resume.status === 'processed' ? 'success' : 'warning'}">
+                            <i class="fas fa-${resume.status === 'processed' ? 'check' : 'clock'}"></i>
+                            ${resume.status === 'processed' ? '已处理' : '处理中'}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            ${resume.preview ? `
+                <div class="resume-preview">
+                    <h5><i class="fas fa-eye"></i> 简历预览</h5>
+                    <div class="preview-content">
+                        <p class="preview-text">${resume.preview}</p>
+                    </div>
+                </div>
+            ` : ''}
+            <div class="resume-actions">
+                <button class="btn btn-secondary" onclick="viewResume('${resume.id}')">
+                    <i class="fas fa-eye"></i> 查看详情
+                </button>
+                <button class="btn btn-primary" onclick="useResume('${resume.id}')">
+                    <i class="fas fa-play"></i> 开始面试
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// 历史记录增强显示
+function generateHistoryItem(item) {
+    return `
+        <div class="history-item">
+            <div class="history-header">
+                <div class="history-title">
+                    <i class="fas fa-comments"></i>
+                    面试记录 #${item.id}
+                    ${item.completed ? '<span class="history-badge"><i class="fas fa-check"></i> 已完成</span>' : ''}
+                </div>
+                <div class="history-meta">
+                    <span><i class="fas fa-calendar"></i> ${item.date}</span>
+                    <span><i class="fas fa-clock"></i> ${item.duration}</span>
+                    <span><i class="fas fa-star"></i> ${item.score || 'N/A'}</span>
+                </div>
+            </div>
+            <div class="history-summary">
+                ${item.summary || '暂无总结'}
+            </div>
+            <div class="history-actions">
+                <button class="btn btn-secondary btn-sm" onclick="viewHistory('${item.id}')">
+                    <i class="fas fa-eye"></i> 查看详情
+                </button>
+                <button class="btn btn-primary btn-sm" onclick="continueInterview('${item.id}')">
+                    <i class="fas fa-play"></i> 继续面试
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// 快捷操作增强
+function addQuickActions() {
+    const quickActions = document.querySelector('.quick-actions');
+    if (!quickActions) return;
+
+    const buttons = quickActions.querySelectorAll('.quick-btn');
+    
+    buttons.forEach((btn, index) => {
+        btn.addEventListener('click', () => {
+            // 添加点击动画
+            btn.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                btn.style.transform = 'scale(1)';
+            }, 150);
+            
+            // 根据按钮执行不同操作
+            switch(index) {
+                case 0: // 开始面试
+                    startQuickInterview();
+                    break;
+                case 1: // 暂停面试
+                    pauseInterview();
+                    break;
+                case 2: // 结束面试
+                    endInterview();
+                    break;
+            }
+        });
+    });
+}
+
+// 快速面试功能
+function startQuickInterview() {
+    updateVoiceStatus('listening', '正在准备面试...');
+    console.log('开始快速面试');
+}
+
+function pauseInterview() {
+    updateVoiceStatus('processing', '面试已暂停');
+    console.log('暂停面试');
+}
+
+function endInterview() {
+    updateVoiceStatus('', '面试已结束');
+    console.log('结束面试');
+}
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化拖拽上传
+    initDragAndDrop();
+    
+    // 初始化快捷操作
+    addQuickActions();
+    
+    // 初始化统计数据
+    updateStats({
+        total: 0,
+        today: 0,
+        success: 0
+    });
+});
+
+// 通知系统
+function showNotification(title, message, type = 'success', duration = 5000) {
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    
+    notification.innerHTML = `
+        <div class="notification-header">
+            <div class="notification-title">
+                <i class="fas fa-${getNotificationIcon(type)}"></i>
+                ${title}
+            </div>
+            <button class="notification-close" onclick="closeNotification(this)">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="notification-content">${message}</div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // 显示动画
+    setTimeout(() => notification.classList.add('show'), 100);
+    
+    // 自动关闭
+    if (duration > 0) {
+        setTimeout(() => closeNotification(notification.querySelector('.notification-close')), duration);
+    }
+}
+
+function getNotificationIcon(type) {
+    const icons = {
+        success: 'check-circle',
+        warning: 'exclamation-triangle',
+        error: 'times-circle',
+        info: 'info-circle'
+    };
+    return icons[type] || 'info-circle';
+}
+
+function closeNotification(button) {
+    const notification = button.closest('.notification');
+    notification.classList.remove('show');
+    setTimeout(() => notification.remove(), 300);
+}
+
+// 工具函数
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function formatDate(date) {
+    return new Date(date).toLocaleDateString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function formatDuration(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+        return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+}
+
+// 本地存储管理
+const Storage = {
+    set(key, value) {
+        try {
+            localStorage.setItem(key, JSON.stringify(value));
+        } catch (e) {
+            console.warn('无法保存到本地存储:', e);
+        }
+    },
+    
+    get(key, defaultValue = null) {
+        try {
+            const item = localStorage.getItem(key);
+            return item ? JSON.parse(item) : defaultValue;
+        } catch (e) {
+            console.warn('无法从本地存储读取:', e);
+            return defaultValue;
+        }
+    },
+    
+    remove(key) {
+        try {
+            localStorage.removeItem(key);
+        } catch (e) {
+            console.warn('无法从本地存储删除:', e);
+        }
+    }
+};
+
+// 防抖函数
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// 节流函数
+function throttle(func, limit) {
+    let inThrottle;
+    return function() {
+        const args = arguments;
+        const context = this;
+        if (!inThrottle) {
+            func.apply(context, args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
+    };
+}
+
+// 复制到剪贴板
+async function copyToClipboard(text) {
+    try {
+        await navigator.clipboard.writeText(text);
+        showNotification('复制成功', '内容已复制到剪贴板', 'success', 2000);
+        return true;
+    } catch (err) {
+        console.error('复制失败:', err);
+        showNotification('复制失败', '无法复制到剪贴板', 'error', 3000);
+        return false;
+    }
+}
+
+// 下载文件
+function downloadFile(content, filename, contentType = 'text/plain') {
+    const blob = new Blob([content], { type: contentType });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+}
+
+// 骨架屏加载
+function showSkeleton(container, count = 3) {
+    const skeletonHtml = Array(count).fill().map(() => `
+        <div class="skeleton-item" style="margin-bottom: 1rem;">
+            <div class="skeleton skeleton-text" style="height: 1.2em; margin-bottom: 0.5rem;"></div>
+            <div class="skeleton skeleton-text" style="height: 1em; width: 80%;"></div>
+        </div>
+    `).join('');
+    
+    if (typeof container === 'string') {
+        container = document.querySelector(container);
+    }
+    
+    if (container) {
+        container.innerHTML = skeletonHtml;
+    }
+}
+
+// 移除骨架屏
+function hideSkeleton(container) {
+    if (typeof container === 'string') {
+        container = document.querySelector(container);
+    }
+    
+    if (container) {
+        const skeletons = container.querySelectorAll('.skeleton-item');
+        skeletons.forEach(skeleton => skeleton.remove());
+    }
+}
+
+// 模拟API调用
+function mockApiCall(data, delay = 1000) {
+    return new Promise((resolve) => {
+        setTimeout(() => resolve(data), delay);
+    });
+}
+
+// 表单验证
+function validateForm(formElement) {
+    const errors = [];
+    const inputs = formElement.querySelectorAll('input[required], textarea[required], select[required]');
+    
+    inputs.forEach(input => {
+        if (!input.value.trim()) {
+            errors.push(`${input.getAttribute('data-label') || input.name} 不能为空`);
+            input.classList.add('error');
+        } else {
+            input.classList.remove('error');
+        }
+        
+        // 邮箱验证
+        if (input.type === 'email' && input.value) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(input.value)) {
+                errors.push('请输入有效的邮箱地址');
+                input.classList.add('error');
+            }
+        }
+    });
+    
+    return {
+        isValid: errors.length === 0,
+        errors
+    };
+}
+
+// 页面可见性检测
+function onVisibilityChange(callback) {
+    document.addEventListener('visibilitychange', () => {
+        callback(!document.hidden);
+    });
+}
+
+// 网络状态检测
+function onNetworkChange(callback) {
+    window.addEventListener('online', () => callback(true));
+    window.addEventListener('offline', () => callback(false));
+}
+
+// 初始化所有功能
+function initializeApp() {
+    // 初始化拖拽上传
+    initDragAndDrop();
+    
+    // 初始化快捷操作
+    addQuickActions();
+    
+    // 初始化统计数据
+    updateStats({
+        total: Storage.get('interview_total', 0),
+        today: Storage.get('interview_today', 0),
+        success: Storage.get('interview_success', 0)
+    });
+    
+    // 网络状态监听
+    onNetworkChange((isOnline) => {
+        if (isOnline) {
+            showNotification('网络连接', '网络连接已恢复', 'success', 3000);
+        } else {
+            showNotification('网络断开', '网络连接已断开，请检查网络设置', 'warning', 0);
+        }
+    });
+    
+    // 页面可见性监听
+    onVisibilityChange((isVisible) => {
+        if (isVisible) {
+            console.log('页面变为可见');
+            // 可以在这里刷新数据
+        } else {
+            console.log('页面变为隐藏');
+            // 可以在这里暂停某些操作
+        }
+    });
+    
+    console.log('AI智能面试官应用已完全初始化');
+}
+
+// 更新原有的DOMContentLoaded事件监听器
+document.addEventListener('DOMContentLoaded', initializeApp);
+
+// 导出常用函数到全局作用域
+window.showNotification = showNotification;
+window.copyToClipboard = copyToClipboard;
+window.downloadFile = downloadFile;
+window.formatFileSize = formatFileSize;
+window.formatDate = formatDate;
+window.formatDuration = formatDuration;

@@ -1,73 +1,73 @@
-# Azure语音面试官系统 - FastRTC增强版
+# AI智能面试官 - 专业语音面试系统
 
-基于 Azure OpenAI 实时语音模型和 FastRTC 音频增强技术的智能面试系统，提供专业的高质量语音面试体验。
+基于 Azure OpenAI 实时语音模型的现代化智能面试系统，提供专业的高质量语音面试体验和现代化用户界面。
 
 ## 📑 快速导航
 
 ### 关键文件索引
-- [`start_azure_voice_interview.py`](start_azure_voice_interview.py) - Azure语音系统启动脚本，环境检查与服务启动
-- [`backend/app.py`](backend/app.py) - Azure语音面试主应用，WebSocket语音服务端，集成FastRTC音频处理
-- [`static/index.html`](static/index.html) - Azure语音面试前端界面，多页面路由系统
-- [`static/app.js`](static/app.js) - Azure语音客户端逻辑，WebSocket音频通信与数据管理
-- [`static/voice-call.js`](static/voice-call.js) - FastRTC增强语音通话模块，专业音频处理与VAD检测
-- [`static/style.css`](static/style.css) - Azure主题UI样式，现代化语音交互界面设计
-- [`config.py`](config.py) - FastRTC音频增强配置，音频质量与处理参数
+- [`start.py`](start.py) - 系统启动脚本，环境检查与服务启动
+- [`backend/app.py`](backend/app.py) - 语音面试主应用，WebSocket语音服务端
+- [`static/index.html`](static/index.html) - 现代化面试前端界面，响应式设计
+- [`static/app.js`](static/app.js) - 前端交互逻辑，WebSocket通信与功能管理
+- [`static/style.css`](static/style.css) - 现代化UI设计系统，专业面试主题
+- [`config.py`](config.py) - 系统配置文件
 
 ### 按功能查找
 - **环境配置** → Azure OpenAI API密钥设置
-- **启动系统** → [`start_azure_voice_interview.py`](start_azure_voice_interview.py) 
-- **语音面试** → 主页面，Azure实时语音通信，FastRTC音频增强
-- **语音通话** → 点击麦克风按钮，全屏语音交互界面（纯白色清晰背景）
-- **音频质量** → FastRTC专业音频预处理，VAD语音活动检测
-- **简历管理** → 导航栏"简历设置"页面，个性化语音面试
-- **历史记录** → 导航栏"历史记录"页面，语音面试记录管理
-- **音频播放** → 流式语音播放与重播功能
-- **响应式设计** → Azure主题CSS，支持移动端语音交互
+- **启动系统** → [`start.py`](start.py) 
+- **语音面试** → 主页面，Azure实时语音通信
+- **语音通话** → 点击麦克风按钮，全屏语音交互界面
+- **简历管理** → 导航栏"简历管理"页面，个性化面试
+- **历史记录** → 导航栏"面试历史"页面，面试记录管理
+- **现代化界面** → 响应式设计，支持移动端和桌面端
 
 ## 🎯 系统特性
 
-### 核心功能特性
+### 现代化界面设计
 ```javascript
-// Azure实时语音面试 - 即开即用
-访问应用 → 立即开始语音面试对话
+// 现代化面试界面 - 专业设计
+访问应用 → 现代化欢迎界面 → 开始语音面试对话
 
-// FastRTC增强语音通话模式 - 专业音频处理
-点击麦克风按钮 → 全屏语音界面 → 高质量实时语音对话 → 智能语音可视化效果
+// 全屏语音通话模式 - 沉浸式体验
+点击麦克风按钮 → 全屏语音界面 → 实时语音对话 → 智能语音可视化
 
-// 个性化语音面试流程
-导航栏"简历设置" → 上传PDF/Word → 返回面试 → Azure AI基于简历进行语音提问
+// 个性化面试流程
+导航栏"简历管理" → 拖拽上传文件 → 返回面试 → AI基于简历进行语音提问
 ```
 
-### FastRTC音频增强技术特性
-- **🎤 专业音频预处理**: 集成高通/低通滤波器、动态压缩器、自动增益控制
-- **🧠 智能语音活动检测(VAD)**: 实时检测语音开始/结束，优化音频传输效率
-- **🔊 高质量音频编码**: 24kHz采样率、16位深度、PCM格式，确保音频清晰度
-- **⚡ 超低延迟处理**: 10ms目标延迟，实时音频处理管道优化
-- **🎛️ 动态音频优化**: 自适应降噪、回声消除、音频增强算法
-- **📊 实时音频分析**: 音频能量检测、频谱分析、可视化反馈
-
-### Azure语音技术特性
+### 核心功能特性
 - **🎤 实时语音对话**: 基于Azure OpenAI实时语音模型，支持语音输入和语音输出
-- **📝 文本输入支持**: 也可以通过文字进行交流，灵活切换
-- **📄 简历分析**: 上传简历获得个性化语音面试
-- **🎯 专业面试**: 技术能力全面评估，语音交互更自然
+- **💬 智能聊天界面**: 现代化聊天气泡设计，支持头像和时间戳
+- **📝 混合输入模式**: 支持语音输入和文本输入，灵活切换
+- **📄 智能简历分析**: 拖拽上传简历获得个性化面试
+- **🎯 专业面试评估**: 技术能力全面评估，语音交互更自然
 - **🔄 流式语音播放**: 边接收边播放，降低延迟提升体验
-- **🎵 音频重播**: 生成完整音频文件供重复播放
-- **🖼️ 清晰界面设计**: 全屏语音界面采用纯白色背景，提供清晰、专业的视觉体验
+- **🎵 音频重播功能**: 生成完整音频文件供重复播放
+- **📱 响应式设计**: 完美适配桌面端和移动端设备
+
+### 现代化UI/UX特性
+- **🎨 专业设计系统**: 现代化色彩方案，专业面试主题
+- **✨ 流畅动画效果**: CSS动画和过渡效果，提升用户体验
+- **🌟 玻璃拟态设计**: 现代化卡片设计，渐变背景和阴影效果
+- **🔔 智能通知系统**: 实时状态提示和操作反馈
+- **📊 可视化状态指示**: 语音状态动画，连接状态实时显示
+- **🎯 直观导航系统**: 清晰的功能分区，便捷的页面切换
+- **💫 交互式元素**: 悬停效果，点击反馈，提升交互体验
 
 ### 多页面导航系统
-- **语音面试页面**: Azure实时语音WebSocket通信，FastRTC音频增强处理
-- **历史记录页面**: 语音面试记录管理，支持继续面试
-- **简历设置页面**: 文件上传管理，个性化语音面试配置
+- **面试主页**: 欢迎界面 + 聊天界面，Azure实时语音WebSocket通信
+- **面试历史页面**: 面试记录管理，支持筛选和统计
+- **简历管理页面**: 拖拽上传，文件预览，个性化面试配置
+- **全屏语音界面**: 沉浸式语音通话体验
 
 ### 技术特性
 - **Azure OpenAI集成**: 使用最新的实时语音模型
-- **FastRTC音频引擎**: 专业级音频处理与优化
 - **WebSocket音频流**: 实时双向语音通信
 - **流式音频处理**: PCM音频解码与WAV文件生成
-- **本地存储**: localStorage管理面试历史
-- **文件处理**: 支持PDF、Word文档解析
-- **现代化设计**: Azure主题设计语言，纯白色清晰界面，支持移动端
+- **本地存储管理**: localStorage管理面试历史和用户设置
+- **文件处理支持**: 支持PDF、Word文档解析
+- **现代化前端**: 原生JavaScript + CSS Grid + Flexbox
+- **拖拽上传功能**: 现代化文件上传体验
 
 ## 🚀 快速开始
 
@@ -75,7 +75,7 @@
 ```bash
 # 克隆项目
 git clone <repository-url>
-cd azure-voice-interview
+cd ai-interview-system
 
 # 创建虚拟环境
 python -m venv .venv
@@ -83,7 +83,7 @@ source .venv/bin/activate  # Linux/Mac
 # 或
 .venv\Scripts\activate     # Windows
 
-# 安装依赖（包含FastRTC音频增强）
+# 安装依赖
 pip install -r requirements.txt
 ```
 
@@ -91,21 +91,26 @@ pip install -r requirements.txt
 
 **方式一：环境变量**
 ```bash
-export AZURE_OPENAI_API_KEY="your_azure_api_key_here"
-export AZURE_OPENAI_ENDPOINT="https://your-resource-name.openai.azure.com"
-export AZURE_API_VERSION="2025-04-01-preview"  # 可选
+export OPENAI_API_KEY="your_azure_api_key_here"
+export OPENAI_BASE_URL="https://your-resource-name.openai.azure.com"
 ```
 
 **方式二：Windows命令行**
 ```cmd
-set AZURE_OPENAI_API_KEY=your_azure_api_key_here
-set AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com
+set OPENAI_API_KEY=your_azure_api_key_here
+set OPENAI_BASE_URL=https://your-resource-name.openai.azure.com
+```
+
+**方式三：.env文件**
+```env
+OPENAI_API_KEY=your_azure_api_key_here
+OPENAI_BASE_URL=https://your-resource-name.openai.azure.com
 ```
 
 ### 3. 启动系统
 ```bash
-# 推荐：使用Azure语音启动脚本（包含环境检查）
-python start_azure_voice_interview.py
+# 推荐：使用启动脚本（包含环境检查）
+python start.py
 
 # 或直接启动
 uvicorn backend.app:app --host localhost --port 8000 --reload
@@ -113,10 +118,11 @@ uvicorn backend.app:app --host localhost --port 8000 --reload
 
 ### 4. 开始使用
 1. 浏览器访问：http://localhost:8000
-2. **直接语音面试**：页面加载后立即开始语音对话
-3. **FastRTC增强体验**：点击麦克风按钮体验专业音频处理
-4. **个性化语音面试**：通过导航栏"简历设置"上传简历
-5. **查看历史**：通过导航栏"历史记录"管理语音面试记录
+2. **现代化界面**：体验全新的专业面试界面设计
+3. **语音面试**：点击"开始面试"按钮开始语音对话
+4. **全屏模式**：点击麦克风按钮体验沉浸式语音通话
+5. **个性化面试**：通过"简历管理"上传简历获得定制化面试
+6. **查看历史**：通过"面试历史"管理面试记录
 
 ## 💼 用户指南
 
@@ -124,91 +130,91 @@ uvicorn backend.app:app --host localhost --port 8000 --reload
 
 #### 快速语音面试模式
 ```
-启动应用 → 点击语音按钮 → 开始Azure实时语音面试 → FastRTC增强音频体验
+启动应用 → 现代化欢迎界面 → 点击"开始面试" → Azure实时语音面试
 ```
 
 #### 个性化语音面试模式
 ```
-启动应用 → 导航栏"简历设置" → 上传简历文件 → 返回面试页面 → Azure AI基于简历进行语音提问
+启动应用 → 导航栏"简历管理" → 拖拽上传简历 → 返回面试页面 → AI基于简历进行语音提问
 ```
 
-#### 语音面试历史管理
+#### 面试历史管理
 ```
-导航栏"历史记录" → 查看过往语音面试 → 支持继续面试、音频重播、删除记录
+导航栏"面试历史" → 查看过往面试 → 筛选和统计 → 支持继续面试、音频重播
 ```
 
 ### 界面导航
 - **顶部导航栏**: 
-  - 🎤 语音面试：Azure实时语音对话界面，FastRTC音频增强
-  - 📋 历史记录：语音面试记录管理
-  - 📄 简历设置：文件上传管理
-- **连接状态**: 实时显示Azure语音服务连接状态
-- **语音交互**: 支持语音输入、文本输入、语音输出
-- **音频播放**: 流式语音播放与完整音频重播
+  - 🎤 语音面试：现代化面试对话界面
+  - 📋 面试历史：面试记录管理和统计
+  - 📄 简历管理：文件上传和预览
+- **连接状态指示器**: 实时显示Azure语音服务连接状态
+- **语音交互控制**: 支持语音输入、文本输入、语音输出
+- **现代化通知**: 智能提示系统，操作反馈
 
-### FastRTC音频增强功能
-- **智能语音检测**: 自动识别语音开始和结束，避免无效音频传输
-- **专业音频处理**: 实时降噪、回声消除、音频增强
-- **可视化反馈**: 根据语音强度动态调整界面效果
-- **音频质量监控**: 实时显示音频质量统计信息
-- **延迟优化**: 10ms超低延迟音频处理
-
-### 功能特色
-- **即开即用**: Azure语音服务启动后直接可用
-- **专业音质**: FastRTC音频增强确保清晰通话质量
-- **智能导航**: 清晰的功能分工，直观的页面切换
-- **数据持久**: 本地存储语音面试记录，隐私安全
-- **跨平台**: 响应式设计，桌面端和移动端完美适配
-- **专业语音**: Azure OpenAI实时语音模型，自然流畅
+### 现代化功能特色
+- **拖拽上传**: 现代化文件上传体验，支持拖拽和点击上传
+- **实时通知**: 智能通知系统，提供操作反馈和状态提示
+- **流式显示**: 消息流式显示效果，模拟真实打字体验
+- **语音状态动画**: 动态语音状态指示，可视化语音交互过程
+- **响应式适配**: 完美适配各种屏幕尺寸，移动端友好
+- **专业主题**: 现代化设计语言，专业面试氛围
 
 ## 🔧 技术架构
 
 ### 系统架构图
 ```
-Frontend (Azure语音客户端 + FastRTC音频引擎)
-├── index.html        # Azure语音面试界面
-├── app.js            # Azure语音WebSocket客户端
-│   ├── AzureVoiceChat       # Azure语音聊天管理
-│   ├── LocalStorageManager  # 本地数据存储
-│   ├── PageRouter          # 页面路由管理  
-│   ├── HistoryManager      # 语音面试历史记录
-│   ├── ResumeManager       # 简历文件管理
-│   └── AzureVoiceInterviewApp # 主应用逻辑
-├── voice-call.js     # FastRTC增强语音通话模块
-│   ├── 专业音频预处理管道    # 滤波器、压缩器、增益控制
-│   ├── 智能VAD语音检测      # 语音活动检测与优化
-│   ├── 实时音频分析        # 频谱分析、能量检测
-│   └── 音频质量监控        # 统计信息、性能指标
-└── style.css         # Azure主题UI样式
+Frontend (现代化面试客户端)
+├── index.html        # 现代化面试界面，响应式设计
+├── app.js            # 前端交互逻辑
+│   ├── WebSocket通信管理    # 实时语音通信
+│   ├── 页面路由系统        # 多页面导航
+│   ├── 拖拽上传功能        # 现代化文件上传
+│   ├── 通知系统           # 智能提示反馈
+│   ├── 本地存储管理        # 数据持久化
+│   ├── 语音状态动画        # 可视化反馈
+│   ├── 消息流式显示        # 打字机效果
+│   └── 工具函数库         # 实用工具集
+└── style.css         # 现代化设计系统
+    ├── CSS变量系统         # 统一设计令牌
+    ├── 响应式布局         # 移动端适配
+    ├── 动画效果           # 流畅过渡动画
+    ├── 组件样式           # 模块化组件
+    ├── 主题色彩           # 专业配色方案
+    └── 交互反馈           # 悬停和点击效果
 
-Backend (Azure语音服务 + FastRTC音频处理)
-├── app.py            # Azure语音面试主应用
-│   ├── AzureVoiceService    # Azure语音服务类
-│   ├── FastRTC音频处理      # process_fastrtc_audio方法
-│   ├── WebSocket端点        # /ws/voice (FastRTC增强)
-│   └── 简历上传API          # /api/upload-resume
-├── config.py         # FastRTC音频增强配置
+Backend (语音面试服务)
+├── app.py            # 面试主应用
+│   ├── WebSocket端点        # /ws 实时通信
+│   ├── 文件上传API         # /upload 简历上传
+│   ├── 静态文件服务        # 前端资源
+│   └── 错误处理           # 异常管理
+├── config.py         # 系统配置
 └── 文件处理模块       # PDF/Word解析
 ```
 
-### FastRTC音频处理管道
-```
-麦克风输入 → WebRTC音频约束 → 音频上下文 → 高通滤波器 → 低通滤波器 
-→ 动态压缩器 → 增益控制 → VAD检测 → 音频分析 → PCM编码 → WebSocket传输
-```
+### 前端技术栈
+- **核心技术**: 原生JavaScript ES6+, HTML5, CSS3
+- **布局系统**: CSS Grid + Flexbox响应式布局
+- **设计系统**: CSS自定义属性，模块化组件设计
+- **动画效果**: CSS Transitions + Animations
+- **通信协议**: WebSocket实时双向通信
+- **存储方案**: localStorage本地数据持久化
+- **文件处理**: File API + 拖拽上传
+- **音频处理**: Web Audio API音频播放
 
 ### 关键技术栈
-- **后端**: FastAPI + uvicorn + Azure OpenAI SDK + FastRTC
-- **前端**: 原生JavaScript + WebSocket + Web Audio API + FastRTC音频处理
+- **后端**: FastAPI + uvicorn + Azure OpenAI SDK
+- **前端**: 原生JavaScript + WebSocket + Web Audio API
 - **Azure集成**: Azure OpenAI实时语音模型
-- **音频处理**: FastRTC + PCM解码 + WAV生成 + 流式播放 + VAD检测
+- **音频处理**: PCM解码 + WAV生成 + 流式播放
 - **文件处理**: python-docx + PyPDF2
-- **UI设计**: Azure主题设计语言，CSS Grid + Flexbox
+- **UI设计**: 现代化设计系统，CSS Grid + Flexbox
 
 ### 数据流设计
 ```
-用户语音输入 → FastRTC音频预处理 → VAD检测 → PCM编码 → WebSocket → 
-Azure OpenAI → 流式音频响应 → 前端播放 → 本地存储
+用户语音输入 → WebSocket → Azure OpenAI → 流式音频响应 → 
+前端播放 → 本地存储 → 历史记录管理
 ```
 
 ## 📝 配置参考
@@ -216,33 +222,15 @@ Azure OpenAI → 流式音频响应 → 前端播放 → 本地存储
 ### 关键环境变量
 | 变量名 | 说明 | 必需 | 默认值 |
 |--------|------|------|--------|
-| `AZURE_OPENAI_API_KEY` | Azure OpenAI API密钥 | 是 | - |
-| `AZURE_OPENAI_ENDPOINT` | Azure OpenAI端点URL | 是 | - |
-| `AZURE_API_VERSION` | Azure API版本 | 否 | 2025-04-01-preview |
-
-### FastRTC音频配置
-```python
-# 音频质量设置
-SAMPLE_RATE = 24000      # 采样率 (Hz)
-BIT_DEPTH = 16           # 位深度
-CHANNELS = 1             # 声道数（单声道）
-
-# VAD语音活动检测
-VAD_THRESHOLD = 0.01     # VAD阈值
-MIN_SPEECH_DURATION = 300 # 最小语音持续时间 (ms)
-TARGET_LATENCY = 0.01    # 目标延迟 (10ms)
-
-# 音频滤波器
-HIGH_PASS_FREQUENCY = 80  # 高通滤波器 (Hz)
-LOW_PASS_FREQUENCY = 8000 # 低通滤波器 (Hz)
-```
+| `OPENAI_API_KEY` | Azure OpenAI API密钥 | 是 | - |
+| `OPENAI_BASE_URL` | Azure OpenAI端点URL | 是 | - |
+| `ARK_API_KEY` | 备用API密钥 | 否 | - |
 
 ### 推荐配置
 ```env
 # Azure OpenAI配置
-AZURE_OPENAI_API_KEY=your_azure_api_key_here
-AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com
-AZURE_API_VERSION=2025-04-01-preview
+OPENAI_API_KEY=your_azure_api_key_here
+OPENAI_BASE_URL=https://your-resource-name.openai.azure.com
 
 # 服务配置
 HOST=localhost
@@ -250,56 +238,59 @@ PORT=8000
 LOG_LEVEL=INFO
 ```
 
-## 🎵 FastRTC音频增强详解
-
-### 音频处理管道
-1. **音频采集**: 24kHz高质量采样，16位深度
-2. **预处理**: 高通/低通滤波器去除噪音
-3. **动态处理**: 压缩器优化音频动态范围
-4. **增益控制**: 自动增益确保音量一致性
-5. **VAD检测**: 智能识别语音活动
-6. **编码传输**: PCM格式高效传输
-
-### 语音活动检测(VAD)
-- **实时检测**: 基于音频能量的RMS计算
-- **平滑处理**: 避免误触发和频繁切换
-- **智能缓冲**: 语音结束后延迟发送，确保完整性
-- **质量过滤**: 只传输高质量语音片段
-
-### 音频质量优化
-- **降噪处理**: 多级滤波器去除环境噪音
-- **回声消除**: WebRTC内置回声消除算法
-- **音频增强**: 动态压缩和增益控制
-- **延迟优化**: 10ms超低延迟处理
-
-### 可视化反馈
-- **实时波形**: 根据音频强度动态显示
-- **状态指示**: 聆听、处理、静音状态可视化
-- **质量监控**: 音频质量统计信息显示
-
 ## 📊 日志规范
 
-### 音频处理日志
-系统自动记录FastRTC音频处理的关键信息：
+### 前端交互日志
+系统自动记录前端用户交互和功能使用情况：
 
 ```
-[2025-01-XX XX:XX:XX] [FastRTC Audio] - 音频处理管道初始化完成
-[2025-01-XX XX:XX:XX] [VAD Detection] - 检测到语音开始，VAD置信度: 0.045
-[2025-01-XX XX:XX:XX] [Audio Quality] - 发送音频数据，长度: 8192, 格式: pcm_s16le
-[2025-01-XX XX:XX:XX] [WebSocket] - 收到FastRTC音频数据: 格式=pcm_s16le, 采样率=24000, VAD置信度=0.045
+[2025-01-XX XX:XX:XX] [Frontend] - 应用初始化完成，现代化界面加载
+[2025-01-XX XX:XX:XX] [Navigation] - 页面切换: 面试主页 → 简历管理
+[2025-01-XX XX:XX:XX] [Upload] - 文件拖拽上传: resume.pdf, 大小: 2.3MB
+[2025-01-XX XX:XX:XX] [WebSocket] - 语音连接建立，状态: 已连接
+[2025-01-XX XX:XX:XX] [Voice] - 语音状态变更: 静音 → 聆听
+[2025-01-XX XX:XX:XX] [Notification] - 显示通知: 文件上传成功
 ```
 
-### 错误追踪
-- **音频初始化错误**: 记录设备访问、权限问题
-- **处理管道错误**: 记录音频处理节点连接失败
-- **VAD检测错误**: 记录语音活动检测异常
-- **传输错误**: 记录WebSocket音频传输问题
+### 用户体验日志
+- **界面交互**: 记录页面切换、按钮点击、拖拽操作
+- **语音状态**: 记录语音开始、结束、状态变更
+- **文件操作**: 记录文件上传、预览、删除操作
+- **通知系统**: 记录通知显示、关闭、用户反馈
 
 ### 性能监控
-- **延迟统计**: 记录音频处理延迟
-- **质量指标**: 记录音频质量参数
-- **资源使用**: 记录CPU、内存使用情况
-- **连接状态**: 记录WebSocket连接稳定性
+- **加载时间**: 记录页面和资源加载时间
+- **响应延迟**: 记录WebSocket通信延迟
+- **内存使用**: 记录前端内存占用情况
+- **错误追踪**: 记录JavaScript错误和异常
+
+## 🎨 设计系统
+
+### 色彩方案
+```css
+/* 主色调 - 专业蓝色系 */
+--primary-color: #2563eb;      /* 主要蓝色 */
+--primary-light: #dbeafe;      /* 浅蓝色 */
+--primary-dark: #1e40af;       /* 深蓝色 */
+
+/* 功能色彩 */
+--success-color: #10b981;      /* 成功绿色 */
+--warning-color: #f59e0b;      /* 警告橙色 */
+--error-color: #ef4444;        /* 错误红色 */
+
+/* 中性色彩 */
+--text-primary: #1f2937;       /* 主要文本 */
+--text-secondary: #6b7280;     /* 次要文本 */
+--bg-primary: #ffffff;         /* 主背景 */
+--bg-secondary: #f9fafb;       /* 次背景 */
+```
+
+### 设计原则
+- **简洁专业**: 清晰的视觉层次，专业的面试氛围
+- **现代化**: 使用最新的设计趋势和交互模式
+- **响应式**: 完美适配各种设备和屏幕尺寸
+- **可访问性**: 符合WCAG无障碍设计标准
+- **一致性**: 统一的设计语言和交互模式
 
 ## 🔍 故障排除
 
@@ -308,30 +299,36 @@ LOG_LEVEL=INFO
 #### Azure服务连接问题
 ```bash
 # 检查Azure配置
-echo $AZURE_OPENAI_API_KEY
-echo $AZURE_OPENAI_ENDPOINT
+echo $OPENAI_API_KEY
+echo $OPENAI_BASE_URL
 
 # 验证网络连接
-curl -H "api-key: $AZURE_OPENAI_API_KEY" $AZURE_OPENAI_ENDPOINT/openai/deployments
+curl -H "Authorization: Bearer $OPENAI_API_KEY" $OPENAI_BASE_URL/v1/models
 ```
 
-#### 音频播放问题
-- **浏览器兼容性**: 确保使用支持Web Audio API的现代浏览器
-- **音频权限**: 检查浏览器音频播放权限设置
-- **网络延迟**: 检查网络连接质量，影响实时音频传输
+#### 前端界面问题
+- **浏览器兼容性**: 确保使用支持ES6+的现代浏览器
+- **缓存问题**: 清除浏览器缓存，强制刷新页面
+- **JavaScript错误**: 检查浏览器控制台错误信息
+- **CSS样式问题**: 确保CSS文件正确加载
 
-#### 简历上传问题
+#### 音频播放问题
+- **浏览器权限**: 检查浏览器音频播放权限设置
+- **网络延迟**: 检查网络连接质量，影响实时音频传输
+- **设备兼容**: 确保音频设备正常工作
+
+#### 文件上传问题
 - **文件格式**: 仅支持PDF、DOC、DOCX格式
-- **文件大小**: 限制10MB以内
-- **编码问题**: 确保文档使用标准编码格式
+- **文件大小**: 建议10MB以内
+- **拖拽功能**: 确保浏览器支持HTML5拖拽API
 
 ## 🚀 部署指南
 
 ### 生产环境部署
 ```bash
 # 设置生产环境变量
-export AZURE_OPENAI_API_KEY="your_production_key"
-export AZURE_OPENAI_ENDPOINT="your_production_endpoint"
+export OPENAI_API_KEY="your_production_key"
+export OPENAI_BASE_URL="your_production_endpoint"
 
 # 启动生产服务
 uvicorn backend.app:app --host 0.0.0.0 --port 8000 --workers 4
@@ -354,7 +351,7 @@ CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000"]
 
 ## 🤝 贡献指南
 
-欢迎提交 Issue 和 Pull Request 来改进Azure语音面试系统！
+欢迎提交 Issue 和 Pull Request 来改进AI智能面试官系统！
 
 ### 开发流程
 1. Fork 本仓库
@@ -365,4 +362,4 @@ CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000"]
 
 ---
 
-**Azure语音面试官系统** - 让面试更智能，让交流更自然 🎤✨
+**AI智能面试官** - 让面试更智能，让交流更自然，让界面更现代 🎤✨

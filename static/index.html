@@ -3,43 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Azure语音面试官 - AI实时语音面试系统</title>
-    <link rel="stylesheet" href="/static/style.css?v=2024010102">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎤</text></svg>">
+    <title>AI智能面试官 - 专业语音面试系统</title>
+    <link rel="stylesheet" href="/static/style.css?v=2024010103">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💼</text></svg>">
     <!-- Lottie动画库 -->
     <script
       src="https://unpkg.com/@dotlottie/player-component@2.7.12/dist/dotlottie-player.mjs"
       type="module"
     ></script>
+    <!-- 字体图标 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <!-- 应用容器 -->
+    <!-- 主应用容器 -->
     <div class="app-container">
-        <!-- 导航栏 -->
-        <nav class="navbar" id="navbar" style="display: none;">
-            <div class="nav-content">
-                <div class="nav-logo">
-                    <span class="logo-icon">🎤</span>
-                    <span class="logo-text">Azure语音面试官</span>
+        <!-- 顶部导航栏 -->
+        <nav class="modern-navbar" id="navbar" style="display: none;">
+            <div class="nav-container">
+                <!-- 品牌logo -->
+                <div class="nav-brand">
+                    <div class="brand-icon">
+                        <i class="fas fa-user-tie"></i>
+                    </div>
+                    <div class="brand-info">
+                        <h1 class="brand-title">AI面试官</h1>
+                        <span class="brand-subtitle">智能语音面试系统</span>
+                    </div>
                 </div>
+                
+                <!-- 导航菜单 -->
                 <div class="nav-menu">
-                    <button class="nav-btn" id="navInterview" data-page="interview">
-                        <span class="nav-icon">🎯</span>
-                        <span class="nav-text">语音面试</span>
+                    <button class="nav-item active" id="navInterview" data-page="interview">
+                        <div class="nav-item-icon">
+                            <i class="fas fa-microphone"></i>
+                        </div>
+                        <div class="nav-item-content">
+                            <span class="nav-item-title">语音面试</span>
+                            <span class="nav-item-desc">开始面试</span>
+                        </div>
                     </button>
-                    <button class="nav-btn" id="navHistory" data-page="history">
-                        <span class="nav-icon">📋</span>
-                        <span class="nav-text">历史记录</span>
+                    
+                    <button class="nav-item" id="navHistory" data-page="history">
+                        <div class="nav-item-icon">
+                            <i class="fas fa-history"></i>
+                        </div>
+                        <div class="nav-item-content">
+                            <span class="nav-item-title">面试记录</span>
+                            <span class="nav-item-desc">历史记录</span>
+                        </div>
                     </button>
-                    <button class="nav-btn" id="navResume" data-page="resume">
-                        <span class="nav-icon">📄</span>
-                        <span class="nav-text">简历设置</span>
+                    
+                    <button class="nav-item" id="navResume" data-page="resume">
+                        <div class="nav-item-icon">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <div class="nav-item-content">
+                            <span class="nav-item-title">简历管理</span>
+                            <span class="nav-item-desc">上传简历</span>
+                        </div>
                     </button>
                 </div>
+                
+                <!-- 连接状态 -->
                 <div class="nav-status">
-                    <div class="connection-status" id="connectionStatus">
+                    <div class="connection-indicator" id="connectionStatus">
                         <div class="status-dot"></div>
+                        <div class="status-info">
                         <span class="status-text">连接中...</span>
+                            <span class="status-desc">Azure语音服务</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -49,77 +81,204 @@
         <div class="page-router" id="pageRouter">
             
             <!-- 面试页面 -->
-            <div class="page" id="interviewPage">
+            <div class="page interview-page" id="interviewPage">
+                <!-- 面试欢迎界面 -->
+                <div class="interview-welcome">
+                    <div class="welcome-hero">
+                        <div class="hero-background">
+                            <div class="hero-pattern"></div>
+                        </div>
+                        <div class="hero-content">
+                            <div class="hero-icon">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <h1 class="hero-title">欢迎来到AI智能面试官</h1>
+                            <p class="hero-subtitle">基于Azure OpenAI的专业语音面试系统，为您提供个性化的面试体验</p>
+                            
+                            <div class="hero-features">
+                                <div class="feature-item">
+                                    <div class="feature-icon">
+                                        <i class="fas fa-comments"></i>
+                                    </div>
+                                    <div class="feature-content">
+                                        <h3>实时语音对话</h3>
+                                        <p>自然流畅的语音交互体验</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="feature-item">
+                                    <div class="feature-icon">
+                                        <i class="fas fa-brain"></i>
+                                    </div>
+                                    <div class="feature-content">
+                                        <h3>AI智能分析</h3>
+                                        <p>基于简历的个性化面试问题</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="feature-item">
+                                    <div class="feature-icon">
+                                        <i class="fas fa-chart-line"></i>
+                                    </div>
+                                    <div class="feature-content">
+                                        <h3>专业评估</h3>
+                                        <p>全面的技能能力评估报告</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                <!-- 主体内容 -->
-                <main class="main-content">
-                    <!-- 聊天区域 -->
-                    <div class="chat-container" id="chatContainer">
+                <!-- 聊天界面 -->
+                <div class="interview-chat">
+                    <div class="chat-container">
+                        <!-- 聊天头部 -->
+                        <div class="chat-header">
+                            <div class="interviewer-info">
+                                <div class="interviewer-avatar">
+                                    <i class="fas fa-user-tie"></i>
+                                </div>
+                                <div class="interviewer-details">
+                                    <h3>AI面试官</h3>
+                                    <p class="interviewer-status">在线 - 准备就绪</p>
+                                </div>
+                            </div>
+                            <div class="chat-actions">
+                                <button class="action-btn" title="清空对话">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                <button class="action-btn" title="全屏模式">
+                                    <i class="fas fa-expand"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 消息区域 -->
                         <div class="chat-messages" id="chatMessages">
-                            <!-- 欢迎消息 -->
-                            <div class="welcome-message">
-                                <div class="welcome-content">
-                                    <h2>🎤 欢迎使用Azure语音面试系统</h2>
-                                    <p>我是您的AI语音面试官，基于Azure OpenAI实时语音模型，提供专业的语音面试体验。</p>
+                            <!-- 初始引导消息 -->
+                            <div class="system-message">
+                                <div class="system-icon">
+                                    <i class="fas fa-info-circle"></i>
+                                </div>
+                                <div class="system-content">
+                                    <h4>面试准备提示</h4>
                                     <ul>
-                                        <li>🗣️ <strong>实时语音对话</strong> - 支持语音输入和语音输出</li>
-                                        <li>📄 <strong>简历分析</strong> - 上传简历获得个性化面试</li>
-                                        <li>🎯 <strong>专业面试</strong> - 技术能力全面评估</li>
+                                        <li>确保您的网络连接稳定</li>
+                                        <li>选择安静的环境进行面试</li>
+                                        <li>建议上传简历以获得个性化问题</li>
+                                        <li>放松心情，真实表达自己</li>
                                     </ul>
                                 </div>
                             </div>
                         </div>
 
                         <!-- 语音控制区域 -->
-                        <div class="voice-control-container">
-                            <div class="voice-control-wrapper">
-                                <!-- 语音通话按钮 -->
-                                <button id="voiceCallButton" class="voice-call-button" title="开始语音对话">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                        <path d="M12 14C13.66 14 15 12.66 15 11V5C15 3.34 13.66 2 12 2S9 3.34 9 5V11C9 12.66 10.34 14 12 14ZM19.35 10.04C18.98 10.04 18.68 10.34 18.68 10.71V11C18.68 14.12 16.12 16.68 13 16.68S7.32 14.12 7.32 11V10.71C7.32 10.34 7.02 10.04 6.65 10.04S6 10.34 6 10.71V11C6 14.84 8.94 18.01 12.5 18.7V21H11C10.45 21 10 21.45 10 22S10.45 23 11 23H13C13.55 23 14 22.55 14 22S13.55 21 13 21H11.5V18.7C15.06 18.01 18 14.84 18 11V10.71C18 10.34 17.66 10.04 17.29 10.04H19.35Z" fill="currentColor"/>
-                                    </svg>
+                        <div class="voice-control-panel">
+                            <div class="control-container">
+                                <!-- 语音状态显示 -->
+                                <div class="voice-status">
+                                    <div class="status-indicator">
+                                        <div class="pulse-ring"></div>
+                                        <div class="pulse-ring delay-1"></div>
+                                        <div class="pulse-ring delay-2"></div>
+                                    </div>
+                                    <div class="status-text">
+                                        <span class="status-title" id="voiceHint">点击开始语音面试</span>
+                                        <span class="status-desc">确保麦克风权限已开启</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- 主控制按钮 -->
+                                <div class="main-controls">
+                                    <button class="voice-start-btn" id="voiceCallButton" title="开始语音面试">
+                                        <div class="btn-icon">
+                                            <i class="fas fa-microphone"></i>
+                                        </div>
+                                        <span class="btn-text">开始面试</span>
+                                    </button>
+                                </div>
+                                
+                                <!-- 快捷操作 -->
+                                <div class="quick-actions">
+                                    <button class="quick-btn" title="上传简历">
+                                        <i class="fas fa-upload"></i>
+                                    </button>
+                                    <button class="quick-btn" title="查看历史">
+                                        <i class="fas fa-history"></i>
+                                    </button>
+                                    <button class="quick-btn" title="设置">
+                                        <i class="fas fa-cog"></i>
                                 </button>
-                                <div class="voice-hint">
-                                    <span id="voiceHint">点击开始语音对话</span>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </main>
+                </div>
             </div>
 
             <!-- 历史记录页面 -->
-            <div class="page" id="historyPage" style="display: none;">
-                <div class="page-content">
+            <div class="page history-page" id="historyPage" style="display: none;">
+                <div class="page-container">
+                    <!-- 页面头部 -->
                     <div class="page-header">
-                        <h1>📋 语音面试历史记录</h1>
-                        <p>查看您的历史语音面试记录，可以基于历史记录重新开始面试</p>
+                        <div class="header-content">
+                            <div class="header-icon">
+                                <i class="fas fa-history"></i>
+                            </div>
+                            <div class="header-info">
+                                <h1>面试记录</h1>
+                                <p>查看和管理您的历史面试记录</p>
+                            </div>
+                        </div>
+                        <div class="header-actions">
+                            <button class="btn-secondary" id="clearHistoryBtn">
+                                <i class="fas fa-trash"></i>
+                                清空记录
+                            </button>
+                        </div>
                     </div>
                     
-                    <div class="history-container">
-                        <!-- 筛选和排序 -->
-                        <div class="history-filters">
+                    <!-- 筛选控制 -->
+                    <div class="filter-panel">
                             <div class="filter-group">
-                                <label for="sortBy">排序方式：</label>
-                                <select id="sortBy">
-                                    <option value="date-desc">时间倒序</option>
-                                    <option value="date-asc">时间正序</option>
-                                    <option value="duration-desc">时长倒序</option>
+                            <label class="filter-label">
+                                <i class="fas fa-sort"></i>
+                                排序方式
+                            </label>
+                            <select class="filter-select" id="sortBy">
+                                <option value="date-desc">最新优先</option>
+                                <option value="date-asc">最早优先</option>
+                                <option value="duration-desc">时长最长</option>
                                 </select>
+                        </div>
+                        
+                        <div class="filter-stats">
+                            <div class="stat-item">
+                                <span class="stat-number">0</span>
+                                <span class="stat-label">总面试数</span>
                             </div>
-                            <div class="filter-actions">
-                                <button class="btn-secondary" id="clearHistoryBtn">清空历史记录</button>
+                            <div class="stat-item">
+                                <span class="stat-number">0h 0m</span>
+                                <span class="stat-label">总时长</span>
+                            </div>
                             </div>
                         </div>
 
-                        <!-- 历史记录列表 -->
+                    <!-- 记录列表 -->
+                    <div class="history-container">
                         <div class="history-list" id="historyList">
                             <!-- 空状态 -->
-                            <div class="empty-history" id="emptyHistory">
-                                <div class="empty-icon">🎤</div>
-                                <h3>暂无语音面试记录</h3>
-                                <p>开始您的第一次语音面试，记录将自动保存在这里</p>
-                                <button class="btn-primary" id="startFirstInterviewBtn">开始语音面试</button>
+                            <div class="empty-state" id="emptyHistory">
+                                <div class="empty-illustration">
+                                    <i class="fas fa-clipboard-list"></i>
+                                </div>
+                                <h3>暂无面试记录</h3>
+                                <p>开始您的第一次AI语音面试，记录将自动保存在这里</p>
+                                <button class="btn-primary" id="startFirstInterviewBtn">
+                                    <i class="fas fa-play"></i>
+                                    开始首次面试
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -127,70 +286,137 @@
             </div>
 
             <!-- 简历设置页面 -->
-            <div class="page" id="resumePage" style="display: none;">
-                <div class="page-content">
+            <div class="page resume-page" id="resumePage" style="display: none;">
+                <div class="page-container">
+                    <!-- 页面头部 -->
                     <div class="page-header">
-                        <h1>📄 简历设置</h1>
-                        <p>上传和管理您的简历文件，系统将基于简历内容进行个性化语音面试</p>
+                        <div class="header-content">
+                            <div class="header-icon">
+                                <i class="fas fa-file-alt"></i>
+                            </div>
+                            <div class="header-info">
+                                <h1>简历管理</h1>
+                                <p>上传简历以获得个性化的面试体验</p>
+                            </div>
+                        </div>
                     </div>
                     
+                    <!-- 简历管理界面 -->
                     <div class="resume-manager">
-                        <!-- 当前简历 -->
-                        <div class="current-resume" id="currentResume">
-                            <h3>当前简历</h3>
+                        <!-- 当前简历状态 -->
+                        <div class="resume-section">
+                            <div class="section-header">
+                                <h2>
+                                    <i class="fas fa-file-check"></i>
+                                    当前简历
+                                </h2>
+                            </div>
                             <div class="resume-info" id="resumeInfo">
                                 <div class="no-resume" id="noResume">
-                                    <div class="no-resume-icon">📄</div>
-                                    <p>暂未上传简历</p>
-                                    <p class="sub-text">上传简历后，系统将基于您的背景生成个性化语音面试问题</p>
+                                    <div class="no-resume-illustration">
+                                        <i class="fas fa-file-upload"></i>
+                                    </div>
+                                    <h3>暂未上传简历</h3>
+                                    <p>上传简历后，AI面试官将基于您的背景生成个性化面试问题</p>
+                                    <div class="resume-benefits">
+                                        <div class="benefit-item">
+                                            <i class="fas fa-bullseye"></i>
+                                            <span>针对性问题</span>
+                                        </div>
+                                        <div class="benefit-item">
+                                            <i class="fas fa-star"></i>
+                                            <span>技能匹配</span>
+                                        </div>
+                                        <div class="benefit-item">
+                                            <i class="fas fa-chart-bar"></i>
+                                            <span>深度分析</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- 简历上传 -->
-                        <div class="resume-upload">
-                            <h3>上传新简历</h3>
-                            <div class="file-upload-area" id="resumeFileUploadArea">
+                        <!-- 简历上传区域 -->
+                        <div class="resume-section">
+                            <div class="section-header">
+                                <h2>
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                    上传简历
+                                </h2>
+                            </div>
+                            
+                            <div class="upload-zone" id="resumeFileUploadArea">
                                 <div class="upload-content">
-                                    <div class="upload-icon">📁</div>
+                                    <div class="upload-icon">
+                                        <i class="fas fa-cloud-upload-alt"></i>
+                                    </div>
                                     <div class="upload-text">
-                                        <p class="upload-main-text">拖拽简历文件到此处，或点击选择文件</p>
-                                        <p class="upload-sub-text">支持 PDF、Word (.doc/.docx) 格式，最大 10MB</p>
+                                        <h3>拖拽简历文件到此处</h3>
+                                        <p>或点击选择文件上传</p>
+                                        <div class="upload-formats">
+                                            <span class="format-tag">PDF</span>
+                                            <span class="format-tag">DOC</span>
+                                            <span class="format-tag">DOCX</span>
+                                        </div>
                                     </div>
                                     <input type="file" id="resumeFileInput" class="file-input" accept=".pdf,.doc,.docx" />
                                 </div>
-                                
-                                <!-- 上传进度 -->
-                                <div class="upload-progress" id="resumeUploadProgress" style="display: none;">
-                                    <div class="progress-bar">
-                                        <div class="progress-fill" id="resumeProgressFill"></div>
-                                    </div>
-                                    <div class="progress-text" id="resumeProgressText">上传中...</div>
                                 </div>
+                                
+                            <!-- 上传提示 -->
+                            <div class="upload-tips">
+                                <h4>
+                                    <i class="fas fa-lightbulb"></i>
+                                    上传建议
+                                </h4>
+                                <ul>
+                                    <li>文件大小不超过10MB</li>
+                                    <li>建议使用最新版本的简历</li>
+                                    <li>确保简历内容清晰完整</li>
+                                    <li>支持中英文简历</li>
+                                </ul>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-
         </div>
     </div>
 
-    <!-- 加载动画 -->
+    <!-- 加载动画覆盖层 -->
     <div class="loading-overlay" id="loadingOverlay">
-        <div class="loading-spinner">
-            <div class="spinner-ring"></div>
-            <div class="loading-text">正在连接面试官...</div>
+        <div class="loading-content">
+            <div class="loading-animation">
+                <div class="loading-ring"></div>
+                <div class="loading-ring"></div>
+                <div class="loading-ring"></div>
+            </div>
+            <h3 class="loading-title">正在连接AI面试官</h3>
+            <p class="loading-subtitle">请稍候，正在初始化语音服务...</p>
         </div>
     </div>
 
     <!-- 语音通话全屏界面 -->
     <div class="voice-call-fullscreen" id="voiceCallFullscreen" style="display: none;">
-        <!-- 模糊背景 -->
+        <!-- 背景 -->
         <div class="voice-call-backdrop" id="voiceCallBackdrop"></div>
         
         <!-- 语音界面内容 -->
-        <div class="voice-call-content">
+        <div class="voice-interface">
+            <!-- 面试官头像区域 -->
+            <div class="interviewer-section">
+                <div class="interviewer-avatar-large">
+                    <div class="avatar-ring"></div>
+                    <div class="avatar-ring delay-1"></div>
+                    <div class="avatar-ring delay-2"></div>
+                    <div class="avatar-content">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                </div>
+                <h2 class="interviewer-name">AI面试官</h2>
+                <p class="interviewer-title">专业技术面试官</p>
+            </div>
+            
             <!-- Lottie动画容器 -->
             <div class="voice-animation-container" id="voiceAnimationContainer">
                 <dotlottie-player
@@ -198,97 +424,36 @@
                     src="https://lottie.host/8778427b-2d8c-477b-99c7-18fd22c3de7b/32za1oZNzw.lottie"
                     background="transparent"
                     speed="1"
-                    style="width: 300px; height: 300px"
+                    style="width: 200px; height: 200px"
                     loop
                     autoplay
                 ></dotlottie-player>
             </div>
             
-            <!-- 状态文本 -->
-            <div class="voice-status-display">
+            <!-- 状态显示 -->
+            <div class="voice-status-section">
+                <div class="status-display">
                 <p class="voice-status-text" id="voiceStatusDisplay">正在聆听您的声音...</p>
                 <div class="voice-timer" id="voiceTimer">00:00</div>
+                </div>
             </div>
             
             <!-- 控制按钮 -->
             <div class="voice-controls">
                 <button class="voice-control-btn mute-btn" id="voiceMuteBtn" title="静音/取消静音">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="mic-icon">
-                        <path d="M12 14C13.66 14 15 12.66 15 11V5C15 3.34 13.66 2 12 2S9 3.34 9 5V11C9 12.66 10.34 14 12 14ZM19.07 11C19.07 15 15.54 18.26 11.93 18.72V21H12.93C13.48 21 13.93 21.45 13.93 22S13.48 23 12.93 23H11.07C10.52 23 10.07 22.55 10.07 22S10.52 21 11.07 21H11.93V18.72C8.32 18.26 4.79 15 4.79 11H6.07C6.07 14.42 8.86 17.21 12.28 17.21S18.49 14.42 18.49 11H19.07Z" fill="currentColor"/>
-                    </svg>
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="mic-off-icon" style="display: none;">
-                        <path d="M19 11H17.3C17.3 11.74 17.14 12.43 16.87 13.05L18.1 14.28C18.66 13.3 19 12.19 19 11ZM14.98 11.17C14.98 11.11 15 11.06 15 11V5C15 3.34 13.66 2 12 2S9 3.34 9 5V5.18L14.98 11.17ZM4.27 3L3 4.27L9.01 10.28V11C9.01 12.66 10.34 14 12 14C12.22 14 12.44 13.97 12.65 13.92L14.31 15.58C13.6 15.91 12.81 16.1 12 16.1C8.24 16.1 5.3 13 5.3 11H4C4 13.76 6.46 16.05 9.69 16.72V21H11.69V16.72C12.4 16.63 13.06 16.43 13.67 16.15L18.73 21.21L20 19.94L4.27 3Z" fill="currentColor"/>
-                    </svg>
+                    <i class="fas fa-microphone mic-icon"></i>
+                    <i class="fas fa-microphone-slash mic-off-icon" style="display: none;"></i>
                 </button>
                 
-                <button class="voice-control-btn end-btn" id="voiceEndBtn" title="结束语音通话">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <path d="M12 9C10.5 9 9.19 9.5 8.17 10.35L6.04 8.22C7.6 6.67 9.71 5.78 12 5.78S16.4 6.67 17.96 8.22L15.83 10.35C14.81 9.5 13.5 9 12 9ZM20.5 6.5L19.09 7.91C17.1 5.92 14.66 4.78 12 4.78S6.9 5.92 4.91 7.91L3.5 6.5C6.05 3.95 9.76 2.78 12 2.78S17.95 3.95 20.5 6.5ZM6.62 10.79C8.06 13.62 10.38 15.94 13.21 17.38L15.41 15.18C15.69 14.9 16.08 14.82 16.43 14.93C17.55 15.3 18.75 15.5 20 15.5C20.55 15.5 21 15.95 21 16.5V20C21 20.55 20.55 21 20 21C10.61 21 3 13.39 3 4C3 3.45 3.45 3 4 3H7.5C8.05 3 8.5 3.45 8.5 4C8.5 5.25 8.7 6.45 9.07 7.57C9.18 7.92 9.1 8.31 8.82 8.59L6.62 10.79Z" fill="currentColor" transform="rotate(135 12 12)"/>
-                    </svg>
+                <button class="voice-control-btn end-btn" id="voiceEndBtn" title="结束面试">
+                    <i class="fas fa-phone-slash"></i>
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- 语音通话弹窗 (保留原有的，作为备用) -->
-    <div class="voice-call-overlay" id="voiceCallOverlay" style="display: none;">
-        <div class="voice-call-modal">
-            <!-- 通话头部 -->
-            <div class="call-header">
-                <div class="call-info">
-                    <div class="caller-avatar">
-                        <span class="avatar-icon">🤖</span>
-                    </div>
-                    <div class="caller-details">
-                        <h3 class="caller-name">AI面试官</h3>
-                        <p class="call-status" id="callStatus">准备通话中...</p>
-                    </div>
-                </div>
-                <button class="call-minimize" id="callMinimize" title="最小化">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                        <path d="M19 13H5V11H19V13Z" fill="currentColor"/>
-                    </svg>
-                </button>
-            </div>
-
-            <!-- 通话内容区域 -->
-            <div class="call-content">
-                <!-- 语音可视化 -->
-                <div class="voice-visualizer" id="voiceVisualizer">
-                    <div class="voice-wave">
-                        <div class="wave-bar"></div>
-                        <div class="wave-bar"></div>
-                        <div class="wave-bar"></div>
-                        <div class="wave-bar"></div>
-                        <div class="wave-bar"></div>
-                        <div class="wave-bar"></div>
-                        <div class="wave-bar"></div>
-                        <div class="wave-bar"></div>
-                    </div>
-                    <div class="voice-status-text" id="voiceStatusText">
-                        正在聆听您的声音...
-                    </div>
-                </div>
-
-                <!-- 通话时长 -->
-                <div class="call-duration">
-                    <span id="callTimer">00:00</span>
-                </div>
-            </div>
-
-            <!-- 通话控制按钮 -->
-            <div class="call-controls">
-                <button class="control-btn end-call-btn" id="endCallButton" title="结束通话">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <path d="M12 9C10.5 9 9.19 9.5 8.17 10.35L6.04 8.22C7.6 6.67 9.71 5.78 12 5.78S16.4 6.67 17.96 8.22L15.83 10.35C14.81 9.5 13.5 9 12 9ZM20.5 6.5L19.09 7.91C17.1 5.92 14.66 4.78 12 4.78S6.9 5.92 4.91 7.91L3.5 6.5C6.05 3.95 9.76 2.78 12 2.78S17.95 3.95 20.5 6.5ZM6.62 10.79C8.06 13.62 10.38 15.94 13.21 17.38L15.41 15.18C15.69 14.9 16.08 14.82 16.43 14.93C17.55 15.3 18.75 15.5 20 15.5C20.55 15.5 21 15.95 21 16.5V20C21 20.55 20.55 21 20 21C10.61 21 3 13.39 3 4C3 3.45 3.45 3 4 3H7.5C8.05 3 8.5 3.45 8.5 4C8.5 5.25 8.7 6.45 9.07 7.57C9.18 7.92 9.1 8.31 8.82 8.59L6.62 10.79Z" fill="currentColor" transform="rotate(135 12 12)"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- JavaScript -->
-    <script src="/static/voice-call.js?v=2024010102"></script>
-    <script src="/static/app.js?v=2024010102"></script>
+    <!-- JavaScript 文件 -->
+    <script src="/static/voice-call.js?v=2024010103"></script>
+    <script src="/static/app.js?v=2024010103"></script>
 </body>
 </html> 
