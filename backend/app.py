@@ -250,11 +250,10 @@ class AzureVoiceService:
             audio_bytes = base64.b64decode(audio_data)
             
             # 记录音频质量信息
-            logger.info(f"FastRTC音频处理: 格式={audio_format}, 采样率={sample_rate}Hz, "
-                       f"声道={channels}, 数据长度={len(audio_bytes)}字节, VAD置信度={vad_confidence:.3f}")
+            logger.info(f"收到FastRTC音频数据: 格式={audio_format}, 采样率={sample_rate}, VAD置信度={vad_confidence:.3f}")
             
             # 只有当VAD置信度足够高时才处理音频
-            if vad_confidence < 0.01:  # 阈值可调整
+            if vad_confidence < 0.001:  # 阈值可调整
                 logger.debug(f"VAD置信度过低({vad_confidence:.3f})，跳过音频处理")
                 return
             

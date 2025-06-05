@@ -84,7 +84,7 @@ class FastRTCAudioConfig:
     CHUNK_DURATION = 50  # 音频块持续时间 (ms)
     
     # 语音活动检测 (VAD) 设置
-    VAD_THRESHOLD = 0.01           # VAD阈值
+    VAD_THRESHOLD = 0.001           # VAD阈值
     VAD_SMOOTHING_FACTOR = 0.8     # VAD平滑因子
     MIN_SPEECH_DURATION = 300      # 最小语音持续时间 (ms)
     MAX_SILENCE_DURATION = 1500    # 最大静音持续时间 (ms)
