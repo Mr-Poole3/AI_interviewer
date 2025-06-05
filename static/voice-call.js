@@ -31,29 +31,34 @@ class VoiceCallManager {
         this.echoCancellationNode = null;
         this.gainNode = null;
         this.compressorNode = null;
-        this.vadThreshold = 0.01; // 语音活动检测阈值
-        this.vadSmoothingFactor = 0.8; // VAD平滑因子
+        
+        // VAD (Voice Activity Detection) 配置 - 优化阈值设置
+        this.vadThreshold = 0.003; // 降低语音活动检测阈值，原值0.01过于严格
+        this.vadSmoothingFactor = 0.6; // 降低平滑因子，提高响应速度，原值0.8过于平滑
         this.currentVadLevel = 0;
-        this.isSpeaking = false;
-        this.silenceTimeout = null;
-        this.speechStartTime = null;
-        this.minSpeechDuration = 300; // 最小语音持续时间(ms)
-        this.maxSilenceDuration = 1500; // 最大静音持续时间(ms)
+        
+        // 新增：音频能量统计，用于动态调整阈值
+        this.audioEnergyStats = {
+            min: Infinity,
+            max: 0,
+            recent: [],
+            avgNoise: 0.001 // 预估环境噪音水平
+        };
+        
+        // 智能打断系统配置
+        this.interruptionEnabled = true;
+        this.isAIResponding = false;
+        this.lastInterruptTime = 0;
+        this.interruptCooldown = 2000; // 2秒冷却时间
+        this.interruptDelay = 200; // 延迟200ms执行打断，避免误触发
+        this.pendingInterrupt = null;
+        this.interruptThreshold = 0.015; // 打断检测阈值，略高于VAD阈值
         
         // 音频质量优化
         this.audioChunks = [];
         this.chunkDuration = 50; // 音频块持续时间(ms)
         this.sampleRate = 24000; // 采样率
         this.bitDepth = 16; // 位深度
-        
-        // 智能打断机制相关
-        this.isAIResponding = false; // AI是否正在回复
-        this.interruptionEnabled = true; // 是否启用打断功能
-        this.interruptThreshold = 0.02; // 打断检测阈值
-        this.interruptDelay = 200; // 打断延迟(ms)，避免误触发
-        this.lastInterruptTime = 0; // 上次打断时间
-        this.interruptCooldown = 1000; // 打断冷却时间(ms)
-        this.pendingInterrupt = null; // 待处理的打断
         
         this.initElements();
         this.bindEvents();
@@ -361,20 +366,39 @@ class VoiceCallManager {
         const inputBuffer = event.inputBuffer;
         const inputData = inputBuffer.getChannelData(0);
         
-        // 计算音频能量（RMS）
+        // 改进的音频能量计算（使用更敏感的检测方法）
         let sum = 0;
+        let peak = 0;
         for (let i = 0; i < inputData.length; i++) {
-            sum += inputData[i] * inputData[i];
+            const sample = Math.abs(inputData[i]);
+            sum += sample * sample; // RMS计算
+            peak = Math.max(peak, sample); // 峰值检测
         }
         const rms = Math.sqrt(sum / inputData.length);
         
-        // 平滑VAD级别
-        this.currentVadLevel = this.vadSmoothingFactor * this.currentVadLevel + 
-                              (1 - this.vadSmoothingFactor) * rms;
+        // 结合RMS和峰值的综合能量指标
+        const combinedEnergy = rms * 0.7 + peak * 0.3;
         
-        // 语音活动检测
+        // 更新音频能量统计信息
+        this.updateAudioEnergyStats(combinedEnergy);
+        
+        // 动态调整VAD阈值
+        const adaptiveThreshold = this.calculateAdaptiveThreshold();
+        
+        // 平滑VAD级别（降低平滑因子，提高响应速度）
+        this.currentVadLevel = this.vadSmoothingFactor * this.currentVadLevel + 
+                              (1 - this.vadSmoothingFactor) * combinedEnergy;
+        
+        // 语音活动检测（使用动态阈值）
         const wasSpeaking = this.isSpeaking;
-        this.isSpeaking = this.currentVadLevel > this.vadThreshold;
+        this.isSpeaking = this.currentVadLevel > adaptiveThreshold;
+        
+        // 记录检测状态（调试用）
+        if (this.isSpeaking !== wasSpeaking) {
+            console.log(`VAD状态变化: ${wasSpeaking ? '说话' : '静音'} -> ${this.isSpeaking ? '说话' : '静音'}, 
+                        能量: ${combinedEnergy.toFixed(4)}, 阈值: ${adaptiveThreshold.toFixed(4)}, 
+                        VAD级别: ${this.currentVadLevel.toFixed(4)}`);
+        }
         
         // 智能打断检测
         if (this.interruptionEnabled && this.isAIResponding && this.isSpeaking && !wasSpeaking) {
@@ -397,6 +421,50 @@ class VoiceCallManager {
         
         // 更新可视化
         this.updateVoiceVisualization(this.currentVadLevel);
+    }
+    
+    /**
+     * 更新音频能量统计信息
+     */
+    updateAudioEnergyStats(energy) {
+        const stats = this.audioEnergyStats;
+        
+        // 更新最小值和最大值
+        stats.min = Math.min(stats.min, energy);
+        stats.max = Math.max(stats.max, energy);
+        
+        // 维护最近的能量值（用于计算噪音基线）
+        stats.recent.push(energy);
+        if (stats.recent.length > 100) { // 保持最近100个样本
+            stats.recent.shift();
+        }
+        
+        // 计算平均噪音水平（取最近样本的较低百分位）
+        if (stats.recent.length >= 20) {
+            const sorted = [...stats.recent].sort((a, b) => a - b);
+            const percentile20 = sorted[Math.floor(sorted.length * 0.2)];
+            stats.avgNoise = percentile20 * 1.2; // 略高于20%百分位作为噪音基线
+        }
+    }
+    
+    /**
+     * 计算自适应VAD阈值
+     */
+    calculateAdaptiveThreshold() {
+        const stats = this.audioEnergyStats;
+        
+        // 基础阈值
+        let threshold = this.vadThreshold;
+        
+        // 根据环境噪音调整阈值
+        if (stats.avgNoise > 0) {
+            threshold = Math.max(threshold, stats.avgNoise * 2.5); // 阈值至少是噪音的2.5倍
+        }
+        
+        // 限制阈值范围
+        threshold = Math.max(0.001, Math.min(0.02, threshold));
+        
+        return threshold;
     }
     
     /**
