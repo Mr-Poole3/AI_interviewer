@@ -252,10 +252,28 @@ class AzureVoiceService:
             # 记录音频质量信息
             logger.info(f"收到FastRTC音频数据: 格式={audio_format}, 采样率={sample_rate}, VAD置信度={vad_confidence:.3f}")
             
-            # 只有当VAD置信度足够高时才处理音频
-            if vad_confidence < 0.001:  # 阈值可调整
-                logger.debug(f"VAD置信度过低({vad_confidence:.3f})，跳过音频处理")
+            # 调整VAD置信度阈值检查 - 原阈值0.01过于严格
+            # 使用更低的阈值，并考虑音频数据长度
+            min_vad_threshold = 0.001  # 降低基础阈值
+            
+            # 如果音频数据足够长，即使VAD置信度较低也可以处理
+            audio_duration_ms = (len(audio_bytes) / 2) / sample_rate * 1000  # 计算音频时长(ms)
+            
+            # 动态调整阈值：音频越长，允许的VAD阈值越低
+            if audio_duration_ms > 200:  # 超过200ms的音频
+                dynamic_threshold = max(0.0005, min_vad_threshold * 0.5)
+            elif audio_duration_ms > 100:  # 超过100ms的音频
+                dynamic_threshold = max(0.001, min_vad_threshold * 0.8)
+            else:
+                dynamic_threshold = min_vad_threshold
+            
+            if vad_confidence < dynamic_threshold:
+                logger.debug(f"VAD置信度({vad_confidence:.4f})低于动态阈值({dynamic_threshold:.4f})，"
+                           f"音频时长{audio_duration_ms:.1f}ms，跳过音频处理")
                 return
+            
+            logger.info(f"通过VAD检查，开始处理音频: 置信度={vad_confidence:.4f}, "
+                       f"阈值={dynamic_threshold:.4f}, 时长={audio_duration_ms:.1f}ms")
             
             async with self.client.beta.realtime.connect(
                 model="gpt-4o-mini-realtime-preview"

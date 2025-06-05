@@ -83,12 +83,17 @@ class FastRTCAudioConfig:
     CHANNELS = 1         # 声道数（单声道）
     CHUNK_DURATION = 50  # 音频块持续时间 (ms)
     
-    # 语音活动检测 (VAD) 设置
-    VAD_THRESHOLD = 0.001           # VAD阈值
-    VAD_SMOOTHING_FACTOR = 0.8     # VAD平滑因子
-    MIN_SPEECH_DURATION = 300      # 最小语音持续时间 (ms)
-    MAX_SILENCE_DURATION = 1500    # 最大静音持续时间 (ms)
-    SILENCE_TIMEOUT = 500          # 静音超时 (ms)
+    # 语音活动检测 (VAD) 设置 - 优化阈值配置
+    VAD_THRESHOLD = 0.003          # VAD阈值（降低以提高灵敏度）
+    VAD_SMOOTHING_FACTOR = 0.6     # VAD平滑因子（降低以提高响应速度）
+    MIN_SPEECH_DURATION = 200      # 最小语音持续时间 (ms) - 降低以捕获短语音
+    MAX_SILENCE_DURATION = 1200    # 最大静音持续时间 (ms) - 降低以提高响应
+    SILENCE_TIMEOUT = 300          # 静音超时 (ms) - 降低以提高响应
+    
+    # VAD动态阈值配置
+    MIN_VAD_THRESHOLD = 0.0005     # 最小VAD阈值
+    MAX_VAD_THRESHOLD = 0.02       # 最大VAD阈值
+    NOISE_MULTIPLIER = 2.5         # 噪音倍数，用于动态调整阈值
     
     # 音频处理设置
     AUDIO_CONTEXT_LATENCY = 'interactive'  # 音频上下文延迟模式
