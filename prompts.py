@@ -154,6 +154,78 @@ class NotificationPrompts:
         "unsupported_format": "不支持的文件格式，请上传PDF、DOC或DOCX文件。"
     }
 
+class InterviewEvaluationPrompts:
+    """面试评分相关提示词"""
+    
+    # 面试评分系统提示词
+    EVALUATION_SYSTEM_PROMPT = """你是一位专业的面试评估专家，负责对AI面试过程进行客观、全面的评分和分析。
+
+请根据以下评估维度对面试表现进行评分（每项0-10分）：
+
+**技术能力评估 (Technical Skills)**
+- 专业知识掌握程度
+- 技术问题回答的准确性和深度
+- 技术概念理解和应用能力
+
+**沟通表达能力 (Communication)**
+- 语言表达的清晰度和逻辑性
+- 回答问题的完整性和条理性
+- 专业术语使用的准确性
+
+**问题解决能力 (Problem Solving)**
+- 分析问题的思路和方法
+- 解决方案的创新性和可行性
+- 面对挑战时的应对策略
+
+**学习适应能力 (Learning & Adaptability)**
+- 对新技术的学习态度
+- 适应变化的能力
+- 持续改进的意识
+
+**职业素养 (Professional Attitude)**
+- 面试态度的积极性
+- 职业规划的清晰度
+- 团队合作意识
+
+请提供：
+1. 各维度具体评分和理由
+2. 总体评分（0-100分）
+3. 优势和改进建议
+4. 面试表现总结
+
+评分标准：
+- 9-10分：优秀，表现突出
+- 7-8分：良好，符合要求
+- 5-6分：一般，有待提升
+- 3-4分：较差，需要改进
+- 0-2分：很差，严重不足"""
+
+    # 面试总结模板
+    EVALUATION_TEMPLATE = """基于以下面试对话内容，请进行专业评估：
+
+**候选人简历背景：**
+{resume_context}
+
+**面试对话记录：**
+{conversation_history}
+
+**面试时长：** {duration}
+**问题总数：** {question_count}
+**回答总数：** {answer_count}
+
+请按照评估标准进行详细分析和评分。"""
+
+    # 快速评估提示词（用于实时反馈）
+    QUICK_EVALUATION_PROMPT = """请对这段面试对话进行快速评估，给出简短的表现总结和建议：
+
+对话内容：
+{conversation_snippet}
+
+请提供：
+1. 这段对话的表现亮点
+2. 需要改进的地方
+3. 简短建议（1-2句话）"""
+
 class DebugPrompts:
     """调试日志提示词"""
     
@@ -163,7 +235,9 @@ class DebugPrompts:
         "resume_loaded": "简历加载成功: 文件={filename}, 大小={size}字符",
         "voice_status": "语音状态变更: {old_status} → {new_status}",
         "api_call": "API调用: {endpoint}, 参数={params}, 结果={result}",
-        "error_occurred": "错误发生: {error_type}, 消息={message}, 堆栈={stack}"
+        "error_occurred": "错误发生: {error_type}, 消息={message}, 堆栈={stack}",
+        "evaluation_start": "开始面试评分: 面试ID={interview_id}, 对话数={message_count}",
+        "evaluation_complete": "面试评分完成: 总分={total_score}, 用时={duration}ms"
     }
 
 def get_interviewer_prompt(position=None, resume_context=None):
@@ -244,4 +318,46 @@ def get_notification_message(message_type, category="success"):
     elif category == "error":
         return NotificationPrompts.ERROR_MESSAGES.get(message_type, "操作失败")
     else:
-        return "未知消息" 
+        return "未知消息"
+
+def get_interview_evaluation_prompt(resume_context=None, conversation_history=None, duration=None, question_count=0, answer_count=0):
+    """
+    获取面试评分提示词
+    
+    Args:
+        resume_context: 简历上下文
+        conversation_history: 对话历史
+        duration: 面试时长
+        question_count: 问题数量
+        answer_count: 回答数量
+    
+    Returns:
+        str: 完整的面试评分提示词
+    """
+    system_prompt = InterviewEvaluationPrompts.EVALUATION_SYSTEM_PROMPT
+    
+    if conversation_history:
+        evaluation_content = InterviewEvaluationPrompts.EVALUATION_TEMPLATE.format(
+            resume_context=resume_context or "未提供简历信息",
+            conversation_history=conversation_history,
+            duration=duration or "未知",
+            question_count=question_count,
+            answer_count=answer_count
+        )
+        return f"{system_prompt}\n\n{evaluation_content}"
+    
+    return system_prompt
+
+def get_quick_evaluation_prompt(conversation_snippet):
+    """
+    获取快速评估提示词
+    
+    Args:
+        conversation_snippet: 对话片段
+    
+    Returns:
+        str: 快速评估提示词
+    """
+    return InterviewEvaluationPrompts.QUICK_EVALUATION_PROMPT.format(
+        conversation_snippet=conversation_snippet
+    ) 

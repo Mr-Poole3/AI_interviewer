@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>历史记录详情测试</title>
+    <link rel="stylesheet" href="static/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <h1>历史记录详情测试</h1>
+        
+        <div class="history-list" id="testHistoryList">
+            <!-- 测试数据将通过JavaScript插入 -->
+        </div>
+    </div>
+
+    <script src="static/app.js"></script>
+    <script>
+        // 创建测试数据
+        const testInterview = {
+            id: 'test-interview-1',
+            createdAt: new Date().toISOString(),
+            duration: 1800, // 30分钟
+            messages: [
+                {
+                    type: 'assistant',
+                    content: '您好！欢迎参加今天的技术面试。我是您的AI面试官，今天我们将主要围绕您的技术背景和项目经验进行交流。首先，请您简单介绍一下自己的技术栈和工作经验。',
+                    timestamp: new Date(Date.now() - 1800000).toISOString()
+                },
+                {
+                    type: 'user',
+                    content: '您好！我是一名前端开发工程师，有3年的工作经验。主要技术栈包括React、Vue.js、TypeScript、Node.js等。曾经参与过多个大型项目的开发，包括电商平台、管理系统等。',
+                    timestamp: new Date(Date.now() - 1750000).toISOString()
+                },
+                {
+                    type: 'assistant',
+                    content: '很好！看起来您有丰富的前端开发经验。能详细说说您在React项目中遇到过的最大挑战是什么？以及您是如何解决的？',
+                    timestamp: new Date(Date.now() - 1700000).toISOString()
+                },
+                {
+                    type: 'user',
+                    content: '最大的挑战是在一个大型电商项目中处理复杂的状态管理。项目有很多组件需要共享状态，最初使用props传递导致了严重的props drilling问题。后来我引入了Redux Toolkit，重新设计了状态结构，将相关的状态按业务模块进行分组，大大提高了代码的可维护性。',
+                    timestamp: new Date(Date.now() - 1600000).toISOString()
+                },
+                {
+                    type: 'assistant',
+                    content: '非常好的解决方案！Redux Toolkit确实是处理复杂状态的好选择。那么在性能优化方面，您有什么经验可以分享吗？比如在React应用中如何避免不必要的重渲染？',
+                    timestamp: new Date(Date.now() - 1500000).toISOString()
+                },
+                {
+                    type: 'user',
+                    content: '性能优化方面，我主要从几个角度入手：1. 使用React.memo包装组件避免不必要的重渲染；2. 合理使用useMemo和useCallback缓存计算结果和函数；3. 实现虚拟滚动处理大列表；4. 使用代码分割和懒加载减少初始包大小；5. 优化图片资源，使用WebP格式和响应式图片。',
+                    timestamp: new Date(Date.now() - 1400000).toISOString()
+                }
+            ],
+            evaluation: {
+                total_score: 85,
+                dimension_scores: {
+                    technical_skills: 9,
+                    communication: 8,
+                    problem_solving: 9,
+                    learning_adaptability: 8,
+                    professional_attitude: 8
+                },
+                summary: '候选人展现出了扎实的前端开发技能和丰富的项目经验。在技术问题的回答中体现了良好的问题分析能力和解决方案设计能力。对React生态系统有深入理解，能够合理运用状态管理和性能优化技术。沟通表达清晰，逻辑性强。',
+                strengths: [
+                    '技术基础扎实，对React生态系统理解深入',
+                    '具备良好的问题分析和解决能力',
+                    '有丰富的实际项目经验和最佳实践',
+                    '沟通表达清晰，逻辑性强',
+                    '对性能优化有系统性的认识'
+                ],
+                improvements: [
+                    '可以进一步深入学习新兴的前端技术',
+                    '建议加强对后端技术的了解',
+                    '可以尝试参与开源项目提升影响力',
+                    '继续积累大型项目的架构设计经验'
+                ],
+                interview_id: 'test-interview-1'
+            },
+            summary: '本次面试主要围绕前端开发技术进行，候选人展现出了扎实的技术基础和丰富的项目经验...'
+        };
+
+        // 创建历史记录管理器实例
+        const storageManager = {
+            getInterviews: () => [testInterview]
+        };
+        
+        const historyManager = new HistoryManager(storageManager);
+        
+        // 渲染测试数据
+        const historyList = document.getElementById('testHistoryList');
+        historyList.innerHTML = historyManager.createHistoryItemHTML(testInterview);
+        
+        console.log('测试页面已加载，可以测试历史记录详情功能');
+    </script>
+</body>
+</html> 

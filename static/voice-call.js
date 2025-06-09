@@ -882,10 +882,16 @@ class VoiceCallManager {
     /**
      * 结束语音通话
      */
-    endVoiceCall() {
+    async endVoiceCall() {
         this.logMessage('结束语音通话...');
         
         try {
+            // 触发面试评分（在关闭连接之前）
+            if (this.azureVoiceChat && this.azureVoiceChat.isInterviewActive) {
+                this.logMessage('触发面试评分...');
+                await this.azureVoiceChat.endInterviewRecording();
+            }
+            
             // 关闭数据通道
             if (this.dataChannel) {
                 this.dataChannel.close();
