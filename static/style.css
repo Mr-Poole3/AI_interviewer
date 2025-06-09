@@ -1636,6 +1636,8 @@ body {
     border: 2px solid rgba(255, 255, 255, 0.3);
 }
 
+
+
 .voice-control-btn.mute-btn {
     background: rgba(255, 255, 255, 0.2);
     color: white;
@@ -2467,4 +2469,196 @@ body {
 * {
     scrollbar-width: thin;
     scrollbar-color: var(--border-light) var(--bg-secondary);
+}
+
+/* ===== VAD设置面板样式 ===== */
+.voice-control-btn.settings-btn {
+    background: var(--gray-600);
+    color: white;
+}
+
+.voice-control-btn.settings-btn:hover {
+    background: var(--gray-500);
+    transform: scale(1.05);
+}
+
+.vad-settings-panel {
+    position: absolute;
+    bottom: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-primary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    width: 350px;
+    max-width: 90vw;
+    z-index: 1000;
+    animation: slideUpFadeIn 0.3s ease-out;
+}
+
+@keyframes slideUpFadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.settings-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.close-settings {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: var(--spacing-xs);
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+}
+
+.close-settings:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.settings-content {
+    padding: var(--spacing-md);
+}
+
+.setting-group {
+    margin-bottom: var(--spacing-lg);
+}
+
+.setting-group:last-of-type {
+    margin-bottom: var(--spacing-md);
+}
+
+.setting-group label {
+    display: block;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-sm);
+    font-size: 0.875rem;
+}
+
+.slider-container {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-xs);
+}
+
+.slider-container input[type="range"] {
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--bg-secondary);
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.slider-container input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all var(--transition-fast);
+}
+
+.slider-container input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.slider-container input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all var(--transition-fast);
+}
+
+.slider-value {
+    font-weight: 600;
+    color: var(--primary-color);
+    font-size: 0.875rem;
+    min-width: 60px;
+    text-align: right;
+}
+
+.setting-description {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.4;
+}
+
+.settings-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-lg);
+}
+
+.settings-actions .btn-secondary,
+.settings-actions .btn-primary {
+    flex: 1;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: 0.875rem;
+    border-radius: var(--radius-md);
+}
+
+/* 移动端适配 */
+@media (max-width: 480px) {
+    .vad-settings-panel {
+        width: 320px;
+        bottom: 100px;
+    }
+    
+    .settings-content {
+        padding: var(--spacing-sm);
+    }
+    
+    .setting-group {
+        margin-bottom: var(--spacing-md);
+    }
+    
+    .slider-container {
+        gap: var(--spacing-sm);
+    }
+    
+    .slider-value {
+        min-width: 50px;
+        font-size: 0.8rem;
+    }
 }

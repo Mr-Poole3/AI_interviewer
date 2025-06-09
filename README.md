@@ -9,7 +9,9 @@
 - [`backend/app.py`](backend/app.py) - 语音面试主应用，WebSocket语音服务端
 - [`static/index.html`](static/index.html) - 现代化面试前端界面，响应式设计
 - [`static/app.js`](static/app.js) - 前端交互逻辑，WebSocket通信与功能管理
+- [`static/voice-call.js`](static/voice-call.js) - 语音通话管理器，Azure WebRTC集成
 - [`static/style.css`](static/style.css) - 现代化UI设计系统，专业面试主题
+- [`prompts.py`](prompts.py) - AI提示词配置文件，集中管理所有prompt
 - [`config.py`](config.py) - 系统配置文件
 
 ### 按功能查找
@@ -19,6 +21,7 @@
 - **语音通话** → 点击麦克风按钮，全屏语音交互界面
 - **简历管理** → 导航栏"简历管理"页面，个性化面试
 - **历史记录** → 导航栏"面试历史"页面，面试记录管理
+- **Prompt管理** → [`prompts.py`](prompts.py) 文件，集中配置AI提示词
 - **现代化界面** → 响应式设计，支持移动端和桌面端
 
 ## 🎯 系统特性
@@ -42,11 +45,12 @@
 - **🎤 实时语音对话**: 基于Azure OpenAI实时语音模型，支持语音输入和语音输出
 - **💬 智能聊天界面**: 现代化聊天气泡设计，支持头像和时间戳
 - **📝 混合输入模式**: 支持语音输入和文本输入，灵活切换
-- **📄 智能简历分析**: 拖拽上传简历获得个性化面试
+- **📄 智能简历分析**: 拖拽上传简历获得个性化面试，支持完整简历内容传递
 - **🎯 专业面试评估**: 技术能力全面评估，语音交互更自然
 - **🔄 流式语音播放**: 边接收边播放，降低延迟提升体验
 - **🎵 音频重播功能**: 生成完整音频文件供重复播放
 - **📱 响应式设计**: 完美适配桌面端和移动端设备，优化小屏幕体验
+- **🎨 集中Prompt管理**: 所有AI提示词集中在prompts.py文件中管理，支持不同岗位专业模板
 
 ### 现代化UI/UX特性
 - **🎨 专业设计系统**: 现代化色彩方案，专业面试主题
@@ -69,12 +73,14 @@
 ### 技术特性
 - **Azure OpenAI集成**: 使用最新的实时语音模型
 - **WebSocket音频流**: 实时双向语音通信
+- **WebRTC语音通话**: 直连Azure OpenAI Realtime API，低延迟语音交互
 - **流式音频处理**: PCM音频解码与WAV文件生成
 - **本地存储管理**: localStorage管理面试历史和用户设置
 - **文件处理支持**: 支持PDF、Word文档解析
 - **现代化前端**: 原生JavaScript + CSS Grid + Flexbox
 - **拖拽上传功能**: 现代化文件上传体验
 - **移动端优化**: 触摸友好的交互设计，防止内容遮挡
+- **集中Prompt管理**: 统一的AI提示词配置系统，支持API动态获取
 
 ## 🚀 快速开始
 
@@ -182,6 +188,12 @@ Frontend (现代化面试客户端)
 │   ├── 语音状态动画        # 可视化反馈
 │   ├── 消息流式显示        # 打字机效果
 │   └── 工具函数库         # 实用工具集
+├── voice-call.js     # 语音通话管理器
+│   ├── WebRTC连接管理      # Azure实时语音API
+│   ├── 音频流处理         # 实时音频传输
+│   ├── 简历信息集成        # 个性化面试支持
+│   ├── Prompt动态获取      # API获取提示词
+│   └── 调试日志系统        # 开发调试支持
 └── style.css         # 现代化设计系统
     ├── CSS变量系统         # 统一设计令牌
     ├── 响应式布局         # 移动端适配
@@ -194,58 +206,66 @@ Backend (语音面试服务)
 ├── app.py            # 面试主应用
 │   ├── WebSocket端点        # /ws 实时通信
 │   ├── 文件上传API         # /upload 简历上传
+│   ├── 简历内容API         # /api/resume/{id} 获取简历
+│   ├── Prompt管理API       # /api/prompts/* 提示词服务
 │   ├── 静态文件服务        # 前端资源
 │   └── 错误处理           # 异常管理
+├── prompts.py        # AI提示词配置
+│   ├── InterviewPrompts    # 面试相关提示词
+│   ├── SystemPrompts       # 系统级提示词
+│   ├── UIPrompts          # 界面提示词
+│   ├── NotificationPrompts # 通知消息
+│   ├── 岗位专业模板        # 不同技术栈提示词
+│   └── 动态获取函数        # API接口函数
 ├── config.py         # 系统配置
 └── 文件处理模块       # PDF/Word解析
 ```
 
-### 前端技术栈
-- **核心技术**: 原生JavaScript ES6+, HTML5, CSS3
-- **布局系统**: CSS Grid + Flexbox响应式布局
-- **设计系统**: CSS自定义属性，模块化组件设计
-- **动画效果**: CSS Transitions + Animations
-- **通信协议**: WebSocket实时双向通信
-- **存储方案**: localStorage本地数据持久化
-- **文件处理**: File API + 拖拽上传
-- **音频处理**: Web Audio API音频播放
+### Prompt管理系统
+```python
+# prompts.py - 集中管理所有AI提示词
+from prompts import get_voice_call_prompt, get_interviewer_prompt
 
-### 关键技术栈
-- **后端**: FastAPI + uvicorn + Azure OpenAI SDK
-- **前端**: 原生JavaScript + WebSocket + Web Audio API
-- **Azure集成**: Azure OpenAI实时语音模型
-- **音频处理**: PCM解码 + WAV生成 + 流式播放
-- **文件处理**: python-docx + PyPDF2
-- **UI设计**: 现代化设计系统，CSS Grid + Flexbox
+# 支持不同岗位的专业提示词
+positions = ["frontend", "backend", "fullstack", "ai_ml", "data_science"]
 
-### 数据流设计
-```
-用户语音输入 → WebSocket → Azure OpenAI → 流式音频响应 → 
-前端播放 → 本地存储 → 历史记录管理
+# 动态获取提示词
+prompt = get_interviewer_prompt(position="frontend", resume_context=resume_text)
+
+# API端点
+GET  /api/prompts/list                # 列出所有可用prompt类型
+GET  /api/prompts/voice-call-default  # 获取默认语音通话prompt
+POST /api/prompts/voice-call          # 获取语音通话专用prompt（带简历上下文）
+GET  /api/prompts/validate            # 验证prompt管理状态
 ```
 
-## 📝 配置参考
-
-### 关键环境变量
-| 变量名 | 说明 | 必需 | 默认值 |
-|--------|------|------|--------|
-| `OPENAI_API_KEY` | Azure OpenAI API密钥 | 是 | - |
-| `OPENAI_BASE_URL` | Azure OpenAI端点URL | 是 | - |
-| `ARK_API_KEY` | 备用API密钥 | 否 | - |
-
-### 推荐配置
-```env
-# Azure OpenAI配置
-OPENAI_API_KEY=your_azure_api_key_here
-OPENAI_BASE_URL=https://your-resource-name.openai.azure.com
-
-# 服务配置
-HOST=localhost
-PORT=8000
-LOG_LEVEL=INFO
+#### Prompt管理架构
 ```
+prompts.py (集中配置)
+    ↓
+backend/app.py (API服务)
+    ↓
+static/voice-call.js (前端调用)
+    ↓
+Azure OpenAI Realtime API (最终使用)
+```
+
+#### 回退机制
+1. **主要路径**: 从 `/api/prompts/voice-call` 获取带简历上下文的prompt
+2. **回退路径**: 从 `/api/prompts/voice-call-default` 获取默认prompt
+3. **最后回退**: 前端硬编码prompt（仅在API完全不可用时）
 
 ## 📊 日志规范
+
+### Prompt管理日志
+系统自动记录Prompt获取和使用情况：
+
+```
+[2025-01-XX XX:XX:XX] [Prompt API] - 获取语音通话prompt: 成功, 包含简历: 是
+[2025-01-XX XX:XX:XX] [Prompt Fallback] - API获取失败，使用默认prompt
+[2025-01-XX XX:XX:XX] [Prompt Update] - 会话指令更新: 长度=1024字符
+[2025-01-XX XX:XX:XX] [Resume Integration] - 简历信息集成到prompt: 文件=resume.pdf
+```
 
 ### 前端交互日志
 系统自动记录前端用户交互和功能使用情况：
@@ -259,17 +279,30 @@ LOG_LEVEL=INFO
 [2025-01-XX XX:XX:XX] [Notification] - 显示通知: 文件上传成功
 ```
 
+### 语音通话日志
+WebRTC语音通话的详细日志记录：
+
+```
+[2025-01-XX XX:XX:XX] [WebRTC] - 获取临时密钥: 成功
+[2025-01-XX XX:XX:XX] [WebRTC] - 建立PeerConnection: 成功
+[2025-01-XX XX:XX:XX] [WebRTC] - 数据通道已打开
+[2025-01-XX XX:XX:XX] [WebRTC] - 会话指令更新: 包含简历信息
+[2025-01-XX XX:XX:XX] [WebRTC] - 语音状态: 正在聆听 → 正在处理
+```
+
 ### 用户体验日志
 - **界面交互**: 记录页面切换、按钮点击、拖拽操作
 - **语音状态**: 记录语音开始、结束、状态变更
 - **文件操作**: 记录文件上传、预览、删除操作
 - **通知系统**: 记录通知显示、关闭、用户反馈
+- **Prompt获取**: 记录提示词API调用、回退机制使用
 
 ### 性能监控
 - **加载时间**: 记录页面和资源加载时间
 - **响应延迟**: 记录WebSocket通信延迟
 - **内存使用**: 记录前端内存占用情况
 - **错误追踪**: 记录JavaScript错误和异常
+- **API性能**: 记录Prompt API响应时间
 
 ## 🎨 设计系统
 
@@ -299,9 +332,112 @@ LOG_LEVEL=INFO
 - **可访问性**: 符合WCAG无障碍设计标准
 - **一致性**: 统一的设计语言和交互模式
 
+## 🎯 Prompt管理指南
+
+### Prompt配置文件结构
+```python
+# prompts.py 文件结构
+InterviewPrompts        # 面试相关提示词
+├── BASE_INTERVIEWER   # 基础面试官提示词
+├── VOICE_CALL_INTERVIEWER  # 语音通话专用
+├── WITH_RESUME_TEMPLATE    # 带简历上下文模板
+└── POSITION_SPECIFIC       # 不同岗位专业提示词
+    ├── frontend           # 前端技术面试
+    ├── backend            # 后端技术面试
+    ├── fullstack          # 全栈技术面试
+    ├── ai_ml              # AI/机器学习面试
+    └── data_science       # 数据科学面试
+
+SystemPrompts           # 系统级提示词
+├── WELCOME_MESSAGE    # 欢迎消息
+├── ERROR_MESSAGES     # 错误处理消息
+└── STATUS_MESSAGES    # 状态提示消息
+
+UIPrompts              # 用户界面提示词
+├── BUTTON_TEXTS       # 按钮文本
+├── PLACEHOLDERS       # 占位符文本
+└── HINTS              # 提示文本
+
+NotificationPrompts    # 通知消息提示词
+├── SUCCESS_MESSAGES   # 成功消息
+├── WARNING_MESSAGES   # 警告消息
+└── ERROR_MESSAGES     # 错误消息
+```
+
+### 修改Prompt的方法
+
+#### 方法一：直接编辑prompts.py文件
+```python
+# 修改基础面试官提示词
+InterviewPrompts.BASE_INTERVIEWER = """
+你是一位专业的AI面试官，负责进行技术面试。
+请遵循以下原则：
+1. 保持专业、友好的态度
+2. 根据候选人的回答进行深入追问
+3. 评估技术能力、解决问题的思路和沟通能力
+4. 提供建设性的反馈
+5. 语音回复要简洁明了，适合口语交流
+"""
+
+# 添加新的岗位专业提示词
+InterviewPrompts.POSITION_SPECIFIC["devops"] = """
+你是一位DevOps技术面试官，专注于以下技术领域：
+- CI/CD流水线设计和实现
+- 容器化技术（Docker/Kubernetes）
+- 云平台服务（AWS/Azure/GCP）
+- 基础设施即代码（Terraform/Ansible）
+- 监控和日志管理
+"""
+```
+
+#### 方法二：通过API查看当前配置
+```bash
+# 查看所有可用的prompt类型
+curl http://localhost:8000/api/prompts/list
+
+# 获取语音通话专用prompt
+curl -X POST http://localhost:8000/api/prompts/voice-call \
+  -H "Content-Type: application/json" \
+  -d '{"resume_context": "候选人简历内容..."}'
+```
+
+#### 方法三：使用辅助函数
+```python
+# 使用辅助函数获取特定岗位的prompt
+from prompts import get_interviewer_prompt
+
+# 获取前端面试官prompt
+frontend_prompt = get_interviewer_prompt(position="frontend")
+
+# 获取带简历上下文的prompt
+personalized_prompt = get_interviewer_prompt(
+    position="ai_ml", 
+    resume_context="候选人的AI/ML背景..."
+)
+```
+
+### Prompt最佳实践
+1. **保持一致性**: 所有prompt应保持相同的语调和风格
+2. **简洁明了**: 语音回复的prompt要特别注意简洁性
+3. **个性化**: 充分利用简历上下文进行个性化提问
+4. **专业性**: 不同岗位的prompt要体现专业深度
+5. **可维护性**: 定期审查和更新prompt内容
+
 ## 🔍 故障排除
 
 ### 常见问题
+
+#### Prompt相关问题
+```bash
+# Prompt API无响应
+检查prompts.py文件语法 → 确认导入路径正确 → 重启服务
+
+# 语音通话获取不到简历信息
+检查简历上传状态 → 验证session_id匹配 → 查看API日志
+
+# 默认prompt回退机制
+确认网络连接 → 检查API端点可用性 → 验证回退逻辑
+```
 
 #### UI界面和导航问题
 ```bash
@@ -343,44 +479,138 @@ curl -H "Authorization: Bearer $OPENAI_API_KEY" $OPENAI_BASE_URL/v1/models
 - **文件大小**: 建议10MB以内
 - **拖拽功能**: 确保浏览器支持HTML5拖拽API
 
+#### 简历信息传递问题
+- **会话ID匹配**: 确保前端和后端session_id一致
+- **API可用性**: 检查 `/api/resume/{session_id}` 端点状态
+- **简历内容**: 验证简历文件解析是否成功
+
 ## 🚀 部署指南
 
 ### 生产环境部署
 ```bash
 # 设置生产环境变量
-export OPENAI_API_KEY="your_production_key"
-export OPENAI_BASE_URL="your_production_endpoint"
+export ENVIRONMENT=production
+export OPENAI_API_KEY=your_production_api_key
+export OPENAI_BASE_URL=your_production_endpoint
 
-# 启动生产服务
-uvicorn backend.app:app --host 0.0.0.0 --port 8000 --workers 4
+# 使用Gunicorn部署
+pip install gunicorn
+gunicorn backend.app:app --host 0.0.0.0 --port 8000 --workers 4
+
+# 使用Docker部署
+docker build -t ai-interview-system .
+docker run -p 8000:8000 -e OPENAI_API_KEY=your_key ai-interview-system
 ```
 
-### Docker部署
-```dockerfile
-FROM python:3.9-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-EXPOSE 8000
-CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000"]
+### 环境变量配置
+
+| 变量名 | 描述 | 必需 | 默认值 |
+|--------|------|------|--------|
+| `OPENAI_API_KEY` | Azure OpenAI API密钥 | 是 | - |
+| `OPENAI_BASE_URL` | Azure OpenAI端点URL | 是 | - |
+| `ARK_API_KEY` | 备用API密钥 | 否 | - |
+
+### 推荐配置
+```env
+# Azure OpenAI配置
+OPENAI_API_KEY=your_azure_api_key_here
+OPENAI_BASE_URL=https://your-resource-name.openai.azure.com
+
+# 服务配置
+HOST=localhost
+PORT=8000
+LOG_LEVEL=INFO
 ```
+
+## 📈 性能优化
+
+### 前端优化
+- **资源压缩**: CSS/JS文件压缩和合并
+- **图片优化**: 使用WebP格式，适当压缩
+- **缓存策略**: 合理设置浏览器缓存
+- **懒加载**: 非关键资源延迟加载
+
+### 后端优化
+- **异步处理**: 使用FastAPI的异步特性
+- **连接池**: 数据库和API连接池管理
+- **缓存机制**: Redis缓存热点数据
+- **负载均衡**: 多实例部署和负载分发
+
+### 语音优化
+- **音频压缩**: 合适的音频编码格式
+- **网络优化**: CDN加速和就近接入
+- **缓冲策略**: 音频流缓冲和预加载
+- **错误恢复**: 网络中断自动重连
+
+## 🔒 安全考虑
+
+### 数据安全
+- **API密钥保护**: 环境变量存储，避免硬编码
+- **文件上传限制**: 文件类型和大小限制
+- **输入验证**: 严格的输入参数验证
+- **错误处理**: 避免敏感信息泄露
+
+### 网络安全
+- **HTTPS部署**: 生产环境强制HTTPS
+- **CORS配置**: 合理的跨域资源共享设置
+- **请求限制**: API请求频率限制
+- **日志审计**: 详细的操作日志记录
+
+## 📝 开发指南
+
+### 添加新功能
+1. **需求分析**: 明确功能需求和用户场景
+2. **设计方案**: 技术方案设计和架构考虑
+3. **代码实现**: 遵循项目代码规范
+4. **测试验证**: 单元测试和集成测试
+5. **文档更新**: 更新README和API文档
+
+### 代码规范
+- **Python**: 遵循PEP 8代码风格
+- **JavaScript**: 使用ES6+语法特性
+- **CSS**: 使用CSS变量和模块化设计
+- **注释**: 关键逻辑添加详细注释
+- **命名**: 使用有意义的变量和函数名
+
+### 测试策略
+- **单元测试**: 核心业务逻辑测试
+- **集成测试**: API接口和数据流测试
+- **前端测试**: 用户交互和界面测试
+- **性能测试**: 负载和压力测试
+- **兼容性测试**: 多浏览器和设备测试
+
+## 🤝 贡献指南
+
+### 提交代码
+1. Fork项目到个人仓库
+2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 创建Pull Request
+
+### 报告问题
+- 使用GitHub Issues报告bug
+- 提供详细的复现步骤
+- 包含错误日志和截图
+- 说明运行环境信息
+
+### 功能建议
+- 在Issues中提出功能建议
+- 详细描述使用场景
+- 考虑实现的可行性
+- 讨论设计方案
 
 ## 📄 许可证
 
 本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
-## 🤝 贡献指南
+## 🙏 致谢
 
-欢迎提交 Issue 和 Pull Request 来改进AI智能面试官系统！
-
-### 开发流程
-1. Fork 本仓库
-2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启 Pull Request
+- [Azure OpenAI](https://azure.microsoft.com/en-us/products/ai-services/openai-service) - 提供强大的AI语音模型
+- [FastAPI](https://fastapi.tiangolo.com/) - 现代化的Python Web框架
+- [WebRTC](https://webrtc.org/) - 实时通信技术支持
+- 所有贡献者和用户的支持与反馈
 
 ---
 
-**AI智能面试官** - 让面试更智能，让交流更自然，让界面更现代 🎤✨
+**🎯 开始您的AI面试之旅！** 访问 http://localhost:8000 体验专业的语音面试系统。

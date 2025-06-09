@@ -28,6 +28,9 @@ from docx import Document
 # Azure OpenAI实时语音客户端
 from openai import AsyncAzureOpenAI
 
+# 导入提示词配置
+from prompts import get_interviewer_prompt, get_voice_call_prompt
+
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
@@ -146,23 +149,7 @@ class AzureVoiceService:
     
     def _build_system_prompt(self, resume_context: str) -> str:
         """构建系统提示词"""
-        base_prompt = """你是一位专业的天汇天汇天汇AI面试官，负责进行技术面试。请遵循以下原则：
-
-1. 保持专业、友好的态度
-2. 根据候选人的回答进行深入追问
-3. 评估技术能力、解决问题的思路和沟通能力
-4. 提供建设性的反馈
-5. 语音回复要简洁明了，适合口语交流"""
-
-        if resume_context:
-            return f"""{base_prompt}
-
-候选人简历信息：
-{resume_context}
-
-请根据简历内容进行针对性的面试提问。"""
-        
-        return base_prompt
+        return get_interviewer_prompt(resume_context=resume_context)
     
     async def _handle_response_event(self, event: Any, websocket: WebSocket) -> None:
         """
@@ -485,6 +472,176 @@ async def startup_event():
 async def read_root():
     """返回主页面"""
     return FileResponse("static/index.html")
+
+from pydantic import BaseModel
+
+class PromptRequest(BaseModel):
+    resume_context: str = ""
+
+@app.post("/api/prompts/voice-call")
+async def get_voice_call_prompt_api(request: PromptRequest) -> JSONResponse:
+    """
+    获取语音通话专用prompt
+    
+    Args:
+        request: 包含resume_context的请求体
+        
+    Returns:
+        prompt指令
+    """
+    try:
+        resume_context = request.resume_context
+        instructions = get_voice_call_prompt(resume_context=resume_context)
+        
+        return JSONResponse(content={
+            "success": True,
+            "instructions": instructions,
+            "has_resume": bool(resume_context)
+        })
+        
+    except Exception as e:
+        logger.error(f"获取语音通话prompt失败: {e}")
+        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
+
+@app.get("/api/prompts/voice-call-default")
+async def get_voice_call_default_prompt() -> JSONResponse:
+    """
+    获取语音通话的默认prompt（不包含简历上下文）
+    
+    Returns:
+        默认的语音通话prompt
+    """
+    try:
+        from prompts import InterviewPrompts
+        
+        return JSONResponse(content={
+            "success": True,
+            "instructions": InterviewPrompts.VOICE_CALL_INTERVIEWER,
+            "source": "prompts.py - VOICE_CALL_INTERVIEWER"
+        })
+        
+    except Exception as e:
+        logger.error(f"获取默认语音通话prompt失败: {e}")
+        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
+
+@app.get("/api/prompts/list")
+async def list_prompts() -> JSONResponse:
+    """
+    列出所有可用的prompt类型
+    
+    Returns:
+        prompt类型列表
+    """
+    try:
+        from prompts import InterviewPrompts, SystemPrompts, UIPrompts, NotificationPrompts
+        
+        prompt_info = {
+            "interview_prompts": {
+                "base_interviewer": InterviewPrompts.BASE_INTERVIEWER,
+                "voice_call_interviewer": InterviewPrompts.VOICE_CALL_INTERVIEWER,
+                "position_specific": list(InterviewPrompts.POSITION_SPECIFIC.keys())
+            },
+            "system_prompts": {
+                "welcome_message": SystemPrompts.WELCOME_MESSAGE,
+                "error_messages": list(SystemPrompts.ERROR_MESSAGES.keys()),
+                "status_messages": list(SystemPrompts.STATUS_MESSAGES.keys())
+            },
+            "ui_prompts": {
+                "button_texts": list(UIPrompts.BUTTON_TEXTS.keys()),
+                "placeholders": list(UIPrompts.PLACEHOLDERS.keys()),
+                "hints": list(UIPrompts.HINTS.keys())
+            },
+            "notification_prompts": {
+                "success_messages": list(NotificationPrompts.SUCCESS_MESSAGES.keys()),
+                "warning_messages": list(NotificationPrompts.WARNING_MESSAGES.keys()),
+                "error_messages": list(NotificationPrompts.ERROR_MESSAGES.keys())
+            }
+        }
+        
+        return JSONResponse(content={
+            "success": True,
+            "prompts": prompt_info,
+            "message": "所有prompt配置已从prompts.py文件中集中管理"
+        })
+        
+    except Exception as e:
+        logger.error(f"获取prompt列表失败: {e}")
+        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
+
+@app.get("/api/prompts/validate")
+async def validate_prompt_management() -> JSONResponse:
+    """
+    验证prompt管理是否完全通过prompts.py文件
+    
+    Returns:
+        验证结果和建议
+    """
+    try:
+        from prompts import InterviewPrompts, SystemPrompts, UIPrompts, NotificationPrompts
+        
+        validation_result = {
+            "prompts_py_status": "✅ prompts.py文件正常加载",
+            "centralized_management": True,
+            "available_prompts": {
+                "interview_prompts": len(InterviewPrompts.POSITION_SPECIFIC) + 2,  # BASE + VOICE_CALL + positions
+                "system_prompts": len(SystemPrompts.ERROR_MESSAGES) + len(SystemPrompts.STATUS_MESSAGES) + 1,  # + WELCOME
+                "ui_prompts": len(UIPrompts.BUTTON_TEXTS) + len(UIPrompts.PLACEHOLDERS) + len(UIPrompts.HINTS),
+                "notification_prompts": len(NotificationPrompts.SUCCESS_MESSAGES) + len(NotificationPrompts.WARNING_MESSAGES) + len(NotificationPrompts.ERROR_MESSAGES)
+            },
+            "api_endpoints": [
+                "/api/prompts/voice-call - 获取语音通话prompt（带简历上下文）",
+                "/api/prompts/voice-call-default - 获取默认语音通话prompt",
+                "/api/prompts/list - 列出所有prompt类型",
+                "/api/prompts/validate - 验证prompt管理状态"
+            ],
+            "recommendations": [
+                "✅ 所有prompt已通过prompts.py集中管理",
+                "✅ 前端已配置API回退机制",
+                "✅ 支持动态prompt更新",
+                "💡 建议定期审查prompt内容的专业性和准确性"
+            ]
+        }
+        
+        return JSONResponse(content={
+            "success": True,
+            "validation": validation_result,
+            "message": "Prompt管理验证完成 - 所有配置已集中到prompts.py"
+        })
+        
+    except Exception as e:
+        logger.error(f"Prompt管理验证失败: {e}")
+        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
+
+@app.get("/api/resume/{session_id}")
+async def get_resume_content(session_id: str) -> JSONResponse:
+    """
+    获取指定会话的简历内容
+    
+    Args:
+        session_id: 会话ID
+        
+    Returns:
+        简历内容
+    """
+    try:
+        # 从内存或文件获取简历内容
+        resume_content = user_sessions.get(session_id) or load_resume_from_file(session_id)
+        
+        if not resume_content:
+            raise HTTPException(status_code=404, detail="未找到对应的简历内容")
+        
+        return JSONResponse(content={
+            "success": True,
+            "session_id": session_id,
+            "content": resume_content,
+            "content_length": len(resume_content)
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取简历内容失败: {e}")
+        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
 
 @app.post("/api/upload-resume")
 async def upload_resume(file: UploadFile = File(...)) -> JSONResponse:

@@ -295,16 +295,16 @@ class AzureVoiceChat {
         }
         
         // 启动语音通话
-        if (window.voiceCallManager) {
+        if (this.app && this.app.voiceCallManager) {
             console.log('启动语音通话管理器');
-            window.voiceCallManager.startVoiceCall();
+            this.app.voiceCallManager.startVoiceCall();
         } else {
             console.log('语音通话管理器未初始化，等待初始化完成...');
             // 等待语音通话管理器初始化完成
             const checkVoiceManager = () => {
-                if (window.voiceCallManager) {
+                if (this.app && this.app.voiceCallManager) {
                     console.log('语音通话管理器已初始化，启动语音通话');
-                    window.voiceCallManager.startVoiceCall();
+                    this.app.voiceCallManager.startVoiceCall();
                 } else {
                     console.log('继续等待语音通话管理器初始化...');
                     setTimeout(checkVoiceManager, 100);
@@ -832,6 +832,16 @@ class AzureVoiceChat {
         this.currentSessionId = sessionId || '';
         console.log('设置会话ID:', this.currentSessionId);
     }
+    
+    showError(message) {
+        console.error('AzureVoiceChat错误:', message);
+        // 显示错误通知
+        if (typeof showNotification === 'function') {
+            showNotification('错误', message, 'error');
+        } else {
+            alert(message);
+        }
+    }
 }
 
 /**
@@ -1283,6 +1293,9 @@ class AzureVoiceInterviewApp {
         this.currentInterview = null;
         this.interviewStartTime = null;
         
+        // 将app实例传递给voiceChat，以便访问voiceCallManager
+        this.voiceChat.app = this;
+        
         this.init();
     }
 
@@ -1330,12 +1343,7 @@ class AzureVoiceInterviewApp {
         try {
             this.voiceCallManager = new VoiceCallManager(this.voiceChat);
             
-            // 检查浏览器兼容性
-            if (!this.voiceCallManager.checkBrowserSupport()) {
-                console.warn('浏览器不完全支持语音通话功能');
-                // 可以选择隐藏语音通话按钮或显示警告
-            }
-            
+            // 浏览器兼容性检查现在在startVoiceCall方法中进行
             console.log('语音通话管理器初始化完成');
         } catch (error) {
             console.error('语音通话管理器初始化失败:', error);

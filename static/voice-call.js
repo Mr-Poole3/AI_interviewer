@@ -1,1010 +1,838 @@
 /**
- * 语音通话管理器 - FastRTC增强版
+ * 语音通话管理器 - Azure OpenAI Realtime API WebRTC版本
  * 
- * 负责语音通话界面的交互逻辑，包括：
- * - 麦克风权限获取和控制
- * - FastRTC音频增强处理
- * - 专业音频预处理（降噪、回声消除、AGC）
- * - 智能语音活动检测（VAD）
- * - 语音可视化效果
- * - 通话状态管理
- * - 全屏语音界面的交互
- * - 智能打断机制
+ * 基于Azure OpenAI Realtime API WebRTC官方实现
+ * 移除了复杂的FastRTC音频处理逻辑，采用标准WebRTC通信
+ * 
+ * 主要功能：
+ * - 直接连接Azure OpenAI Realtime API WebRTC
+ * - 使用ephemeral API key进行安全认证
+ * - 通过RTCPeerConnection进行音频通信
+ * - 通过DataChannel进行事件通信
+ * - 支持多区域WebRTC端点回退
+ * - 实时事件处理和调试日志
  */
 class VoiceCallManager {
     constructor(azureVoiceChat) {
         this.azureVoiceChat = azureVoiceChat;
-        this.mediaRecorder = null;
-        this.audioStream = null;
-        this.isRecording = false;
-        this.isMuted = false;
+        
+        // Azure配置
+        this.SESSIONS_URL = "https://gpt-realtime-4o-mini.openai.azure.com/openai/realtimeapi/sessions?api-version=2025-04-01-preview";
+        this.API_KEY = "1CPbxJPoYjJzTmG2296QXpJ8LT8jHJ0NmgKDv56sQ5tjonM6RXgOJQQJ99BEACHYHv6XJ3w3AAABACOG45bg";
+        this.DEPLOYMENT = "gpt-4o-mini-realtime-preview";
+        this.VOICE = "verse";
+        
+        // WebRTC端点配置（支持多区域回退）
+        this.WEBRTC_CONFIGS = [
+            // East US 2 (主要区域)
+            { url: "https://eastus2.realtimeapi-preview.ai.azure.com/v1/realtimertc", useQuery: true },
+            // Sweden Central (备用区域)
+            { url: "https://swedencentral.realtimeapi-preview.ai.azure.com/v1/realtimertc", useQuery: true }
+        ];
+        
+        // WebRTC连接相关
+        this.peerConnection = null;
+        this.dataChannel = null;
+        this.audioElement = null;
+        this.clientMedia = null;
+        this.ephemeralKey = null;
+        this.sessionId = null;
+        
+        // 状态管理
+        this.isConnected = false;
+        this.isCallActive = false;
         this.callStartTime = null;
         this.callTimer = null;
-        this.audioContext = null;
-        this.analyser = null;
-        this.animationId = null;
         
-        // FastRTC音频增强相关
-        this.audioProcessor = null;
-        this.vadProcessor = null;
-        this.noiseSuppressionNode = null;
-        this.echoCancellationNode = null;
-        this.gainNode = null;
-        this.compressorNode = null;
-        
-        // VAD (Voice Activity Detection) 配置 - 优化阈值设置
-        this.vadThreshold = 0.003; // 降低语音活动检测阈值，原值0.01过于严格
-        this.vadSmoothingFactor = 0.6; // 降低平滑因子，提高响应速度，原值0.8过于平滑
-        this.currentVadLevel = 0;
-        
-        // 新增：音频能量统计，用于动态调整阈值
-        this.audioEnergyStats = {
-            min: Infinity,
-            max: 0,
-            recent: [],
-            avgNoise: 0.001 // 预估环境噪音水平
+        // 语音活动检测（VAD）配置
+        this.vadConfig = {
+            threshold: 0.5,              // 语音检测阈值 (0.0-1.0，越高越不敏感)
+            prefix_padding_ms: 300,      // 语音开始前的缓冲时间
+            silence_duration_ms: 1500,   // 静音持续时间（毫秒，用户停顿多久后AI开始回复）
+            create_response: true,       // 检测到静音后自动创建响应
+            interrupt_response: true     // 允许用户打断AI回复
         };
         
-        // 智能打断系统配置
-        this.interruptionEnabled = true;
-        this.isAIResponding = false;
-        this.lastInterruptTime = 0;
-        this.interruptCooldown = 2000; // 2秒冷却时间
-        this.interruptDelay = 200; // 延迟200ms执行打断，避免误触发
-        this.pendingInterrupt = null;
-        this.interruptThreshold = 0.015; // 打断检测阈值，略高于VAD阈值
-        
-        // 音频质量优化
-        this.audioChunks = [];
-        this.chunkDuration = 50; // 音频块持续时间(ms)
-        this.sampleRate = 24000; // 采样率
-        this.bitDepth = 16; // 位深度
+        // 调试日志
+        this.debugMode = false;
+        this.logContainer = null;
         
         this.initElements();
         this.bindEvents();
-        this.initAudioVisualization();
+        this.setupDebugMode();
     }
     
     /**
      * 初始化DOM元素
      */
     initElements() {
-        // 语音通话按钮
-        this.voiceCallButton = document.getElementById('voiceCallButton');
-        
-        // 全屏语音界面
-        this.voiceCallFullscreen = document.getElementById('voiceCallFullscreen');
-        this.voiceCallBackdrop = document.getElementById('voiceCallBackdrop');
-        this.voiceAnimationContainer = document.getElementById('voiceAnimationContainer');
-        this.voiceLottiePlayer = document.getElementById('voiceLottiePlayer');
-        this.voiceStatusDisplay = document.getElementById('voiceStatusDisplay');
+        // 语音通话界面元素
+        this.voiceCallOverlay = document.getElementById('voiceCallFullscreen');
+        this.voiceStatus = document.getElementById('voiceStatusDisplay');
         this.voiceTimer = document.getElementById('voiceTimer');
-        this.voiceMuteBtn = document.getElementById('voiceMuteBtn');
-        this.voiceEndBtn = document.getElementById('voiceEndBtn');
+        this.endCallButton = document.getElementById('voiceEndBtn');
+        this.muteButton = document.getElementById('voiceMuteBtn');
+        this.settingsButton = document.getElementById('voiceSettingsBtn');
+        this.voiceVisualization = document.getElementById('voiceAnimationContainer');
         
-        // 弹窗语音界面（备用）
-        this.voiceCallOverlay = document.getElementById('voiceCallOverlay');
-        this.callStatus = document.getElementById('callStatus');
-        this.callTimer2 = document.getElementById('callTimer');
-        this.endCallButton = document.getElementById('endCallButton');
-        this.callMinimize = document.getElementById('callMinimize');
-        this.voiceVisualizer = document.getElementById('voiceVisualizer');
-        this.voiceStatusText = document.getElementById('voiceStatusText');
+        // VAD设置面板元素
+        this.vadSettingsPanel = document.getElementById('vadSettingsPanel');
+        this.closeVadSettings = document.getElementById('closeVadSettings');
+        this.silenceDurationSlider = document.getElementById('silenceDurationSlider');
+        this.silenceDurationValue = document.getElementById('silenceDurationValue');
+        this.thresholdSlider = document.getElementById('thresholdSlider');
+        this.thresholdValue = document.getElementById('thresholdValue');
+        this.prefixPaddingSlider = document.getElementById('prefixPaddingSlider');
+        this.prefixPaddingValue = document.getElementById('prefixPaddingValue');
+        this.resetVadSettings = document.getElementById('resetVadSettings');
+        this.applyVadSettings = document.getElementById('applyVadSettings');
         
-        // 创建打断按钮
-        this.createInterruptButton();
+        // 创建音频播放元素
+        this.audioElement = document.createElement('audio');
+        this.audioElement.autoplay = true;
+        this.audioElement.style.display = 'none';
+        document.body.appendChild(this.audioElement);
         
-        console.log('语音通话管理器 - DOM元素初始化完成');
-    }
-    
-    /**
-     * 创建打断按钮
-     */
-    createInterruptButton() {
-        // 在全屏界面添加打断按钮
-        if (this.voiceCallFullscreen) {
-            const voiceControls = this.voiceCallFullscreen.querySelector('.voice-controls');
-            if (voiceControls) {
-                const interruptBtn = document.createElement('button');
-                interruptBtn.id = 'voiceInterruptBtn';
-                interruptBtn.className = 'voice-control-btn interrupt-btn';
-                interruptBtn.innerHTML = `
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M6 6h12v12H6z"/>
-                    </svg>
-                `;
-                interruptBtn.title = '打断AI回复';
-                interruptBtn.style.display = 'none'; // 默认隐藏
-                
-                // 插入到静音按钮和结束按钮之间
-                const muteBtn = voiceControls.querySelector('.mute-btn');
-                if (muteBtn) {
-                    voiceControls.insertBefore(interruptBtn, muteBtn.nextSibling);
-                } else {
-                    voiceControls.appendChild(interruptBtn);
-                }
-                
-                this.voiceInterruptBtn = interruptBtn;
-            }
-        }
+        // 创建调试日志容器
+        this.logContainer = document.createElement('div');
+        this.logContainer.id = 'debugLogContainer';
+        this.logContainer.style.cssText = `
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 400px;
+            height: 300px;
+            background: rgba(0,0,0,0.9);
+            color: #00ff00;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-y: auto;
+            z-index: 10000;
+            display: none;
+        `;
+        document.body.appendChild(this.logContainer);
     }
     
     /**
      * 绑定事件监听器
      */
     bindEvents() {
-        // 语音通话按钮点击
-        if (this.voiceCallButton) {
-            this.voiceCallButton.addEventListener('click', () => {
-                this.startVoiceCall();
-            });
-        }
-        
-        // 全屏界面控制按钮
-        if (this.voiceMuteBtn) {
-            this.voiceMuteBtn.addEventListener('click', () => {
-                this.toggleMute();
-            });
-        }
-        
-        if (this.voiceEndBtn) {
-            this.voiceEndBtn.addEventListener('click', () => {
-                this.endVoiceCall();
-            });
-        }
-        
-        // 打断按钮事件
-        if (this.voiceInterruptBtn) {
-            this.voiceInterruptBtn.addEventListener('click', () => {
-                this.manualInterrupt();
-            });
-        }
-        
-        // 弹窗界面控制按钮
+        // 结束通话按钮
         if (this.endCallButton) {
-            this.endCallButton.addEventListener('click', () => {
-                this.endVoiceCall();
-            });
+            this.endCallButton.addEventListener('click', () => this.endVoiceCall());
         }
         
-        if (this.callMinimize) {
-            this.callMinimize.addEventListener('click', () => {
-                this.minimizeCall();
-            });
+        // 静音按钮
+        if (this.muteButton) {
+            this.muteButton.addEventListener('click', () => this.toggleMute());
         }
         
-        // 背景点击关闭（可选）
-        if (this.voiceCallBackdrop) {
-            this.voiceCallBackdrop.addEventListener('click', () => {
-                // 可以选择是否允许点击背景关闭
-                // this.endVoiceCall();
-            });
+        // 设置按钮
+        if (this.settingsButton) {
+            this.settingsButton.addEventListener('click', () => this.toggleVadSettings());
         }
         
-        // 监听AI回复状态变化
-        this.bindAIResponseEvents();
+        // VAD设置面板事件
+        this.bindVadSettingsEvents();
         
-        console.log('语音通话管理器 - 事件绑定完成');
-    }
-    
-    /**
-     * 绑定AI回复状态事件
-     */
-    bindAIResponseEvents() {
-        // 监听AI开始回复
-        window.addEventListener('aiResponseStart', () => {
-            this.onAIResponseStart();
-        });
-        
-        // 监听AI回复结束
-        window.addEventListener('aiResponseEnd', () => {
-            this.onAIResponseEnd();
-        });
-        
-        // 监听音频播放开始
-        window.addEventListener('audioPlaybackStart', () => {
-            this.onAudioPlaybackStart();
-        });
-        
-        // 监听音频播放结束
-        window.addEventListener('audioPlaybackEnd', () => {
-            this.onAudioPlaybackEnd();
-        });
-    }
-    
-    /**
-     * 初始化音频可视化和FastRTC音频处理
-     */
-    async initAudioVisualization() {
-        try {
-            // 创建高质量音频上下文
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
-                sampleRate: this.sampleRate,
-                latencyHint: 'interactive' // 优化延迟
-            });
-            
-            console.log('语音通话管理器 - FastRTC音频上下文初始化完成');
-        } catch (error) {
-            console.error('语音通话管理器 - 音频上下文初始化失败:', error);
-        }
-    }
-    
-    /**
-     * 请求麦克风权限 - FastRTC增强版
-     */
-    async requestMicrophonePermission() {
-        try {
-            // FastRTC优化的音频约束
-            const audioConstraints = {
-                audio: {
-                    // 基础音频处理
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                    
-                    // FastRTC音频质量优化
-                    sampleRate: this.sampleRate,
-                    sampleSize: this.bitDepth,
-                    channelCount: 1, // 单声道，减少带宽
-                    
-                    // 延迟优化
-                    latency: 0.01, // 10ms延迟
-                    
-                    // 高级音频处理
-                    googEchoCancellation: true,
-                    googAutoGainControl: true,
-                    googNoiseSuppression: true,
-                    googHighpassFilter: true,
-                    googTypingNoiseDetection: true,
-                    googAudioMirroring: false,
-                    
-                    // 音频质量设置
-                    googAGCGain: 15,
-                    googNoiseReduction: true
-                }
-            };
-            
-            this.audioStream = await navigator.mediaDevices.getUserMedia(audioConstraints);
-            
-            // 初始化FastRTC音频处理管道
-            await this.initFastRTCAudioPipeline();
-            
-            console.log('语音通话管理器 - FastRTC增强麦克风权限获取成功');
-            return this.audioStream;
-            
-        } catch (error) {
-            console.error('语音通话管理器 - 麦克风权限获取失败:', error);
-            
-            let errorMessage = '无法访问麦克风';
-            if (error.name === 'NotAllowedError') {
-                errorMessage = '麦克风权限被拒绝，请在浏览器设置中允许麦克风访问';
-            } else if (error.name === 'NotFoundError') {
-                errorMessage = '未找到麦克风设备';
-            } else if (error.name === 'NotReadableError') {
-                errorMessage = '麦克风设备被其他应用占用';
+        // 快捷键绑定
+        document.addEventListener('keydown', (e) => {
+            // 调试模式快捷键 (Ctrl+Shift+L)
+            if (e.ctrlKey && e.shiftKey && e.key === 'L') {
+                this.toggleDebugMode();
             }
             
-            throw new Error(errorMessage);
+            // VAD配置快捷键（仅在语音通话期间有效）
+            if (this.isCallActive) {
+                // Ctrl+Shift+1: 减少静音时长 (更敏感)
+                if (e.ctrlKey && e.shiftKey && e.key === '1') {
+                    e.preventDefault();
+                    const currentDuration = this.vadConfig.silence_duration_ms;
+                    const newDuration = Math.max(500, currentDuration - 250);
+                    this.updateVADConfig({ silence_duration_ms: newDuration });
+                }
+                
+                // Ctrl+Shift+2: 增加静音时长 (更不敏感)
+                if (e.ctrlKey && e.shiftKey && e.key === '2') {
+                    e.preventDefault();
+                    const currentDuration = this.vadConfig.silence_duration_ms;
+                    const newDuration = Math.min(3000, currentDuration + 250);
+                    this.updateVADConfig({ silence_duration_ms: newDuration });
+                }
+                
+                // Ctrl+Shift+3: 重置为默认配置
+                if (e.ctrlKey && e.shiftKey && e.key === '3') {
+                    e.preventDefault();
+                    this.updateVADConfig({
+                        threshold: 0.5,
+                        silence_duration_ms: 1500,
+                        prefix_padding_ms: 300
+                    });
+                }
+            }
+        });
+    }
+    
+    /**
+     * 设置调试模式
+     */
+    setupDebugMode() {
+        this.logMessage('Azure OpenAI Realtime API WebRTC 语音通话管理器已初始化');
+        this.logMessage('快捷键说明:');
+        this.logMessage('  Ctrl+Shift+L: 切换调试日志显示');
+        this.logMessage('  Ctrl+Shift+1: 减少静音时长 (通话中)');
+        this.logMessage('  Ctrl+Shift+2: 增加静音时长 (通话中)');
+        this.logMessage('  Ctrl+Shift+3: 重置VAD配置 (通话中)');
+        this.logMessage(`当前VAD配置: 静音时长=${this.vadConfig.silence_duration_ms}ms, 阈值=${this.vadConfig.threshold}`);
+    }
+    
+    /**
+     * 切换调试模式
+     */
+    toggleDebugMode() {
+        this.debugMode = !this.debugMode;
+        this.logContainer.style.display = this.debugMode ? 'block' : 'none';
+        this.logMessage(`调试模式: ${this.debugMode ? '开启' : '关闭'}`);
+    }
+    
+    /**
+     * 更新VAD配置
+     * @param {Object} newConfig - 新的VAD配置
+     * @param {number} newConfig.threshold - 语音检测阈值 (0.0-1.0)
+     * @param {number} newConfig.silence_duration_ms - 静音持续时间（毫秒）
+     * @param {number} newConfig.prefix_padding_ms - 语音开始前的缓冲时间
+     */
+    updateVADConfig(newConfig) {
+        const oldConfig = { ...this.vadConfig };
+        
+        // 更新配置
+        if (newConfig.threshold !== undefined) {
+            this.vadConfig.threshold = Math.max(0.0, Math.min(1.0, newConfig.threshold));
+        }
+        if (newConfig.silence_duration_ms !== undefined) {
+            this.vadConfig.silence_duration_ms = Math.max(200, Math.min(5000, newConfig.silence_duration_ms));
+        }
+        if (newConfig.prefix_padding_ms !== undefined) {
+            this.vadConfig.prefix_padding_ms = Math.max(0, Math.min(1000, newConfig.prefix_padding_ms));
+        }
+        
+        this.logMessage(`VAD配置已更新:`);
+        this.logMessage(`  阈值: ${oldConfig.threshold} → ${this.vadConfig.threshold}`);
+        this.logMessage(`  静音时长: ${oldConfig.silence_duration_ms}ms → ${this.vadConfig.silence_duration_ms}ms`);
+        this.logMessage(`  前缀缓冲: ${oldConfig.prefix_padding_ms}ms → ${this.vadConfig.prefix_padding_ms}ms`);
+        
+        // 如果当前有活跃连接，立即应用新配置
+        if (this.isConnected && this.dataChannel && this.dataChannel.readyState === 'open') {
+            this.updateSessionInstructions();
         }
     }
     
     /**
-     * 初始化FastRTC音频处理管道
+     * 获取当前VAD配置
      */
-    async initFastRTCAudioPipeline() {
-        if (!this.audioContext || !this.audioStream) {
-            throw new Error('音频上下文或音频流未初始化');
+    getVADConfig() {
+        return { ...this.vadConfig };
+    }
+    
+    /**
+     * 绑定VAD设置面板事件
+     */
+    bindVadSettingsEvents() {
+        // 关闭设置面板
+        if (this.closeVadSettings) {
+            this.closeVadSettings.addEventListener('click', () => this.hideVadSettings());
         }
         
+        // 滑块事件
+        if (this.silenceDurationSlider) {
+            this.silenceDurationSlider.addEventListener('input', (e) => {
+                this.silenceDurationValue.textContent = `${e.target.value}ms`;
+            });
+        }
+        
+        if (this.thresholdSlider) {
+            this.thresholdSlider.addEventListener('input', (e) => {
+                this.thresholdValue.textContent = e.target.value;
+            });
+        }
+        
+        if (this.prefixPaddingSlider) {
+            this.prefixPaddingSlider.addEventListener('input', (e) => {
+                this.prefixPaddingValue.textContent = `${e.target.value}ms`;
+            });
+        }
+        
+        // 重置按钮
+        if (this.resetVadSettings) {
+            this.resetVadSettings.addEventListener('click', () => this.resetVadSettingsToDefault());
+        }
+        
+        // 应用按钮
+        if (this.applyVadSettings) {
+            this.applyVadSettings.addEventListener('click', () => this.applyVadSettingsFromPanel());
+        }
+        
+        // 点击面板外部关闭
+        document.addEventListener('click', (e) => {
+            if (this.vadSettingsPanel && 
+                this.vadSettingsPanel.style.display === 'block' &&
+                !this.vadSettingsPanel.contains(e.target) &&
+                !this.settingsButton.contains(e.target)) {
+                this.hideVadSettings();
+            }
+        });
+    }
+    
+    /**
+     * 切换VAD设置面板显示
+     */
+    toggleVadSettings() {
+        if (this.vadSettingsPanel.style.display === 'block') {
+            this.hideVadSettings();
+        } else {
+            this.showVadSettings();
+        }
+    }
+    
+    /**
+     * 显示VAD设置面板
+     */
+    showVadSettings() {
+        // 更新滑块值为当前配置
+        this.updateVadSettingsPanel();
+        this.vadSettingsPanel.style.display = 'block';
+        this.logMessage('显示VAD设置面板');
+    }
+    
+    /**
+     * 隐藏VAD设置面板
+     */
+    hideVadSettings() {
+        this.vadSettingsPanel.style.display = 'none';
+        this.logMessage('隐藏VAD设置面板');
+    }
+    
+    /**
+     * 更新VAD设置面板的值
+     */
+    updateVadSettingsPanel() {
+        if (this.silenceDurationSlider) {
+            this.silenceDurationSlider.value = this.vadConfig.silence_duration_ms;
+            this.silenceDurationValue.textContent = `${this.vadConfig.silence_duration_ms}ms`;
+        }
+        
+        if (this.thresholdSlider) {
+            this.thresholdSlider.value = this.vadConfig.threshold;
+            this.thresholdValue.textContent = this.vadConfig.threshold;
+        }
+        
+        if (this.prefixPaddingSlider) {
+            this.prefixPaddingSlider.value = this.vadConfig.prefix_padding_ms;
+            this.prefixPaddingValue.textContent = `${this.vadConfig.prefix_padding_ms}ms`;
+        }
+    }
+    
+    /**
+     * 重置VAD设置为默认值
+     */
+    resetVadSettingsToDefault() {
+        const defaultConfig = {
+            threshold: 0.5,
+            silence_duration_ms: 1500,
+            prefix_padding_ms: 300
+        };
+        
+        // 更新滑块显示
+        if (this.silenceDurationSlider) {
+            this.silenceDurationSlider.value = defaultConfig.silence_duration_ms;
+            this.silenceDurationValue.textContent = `${defaultConfig.silence_duration_ms}ms`;
+        }
+        
+        if (this.thresholdSlider) {
+            this.thresholdSlider.value = defaultConfig.threshold;
+            this.thresholdValue.textContent = defaultConfig.threshold;
+        }
+        
+        if (this.prefixPaddingSlider) {
+            this.prefixPaddingSlider.value = defaultConfig.prefix_padding_ms;
+            this.prefixPaddingValue.textContent = `${defaultConfig.prefix_padding_ms}ms`;
+        }
+        
+        this.logMessage('VAD设置已重置为默认值');
+    }
+    
+    /**
+     * 从面板应用VAD设置
+     */
+    applyVadSettingsFromPanel() {
+        const newConfig = {
+            threshold: parseFloat(this.thresholdSlider.value),
+            silence_duration_ms: parseInt(this.silenceDurationSlider.value),
+            prefix_padding_ms: parseInt(this.prefixPaddingSlider.value)
+        };
+        
+        this.updateVADConfig(newConfig);
+        this.hideVadSettings();
+        this.logMessage('VAD设置已从面板应用');
+    }
+    
+    /**
+     * 记录调试日志
+     */
+    logMessage(message) {
+        const timestamp = new Date().toLocaleTimeString();
+        const logEntry = `[${timestamp}] ${message}`;
+        console.log(logEntry);
+        
+        if (this.logContainer) {
+            const p = document.createElement('p');
+            p.textContent = logEntry;
+            p.style.margin = '2px 0';
+            this.logContainer.appendChild(p);
+            this.logContainer.scrollTop = this.logContainer.scrollHeight;
+        }
+    }
+    
+    /**
+     * 检查浏览器兼容性
+     */
+    checkBrowserCompatibility() {
+        const checks = {
+            webrtc: !!window.RTCPeerConnection,
+            getUserMedia: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+            audioContext: !!(window.AudioContext || window.webkitAudioContext)
+        };
+        
+        const incompatible = Object.entries(checks)
+            .filter(([key, supported]) => !supported)
+            .map(([key]) => key);
+        
+        if (incompatible.length > 0) {
+            throw new Error(`浏览器不支持以下功能: ${incompatible.join(', ')}`);
+        }
+        
+        this.logMessage('浏览器兼容性检查通过');
+        return true;
+    }
+    
+    /**
+     * 获取临时密钥
+     */
+    async getEphemeralKey() {
+        this.logMessage('正在获取临时密钥...');
+        
         try {
-            // 创建音频源节点
-            const sourceNode = this.audioContext.createMediaStreamSource(this.audioStream);
+            const response = await fetch(this.SESSIONS_URL, {
+                method: "POST",
+                headers: {
+                    "api-key": this.API_KEY,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    model: this.DEPLOYMENT,
+                    voice: this.VOICE
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                this.logMessage(`API请求失败: ${response.status} ${response.statusText} - ${errorText}`);
+                throw new Error(`API请求失败: ${response.status} ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            this.sessionId = data.id;
+            this.ephemeralKey = data.client_secret?.value;
             
-            // 创建分析器节点（用于VAD和可视化）
-            this.analyser = this.audioContext.createAnalyser();
-            this.analyser.fftSize = 2048;
-            this.analyser.smoothingTimeConstant = 0.8;
+            this.logMessage(`临时密钥获取成功: ***`);
+            this.logMessage(`WebRTC会话ID: ${this.sessionId}`);
             
-            // 创建增益控制节点
-            this.gainNode = this.audioContext.createGain();
-            this.gainNode.gain.value = 1.0;
-            
-            // 创建动态压缩器（改善音频动态范围）
-            this.compressorNode = this.audioContext.createDynamicsCompressor();
-            this.compressorNode.threshold.value = -24;
-            this.compressorNode.knee.value = 30;
-            this.compressorNode.ratio.value = 12;
-            this.compressorNode.attack.value = 0.003;
-            this.compressorNode.release.value = 0.25;
-            
-            // 创建高通滤波器（去除低频噪音）
-            const highPassFilter = this.audioContext.createBiquadFilter();
-            highPassFilter.type = 'highpass';
-            highPassFilter.frequency.value = 80; // 80Hz高通
-            highPassFilter.Q.value = 0.7;
-            
-            // 创建低通滤波器（去除高频噪音）
-            const lowPassFilter = this.audioContext.createBiquadFilter();
-            lowPassFilter.type = 'lowpass';
-            lowPassFilter.frequency.value = 8000; // 8kHz低通
-            lowPassFilter.Q.value = 0.7;
-            
-            // 创建音频处理器节点（用于VAD和实时处理）
-            this.audioProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
-            this.audioProcessor.onaudioprocess = (event) => {
-                this.processAudioWithVAD(event);
-            };
-            
-            // 连接音频处理管道
-            sourceNode
-                .connect(highPassFilter)
-                .connect(lowPassFilter)
-                .connect(this.compressorNode)
-                .connect(this.gainNode)
-                .connect(this.analyser)
-                .connect(this.audioProcessor);
-            
-            // 连接到目标（用于录音）
-            this.audioProcessor.connect(this.audioContext.destination);
-            
-            console.log('语音通话管理器 - FastRTC音频处理管道初始化完成');
+            return this.ephemeralKey;
             
         } catch (error) {
-            console.error('语音通话管理器 - FastRTC音频处理管道初始化失败:', error);
+            this.logMessage(`获取临时密钥失败: ${error.message}`);
             throw error;
         }
     }
     
     /**
-     * 音频处理与语音活动检测（VAD）- 增强打断机制
+     * 初始化WebRTC连接
      */
-    processAudioWithVAD(event) {
-        if (!this.isRecording || this.isMuted) {
-            return;
-        }
+    async initWebRTCConnection() {
+        this.logMessage('初始化WebRTC连接...');
         
-        const inputBuffer = event.inputBuffer;
-        const inputData = inputBuffer.getChannelData(0);
-        
-        // 改进的音频能量计算（使用更敏感的检测方法）
-        let sum = 0;
-        let peak = 0;
-        for (let i = 0; i < inputData.length; i++) {
-            const sample = Math.abs(inputData[i]);
-            sum += sample * sample; // RMS计算
-            peak = Math.max(peak, sample); // 峰值检测
-        }
-        const rms = Math.sqrt(sum / inputData.length);
-        
-        // 结合RMS和峰值的综合能量指标
-        const combinedEnergy = rms * 0.7 + peak * 0.3;
-        
-        // 更新音频能量统计信息
-        this.updateAudioEnergyStats(combinedEnergy);
-        
-        // 动态调整VAD阈值
-        const adaptiveThreshold = this.calculateAdaptiveThreshold();
-        
-        // 平滑VAD级别（降低平滑因子，提高响应速度）
-        this.currentVadLevel = this.vadSmoothingFactor * this.currentVadLevel + 
-                              (1 - this.vadSmoothingFactor) * combinedEnergy;
-        
-        // 语音活动检测（使用动态阈值）
-        const wasSpeaking = this.isSpeaking;
-        this.isSpeaking = this.currentVadLevel > adaptiveThreshold;
-        
-        // 记录检测状态（调试用）
-        if (this.isSpeaking !== wasSpeaking) {
-            console.log(`VAD状态变化: ${wasSpeaking ? '说话' : '静音'} -> ${this.isSpeaking ? '说话' : '静音'}, 
-                        能量: ${combinedEnergy.toFixed(4)}, 阈值: ${adaptiveThreshold.toFixed(4)}, 
-                        VAD级别: ${this.currentVadLevel.toFixed(4)}`);
-        }
-        
-        // 智能打断检测
-        if (this.interruptionEnabled && this.isAIResponding && this.isSpeaking && !wasSpeaking) {
-            this.detectInterruption();
-        }
-        
-        // 处理语音状态变化
-        if (this.isSpeaking && !wasSpeaking) {
-            // 开始说话
-            this.onSpeechStart();
-        } else if (!this.isSpeaking && wasSpeaking) {
-            // 停止说话
-            this.onSpeechEnd();
-        }
-        
-        // 如果正在说话，处理音频数据
-        if (this.isSpeaking) {
-            this.processAudioChunk(inputData);
-        }
-        
-        // 更新可视化
-        this.updateVoiceVisualization(this.currentVadLevel);
-    }
-    
-    /**
-     * 更新音频能量统计信息
-     */
-    updateAudioEnergyStats(energy) {
-        const stats = this.audioEnergyStats;
-        
-        // 更新最小值和最大值
-        stats.min = Math.min(stats.min, energy);
-        stats.max = Math.max(stats.max, energy);
-        
-        // 维护最近的能量值（用于计算噪音基线）
-        stats.recent.push(energy);
-        if (stats.recent.length > 100) { // 保持最近100个样本
-            stats.recent.shift();
-        }
-        
-        // 计算平均噪音水平（取最近样本的较低百分位）
-        if (stats.recent.length >= 20) {
-            const sorted = [...stats.recent].sort((a, b) => a - b);
-            const percentile20 = sorted[Math.floor(sorted.length * 0.2)];
-            stats.avgNoise = percentile20 * 1.2; // 略高于20%百分位作为噪音基线
-        }
-    }
-    
-    /**
-     * 计算自适应VAD阈值
-     */
-    calculateAdaptiveThreshold() {
-        const stats = this.audioEnergyStats;
-        
-        // 基础阈值
-        let threshold = this.vadThreshold;
-        
-        // 根据环境噪音调整阈值
-        if (stats.avgNoise > 0) {
-            threshold = Math.max(threshold, stats.avgNoise * 2.5); // 阈值至少是噪音的2.5倍
-        }
-        
-        // 限制阈值范围
-        threshold = Math.max(0.001, Math.min(0.02, threshold));
-        
-        return threshold;
-    }
-    
-    /**
-     * 检测打断意图
-     */
-    detectInterruption() {
-        const now = Date.now();
-        
-        // 检查冷却时间
-        if (now - this.lastInterruptTime < this.interruptCooldown) {
-            return;
-        }
-        
-        // 检查打断阈值
-        if (this.currentVadLevel > this.interruptThreshold) {
-            // 设置延迟打断，避免误触发
-            if (this.pendingInterrupt) {
-                clearTimeout(this.pendingInterrupt);
-            }
+        try {
+            // 创建RTCPeerConnection
+            this.peerConnection = new RTCPeerConnection();
             
-            this.pendingInterrupt = setTimeout(() => {
-                this.executeInterruption('auto');
-                this.pendingInterrupt = null;
-            }, this.interruptDelay);
+            // 设置音频播放
+            this.peerConnection.ontrack = (event) => {
+                this.logMessage('收到远程音频流');
+                this.audioElement.srcObject = event.streams[0];
+            };
             
-            console.log('语音通话管理器 - 检测到打断意图，延迟执行');
-        }
-    }
-    
-    /**
-     * 执行打断操作
-     */
-    executeInterruption(type = 'auto') {
-        if (!this.isAIResponding) {
-            return;
-        }
-        
-        const now = Date.now();
-        this.lastInterruptTime = now;
-        
-        console.log(`语音通话管理器 - 执行${type === 'auto' ? '自动' : '手动'}打断`);
-        
-        // 1. 立即停止AI音频播放
-        this.stopAIAudioPlayback();
-        
-        // 2. 清理音频队列和缓冲区
-        this.clearAudioBuffers();
-        
-        // 3. 中断服务器端连接
-        this.interruptServerConnection();
-        
-        // 4. 更新UI状态
-        this.updateInterruptionUI(type);
-        
-        // 5. 重置AI回复状态
-        this.isAIResponding = false;
-        
-        // 6. 触发打断事件
-        this.dispatchInterruptEvent(type);
-    }
-    
-    /**
-     * 停止AI音频播放
-     */
-    stopAIAudioPlayback() {
-        // 停止所有正在播放的音频源
-        if (this.azureVoiceChat && this.azureVoiceChat.audioSources) {
-            this.azureVoiceChat.audioSources.forEach(source => {
-                try {
-                    source.stop();
-                    console.log('语音通话管理器 - 停止音频源播放');
-                } catch (e) {
-                    // 忽略已停止的音频源
+            // 获取用户媒体 - 根据官方文档配置音频参数
+            this.clientMedia = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    sampleRate: 24000,  // Azure OpenAI Realtime API 推荐采样率
+                    channelCount: 1     // 单声道
                 }
             });
-            this.azureVoiceChat.audioSources = [];
-        }
-        
-        // 重置播放时间
-        if (this.azureVoiceChat) {
-            this.azureVoiceChat.lastPlayTime = 0;
-        }
-    }
-    
-    /**
-     * 清理音频队列和缓冲区
-     */
-    clearAudioBuffers() {
-        if (this.azureVoiceChat) {
-            // 清理音频队列
-            this.azureVoiceChat.audioQueue = [];
             
-            // 清理音频数据缓存
-            this.azureVoiceChat.allAudioData = [];
+            const audioTrack = this.clientMedia.getAudioTracks()[0];
+            // 立即启用音频轨道开始录制
+            audioTrack.enabled = true;
+            this.peerConnection.addTrack(audioTrack);
+            this.logMessage('用户音频轨道已添加并启用');
             
-            // 重置流式音频状态
-            this.azureVoiceChat.isStreamingAudio = false;
+            // 创建数据通道
+            this.dataChannel = this.peerConnection.createDataChannel('realtime-channel');
+            this.setupDataChannelEvents();
             
-            console.log('语音通话管理器 - 清理音频缓冲区完成');
-        }
-    }
-    
-    /**
-     * 中断服务器端连接
-     */
-    interruptServerConnection() {
-        if (this.azureVoiceChat && this.azureVoiceChat.ws && 
-            this.azureVoiceChat.ws.readyState === WebSocket.OPEN) {
+            this.logMessage('WebRTC连接初始化完成');
             
-            // 发送打断信号到服务器
-            this.azureVoiceChat.ws.send(JSON.stringify({
-                type: 'interrupt_request',
-                timestamp: Date.now(),
-                session_id: this.azureVoiceChat.currentSessionId,
-                reason: 'user_speech_detected'
-            }));
-            
-            console.log('语音通话管理器 - 发送打断信号到服务器');
+        } catch (error) {
+            this.logMessage(`WebRTC连接初始化失败: ${error.message}`);
+            throw error;
         }
     }
     
     /**
-     * 更新打断UI状态
+     * 设置数据通道事件
      */
-    updateInterruptionUI(type) {
-        // 更新状态显示
-        this.updateVoiceStatus('已打断AI回复', 'interrupted');
-        
-        // 隐藏打断按钮
-        this.hideInterruptButton();
-        
-        // 显示打断反馈
-        this.showInterruptionFeedback(type);
-        
-        // 更新动画状态
-        if (this.voiceAnimationContainer) {
-            this.voiceAnimationContainer.classList.add('interrupted');
-            setTimeout(() => {
-                this.voiceAnimationContainer.classList.remove('interrupted');
-            }, 1000);
-        }
-    }
-    
-    /**
-     * 显示打断反馈
-     */
-    showInterruptionFeedback(type) {
-        // 创建打断提示
-        const feedback = document.createElement('div');
-        feedback.className = 'interruption-feedback';
-        feedback.innerHTML = `
-            <div class="feedback-content">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M6 6h12v12H6z"/>
-                </svg>
-                <span>${type === 'auto' ? '检测到您的声音，已停止AI回复' : '已手动停止AI回复'}</span>
-            </div>
-        `;
-        
-        // 添加到界面
-        if (this.voiceCallFullscreen) {
-            this.voiceCallFullscreen.appendChild(feedback);
-            
-            // 3秒后自动移除
-            setTimeout(() => {
-                if (feedback.parentNode) {
-                    feedback.parentNode.removeChild(feedback);
-                }
-            }, 3000);
-        }
-    }
-    
-    /**
-     * 手动打断
-     */
-    manualInterrupt() {
-        if (this.isAIResponding) {
-            this.executeInterruption('manual');
-        }
-    }
-    
-    /**
-     * AI开始回复事件
-     */
-    onAIResponseStart() {
-        this.isAIResponding = true;
-        this.showInterruptButton();
-        console.log('语音通话管理器 - AI开始回复，启用打断机制');
-    }
-    
-    /**
-     * AI回复结束事件
-     */
-    onAIResponseEnd() {
-        this.isAIResponding = false;
-        this.hideInterruptButton();
-        
-        // 清除待处理的打断
-        if (this.pendingInterrupt) {
-            clearTimeout(this.pendingInterrupt);
-            this.pendingInterrupt = null;
-        }
-        
-        console.log('语音通话管理器 - AI回复结束，禁用打断机制');
-    }
-    
-    /**
-     * 音频播放开始事件
-     */
-    onAudioPlaybackStart() {
-        this.isAIResponding = true;
-        this.showInterruptButton();
-    }
-    
-    /**
-     * 音频播放结束事件
-     */
-    onAudioPlaybackEnd() {
-        this.isAIResponding = false;
-        this.hideInterruptButton();
-    }
-    
-    /**
-     * 显示打断按钮
-     */
-    showInterruptButton() {
-        if (this.voiceInterruptBtn && this.interruptionEnabled) {
-            this.voiceInterruptBtn.style.display = 'flex';
-            this.voiceInterruptBtn.classList.add('show');
-        }
-    }
-    
-    /**
-     * 隐藏打断按钮
-     */
-    hideInterruptButton() {
-        if (this.voiceInterruptBtn) {
-            this.voiceInterruptBtn.style.display = 'none';
-            this.voiceInterruptBtn.classList.remove('show');
-        }
-    }
-    
-    /**
-     * 触发打断事件
-     */
-    dispatchInterruptEvent(type) {
-        const event = new CustomEvent('voiceInterruption', {
-            detail: {
-                type: type,
-                timestamp: Date.now(),
-                vadLevel: this.currentVadLevel
-            }
+    setupDataChannelEvents() {
+        this.dataChannel.addEventListener('open', async () => {
+            this.logMessage('数据通道已打开');
+            this.isConnected = true;
+            await this.updateSessionInstructions();
         });
-        window.dispatchEvent(event);
+
+        this.dataChannel.addEventListener('message', (event) => {
+            const realtimeEvent = JSON.parse(event.data);
+            this.handleRealtimeEvent(realtimeEvent);
+        });
+
+        this.dataChannel.addEventListener('close', () => {
+            this.logMessage('数据通道已关闭');
+            this.isConnected = false;
+        });
+
+        this.dataChannel.addEventListener('error', (error) => {
+            this.logMessage(`数据通道错误: ${error}`);
+        });
     }
     
     /**
-     * 启用/禁用打断功能
+     * 处理实时事件
      */
-    toggleInterruption(enabled) {
-        this.interruptionEnabled = enabled;
+    handleRealtimeEvent(event) {
+        this.logMessage(`收到服务器事件: ${JSON.stringify(event, null, 2)}`);
         
-        if (!enabled) {
-            this.hideInterruptButton();
-            
-            // 清除待处理的打断
-            if (this.pendingInterrupt) {
-                clearTimeout(this.pendingInterrupt);
-                this.pendingInterrupt = null;
-            }
-        }
-        
-        console.log(`语音通话管理器 - 打断功能${enabled ? '启用' : '禁用'}`);
-    }
-    
-    /**
-     * 设置打断参数
-     */
-    setInterruptionParams(params) {
-        if (params.threshold !== undefined) {
-            this.interruptThreshold = params.threshold;
-        }
-        if (params.delay !== undefined) {
-            this.interruptDelay = params.delay;
-        }
-        if (params.cooldown !== undefined) {
-            this.interruptCooldown = params.cooldown;
-        }
-        
-        console.log('语音通话管理器 - 更新打断参数:', params);
-    }
-    
-    /**
-     * 语音开始事件 - 增强打断检测
-     */
-    onSpeechStart() {
-        this.speechStartTime = Date.now();
-        this.audioChunks = []; // 重置音频缓冲区
-        
-        // 清除静音超时
-        if (this.silenceTimeout) {
-            clearTimeout(this.silenceTimeout);
-            this.silenceTimeout = null;
-        }
-        
-        // 如果AI正在回复且启用了打断，立即检测打断
-        if (this.interruptionEnabled && this.isAIResponding) {
-            this.detectInterruption();
-        }
-        
-        // 更新UI状态
-        this.updateVoiceStatus('正在聆听...', 'listening');
-        
-        console.log('语音通话管理器 - 检测到语音开始');
-    }
-    
-    /**
-     * 语音结束事件
-     */
-    onSpeechEnd() {
-        const speechDuration = Date.now() - this.speechStartTime;
-        
-        // 只有当语音持续时间足够长时才处理
-        if (speechDuration >= this.minSpeechDuration && this.audioChunks.length > 0) {
-            // 设置静音超时，延迟发送音频数据
-            this.silenceTimeout = setTimeout(() => {
-                this.sendAudioChunks();
-                this.updateVoiceStatus('处理中...', 'processing');
-            }, 500); // 500ms静音后发送
-        }
-        
-        console.log(`语音通话管理器 - 检测到语音结束，持续时间: ${speechDuration}ms`);
-    }
-    
-    /**
-     * 处理音频块
-     */
-    processAudioChunk(audioData) {
-        // 将Float32Array转换为Int16Array（PCM格式）
-        const pcmData = new Int16Array(audioData.length);
-        for (let i = 0; i < audioData.length; i++) {
-            // 限制在-1到1之间，然后转换为16位整数
-            const sample = Math.max(-1, Math.min(1, audioData[i]));
-            pcmData[i] = sample * 0x7FFF;
-        }
-        
-        // 添加到音频缓冲区
-        this.audioChunks.push(pcmData);
-        
-        // 限制缓冲区大小，避免内存过度使用
-        const maxChunks = 100; // 最多保留100个音频块
-        if (this.audioChunks.length > maxChunks) {
-            // 移除最旧的音频块
-            this.audioChunks.shift();
-            console.debug('语音通话管理器 - 音频缓冲区已满，移除最旧的音频块');
-        }
-        
-        // 检查总音频数据大小
-        const totalSamples = this.audioChunks.reduce((sum, chunk) => sum + chunk.length, 0);
-        const maxTotalSamples = 1024 * 1024; // 1M samples (2MB)
-        
-        if (totalSamples > maxTotalSamples) {
-            // 如果总数据量过大，移除一半的旧数据
-            const chunksToRemove = Math.floor(this.audioChunks.length / 2);
-            this.audioChunks.splice(0, chunksToRemove);
-            console.debug(`语音通话管理器 - 音频数据过大，移除 ${chunksToRemove} 个旧音频块`);
+        switch (event.type) {
+            case "session.created":
+                this.logMessage("会话已创建");
+                break;
+                
+            case "session.updated":
+                this.logMessage("会话已更新");
+                if (event.session.instructions) {
+                    this.logMessage(`指令: ${event.session.instructions}`);
+                }
+                break;
+                
+            case "session.error":
+                this.logMessage(`会话错误: ${event.error.message}`);
+                this.showError(`会话错误: ${event.error.message}`);
+                break;
+                
+            case "session.end":
+                this.logMessage("会话已结束");
+                this.endVoiceCall();
+                break;
+                
+            case "conversation.item.created":
+                this.logMessage("对话项已创建");
+                break;
+                
+            case "input_audio_buffer.speech_started":
+                this.logMessage("检测到用户开始说话");
+                this.updateVoiceStatus('正在聆听...', 'listening');
+                break;
+                
+            case "input_audio_buffer.speech_stopped":
+                this.logMessage(`用户停止说话 (静音时长阈值: ${this.vadConfig.silence_duration_ms}ms)`);
+                this.updateVoiceStatus('正在处理...', 'processing');
+                break;
+                
+            case "input_audio_buffer.committed":
+                this.logMessage("音频输入已提交");
+                break;
+                
+            case "response.audio.delta":
+                // 音频数据流，不记录详细日志避免刷屏
+                this.updateVoiceStatus('AI正在回复...', 'speaking');
+                break;
+                
+            case "response.done":
+                this.logMessage("响应完成");
+                this.updateVoiceStatus('通话进行中...', 'connected');
+                break;
+                
+            default:
+                this.logMessage(`未处理的事件类型: ${event.type}`);
         }
     }
     
     /**
-     * 发送音频块到服务器
+     * 更新会话指令
      */
-    async sendAudioChunks() {
-        if (this.audioChunks.length === 0) {
+    async updateSessionInstructions() {
+        if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
             return;
         }
         
+        // 获取简历信息
+        const resumeContext = await this.getResumeContext();
+        
+        // 构建系统指令
+        const instructions = await this.buildInstructions(resumeContext);
+        
+        const event = {
+            type: "session.update",
+            session: {
+                instructions: instructions,
+                // 配置语音活动检测（VAD）参数
+                turn_detection: {
+                    type: "server_vad",
+                    threshold: this.vadConfig.threshold,
+                    prefix_padding_ms: this.vadConfig.prefix_padding_ms,
+                    silence_duration_ms: this.vadConfig.silence_duration_ms,
+                    create_response: this.vadConfig.create_response,
+                    interrupt_response: this.vadConfig.interrupt_response
+                }
+            }
+        };
+        
+        this.dataChannel.send(JSON.stringify(event));
+        this.logMessage(`发送会话更新: ${JSON.stringify(event, null, 2)}`);
+        
+        if (resumeContext) {
+            this.logMessage(`已包含简历信息，长度: ${resumeContext.length} 字符`);
+        } else {
+            this.logMessage('未找到简历信息，使用默认面试指令');
+        }
+    }
+    
+    /**
+     * 构建系统指令
+     */
+    async buildInstructions(resumeContext) {
         try {
-            // 合并所有音频块
-            const totalLength = this.audioChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+            // 从后端获取prompt配置
+            const response = await fetch('/api/prompts/voice-call', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    resume_context: resumeContext
+                })
+            });
             
-            // 限制单次发送的音频数据大小（最大1MB）
-            const maxAudioSize = 1024 * 1024 / 2; // 512K samples (1MB bytes)
-            if (totalLength > maxAudioSize) {
-                console.warn(`语音通话管理器 - 音频数据过大 (${totalLength} samples)，截取前 ${maxAudioSize} samples`);
-                // 只保留最新的音频数据
-                let currentLength = 0;
-                const filteredChunks = [];
+            if (response.ok) {
+                const data = await response.json();
+                this.logMessage(`从服务器获取prompt成功`);
+                return data.instructions;
+            } else {
+                this.logMessage(`获取prompt失败: ${response.status}`);
+                // 回退到默认prompt
+                return await this.getDefaultInstructions(resumeContext);
+            }
+        } catch (error) {
+            this.logMessage(`获取prompt错误: ${error.message}`);
+            // 回退到默认prompt
+            return await this.getDefaultInstructions(resumeContext);
+        }
+    }
+    
+    /**
+     * 获取默认指令（回退方案）
+     * 优先从API获取prompts.py中的配置，最后才使用硬编码
+     */
+    async getDefaultInstructions(resumeContext) {
+        try {
+            // 尝试从API获取默认prompt
+            const response = await fetch('/api/prompts/voice-call-default');
+            if (response.ok) {
+                const data = await response.json();
+                this.logMessage(`✅ 从API获取默认prompt成功: ${data.source}`);
                 
-                for (let i = this.audioChunks.length - 1; i >= 0; i--) {
-                    const chunk = this.audioChunks[i];
-                    if (currentLength + chunk.length <= maxAudioSize) {
-                        filteredChunks.unshift(chunk);
-                        currentLength += chunk.length;
+                let instructions = data.instructions;
+                if (resumeContext) {
+                    instructions += `\n\n候选人简历信息：\n${resumeContext}\n\n请根据简历内容进行针对性的面试提问。`;
+                }
+                return instructions;
+            } else {
+                this.logMessage(`❌ API获取默认prompt失败: ${response.status}`);
+            }
+        } catch (error) {
+            this.logMessage(`❌ API请求错误: ${error.message}`);
+        }
+        
+        // 最后的硬编码回退方案
+        this.logMessage('⚠️ 使用硬编码回退prompt，建议检查prompts.py配置和API连接');
+        
+        // 从prompts.py的VOICE_CALL_INTERVIEWER获取的内容（硬编码备份）
+        let instructions = "你是一位专业的AI面试官，请用自然、友好的语调进行面试对话。根据候选人的简历内容，提出相关的技术和行为问题。保持对话流畅，适时给出反馈和鼓励。";
+        
+        if (resumeContext) {
+            instructions += `\n\n候选人简历信息：\n${resumeContext}\n\n请根据简历内容进行针对性的面试提问。`;
+        }
+        
+        return instructions;
+    }
+    
+    /**
+     * 获取简历上下文信息
+     */
+    async getResumeContext() {
+        try {
+            // 从localStorage获取当前简历
+            const resumeData = localStorage.getItem('azure_current_resume');
+            this.logMessage(`localStorage简历数据: ${resumeData ? '存在' : '不存在'}`);
+            
+            if (!resumeData) {
+                this.logMessage('未找到localStorage中的简历数据');
+                return null;
+            }
+            
+            const resume = JSON.parse(resumeData);
+            if (!resume || !resume.sessionId) {
+                this.logMessage('简历数据格式无效或缺少sessionId');
+                return null;
+            }
+            
+            // 从azureVoiceChat获取session_id对应的简历内容
+            const sessionId = this.azureVoiceChat.currentSessionId;
+            this.logMessage(`当前会话ID: ${sessionId}, 简历会话ID: ${resume.sessionId}`);
+            
+            if (!sessionId) {
+                this.logMessage('当前会话ID为空，使用简历会话ID');
+                // 如果当前会话ID为空，使用简历的会话ID
+                const resumeSessionId = resume.sessionId;
+                
+                // 通过API获取完整简历内容
+                try {
+                    const response = await fetch(`/api/resume/${resumeSessionId}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.logMessage(`成功获取简历内容，长度: ${data.content.length}`);
+                        return data.content;
                     } else {
-                        break;
+                        this.logMessage(`获取简历API失败: ${response.status}`);
+                        // 回退到使用预览内容
+                        return resume.preview || null;
                     }
+                } catch (apiError) {
+                    this.logMessage(`简历API请求错误: ${apiError.message}`);
+                    // 回退到使用预览内容
+                    return resume.preview || null;
                 }
-                
-                this.audioChunks = filteredChunks;
-            }
-            
-            const mergedAudio = new Int16Array(this.audioChunks.reduce((sum, chunk) => sum + chunk.length, 0));
-            
-            let offset = 0;
-            for (const chunk of this.audioChunks) {
-                mergedAudio.set(chunk, offset);
-                offset += chunk.length;
-            }
-            
-            // 使用更高效的base64转换方式
-            const uint8Array = new Uint8Array(mergedAudio.buffer);
-            let base64Audio;
-            
-            try {
-                // 尝试使用现代浏览器的高效方法
-                if (typeof FileReader !== 'undefined' && uint8Array.length > 32768) {
-                    // 对于大数据使用 FileReader (异步但更高效)
-                    base64Audio = await this.arrayBufferToBase64(uint8Array.buffer);
-                } else {
-                    // 对于小数据使用分块处理
-                    base64Audio = this.uint8ArrayToBase64(uint8Array);
+            } else if (sessionId !== resume.sessionId) {
+                this.logMessage('会话ID不匹配，可能是不同的简历');
+                return null;
+            } else {
+                // 会话ID匹配，获取完整简历内容
+                try {
+                    const response = await fetch(`/api/resume/${sessionId}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.logMessage(`成功获取简历内容，长度: ${data.content.length}`);
+                        return data.content;
+                    } else {
+                        this.logMessage(`获取简历API失败: ${response.status}`);
+                        // 回退到使用预览内容
+                        return resume.preview || null;
+                    }
+                } catch (apiError) {
+                    this.logMessage(`简历API请求错误: ${apiError.message}`);
+                    // 回退到使用预览内容
+                    return resume.preview || null;
                 }
-            } catch (conversionError) {
-                console.warn('语音通话管理器 - base64转换失败，使用备用方法:', conversionError);
-                base64Audio = this.uint8ArrayToBase64(uint8Array);
             }
-            
-            // 发送到服务器
-            if (this.azureVoiceChat.ws && this.azureVoiceChat.ws.readyState === WebSocket.OPEN) {
-                this.azureVoiceChat.ws.send(JSON.stringify({
-                    type: 'voice_input',
-                    audio_data: base64Audio,
-                    audio_format: 'pcm_s16le',
-                    sample_rate: this.sampleRate,
-                    channels: 1,
-                    session_id: this.azureVoiceChat.currentSessionId,
-                    vad_confidence: this.currentVadLevel
-                }));
-                
-                console.log(`语音通话管理器 - 发送音频数据，长度: ${mergedAudio.length} samples (${(mergedAudio.length * 2 / 1024).toFixed(1)}KB), VAD置信度: ${this.currentVadLevel.toFixed(3)}`);
-            }
-            
-            // 清空缓冲区
-            this.audioChunks = [];
             
         } catch (error) {
-            console.error('语音通话管理器 - 发送音频数据失败:', error);
-            
-            // 清空缓冲区，避免重复错误
-            this.audioChunks = [];
+            this.logMessage(`获取简历上下文失败: ${error.message}`);
+            return null;
         }
     }
     
     /**
-     * 将Uint8Array转换为base64字符串（分块处理）
+     * 建立WebRTC连接
      */
-    uint8ArrayToBase64(uint8Array) {
-        let binaryString = '';
-        const chunkSize = 8192; // 8KB chunks
-        
-        for (let i = 0; i < uint8Array.length; i += chunkSize) {
-            const chunk = uint8Array.slice(i, i + chunkSize);
-            binaryString += String.fromCharCode.apply(null, chunk);
-        }
-        
-        return btoa(binaryString);
-    }
-    
-    /**
-     * 将ArrayBuffer转换为base64字符串（异步方法）
-     */
-    arrayBufferToBase64(buffer) {
-        return new Promise((resolve, reject) => {
-            const blob = new Blob([buffer]);
-            const reader = new FileReader();
-            
-            reader.onload = () => {
-                const dataUrl = reader.result;
-                const base64 = dataUrl.split(',')[1];
-                resolve(base64);
-            };
-            
-            reader.onerror = () => {
-                reject(new Error('FileReader转换失败'));
-            };
-            
-            reader.readAsDataURL(blob);
-        });
-    }
-    
-    /**
-     * 开始录音 - FastRTC增强版
-     */
-    async startRecording() {
-        if (!this.audioStream) {
-            throw new Error('音频流未初始化');
-        }
+    async establishWebRTCConnection() {
+        this.logMessage('建立WebRTC连接...');
         
         try {
-            // 使用FastRTC音频处理管道，不再使用MediaRecorder
-            this.isRecording = true;
+            // 创建SDP offer
+            const offer = await this.peerConnection.createOffer();
+            await this.peerConnection.setLocalDescription(offer);
+            this.logMessage('SDP offer已创建');
             
-            // 启动音频上下文（如果被暂停）
-            if (this.audioContext.state === 'suspended') {
-                await this.audioContext.resume();
+            // 尝试连接不同的WebRTC端点
+            let sdpResponse = null;
+            let successfulUrl = null;
+            
+            for (const config of this.WEBRTC_CONFIGS) {
+                try {
+                    const webrtcUrl = config.useQuery ? `${config.url}?model=${this.DEPLOYMENT}` : config.url;
+                    this.logMessage(`尝试连接: ${webrtcUrl}`);
+                    
+                    sdpResponse = await fetch(webrtcUrl, {
+                        method: "POST",
+                        body: offer.sdp,
+                        headers: {
+                            Authorization: `Bearer ${this.ephemeralKey}`,
+                            "Content-Type": "application/sdp",
+                        },
+                    });
+
+                    this.logMessage(`SDP响应状态: ${sdpResponse.status} ${sdpResponse.statusText}`);
+                    
+                    if (sdpResponse.ok) {
+                        successfulUrl = webrtcUrl;
+                        this.logMessage(`✅ 成功连接到: ${webrtcUrl}`);
+                        break;
+                    } else {
+                        const errorText = await sdpResponse.text();
+                        this.logMessage(`❌ 连接失败 ${config.url}: ${sdpResponse.status} - ${errorText}`);
+                    }
+                } catch (error) {
+                    this.logMessage(`❌ 连接错误 ${config.url}: ${error.message}`);
+                }
             }
             
-            console.log('语音通话管理器 - FastRTC增强录音开始');
+            if (!sdpResponse || !sdpResponse.ok) {
+                throw new Error("无法连接到任何WebRTC端点，请检查Azure资源区域配置");
+            }
+
+            const sdpText = await sdpResponse.text();
+            this.logMessage(`收到SDP: ${sdpText.substring(0, 100)}...`);
+            
+            const answer = { type: "answer", sdp: sdpText };
+            await this.peerConnection.setRemoteDescription(answer);
+            
+            this.logMessage('WebRTC连接建立成功');
             
         } catch (error) {
-            console.error('语音通话管理器 - 开始录音失败:', error);
-            throw new Error('无法开始录音: ' + error.message);
+            this.logMessage(`WebRTC连接建立失败: ${error.message}`);
+            throw error;
         }
-    }
-    
-    /**
-     * 更新语音可视化
-     */
-    updateVoiceVisualization(vadLevel) {
-        // 更新动画容器的缩放
-        if (this.voiceAnimationContainer) {
-            let scaleClass = 'scale-small';
-            
-            if (vadLevel > 0.1) {
-                scaleClass = 'scale-xlarge';
-            } else if (vadLevel > 0.05) {
-                scaleClass = 'scale-large';
-            } else if (vadLevel > 0.02) {
-                scaleClass = 'scale-medium';
-            }
-            
-            // 移除所有缩放类
-            this.voiceAnimationContainer.classList.remove('scale-small', 'scale-medium', 'scale-large', 'scale-xlarge');
-            // 添加新的缩放类
-            this.voiceAnimationContainer.classList.add(scaleClass);
-        }
-        
-        // 更新波形可视化
-        this.updateWaveVisualization(vadLevel * 100); // 转换为0-100范围
     }
     
     /**
@@ -1012,35 +840,123 @@ class VoiceCallManager {
      */
     async startVoiceCall() {
         try {
-            console.log('语音通话管理器 - 开始语音通话');
+            this.logMessage('开始语音通话...');
+            
+            // 检查浏览器兼容性
+            this.checkBrowserCompatibility();
             
             // 检查WebSocket连接状态
             if (!this.azureVoiceChat.ws || this.azureVoiceChat.ws.readyState !== WebSocket.OPEN) {
                 this.showError('请等待连接建立后再开始语音通话');
-                return;
-            }
-            
-            // 请求麦克风权限
-            await this.requestMicrophonePermission();
-            
-            // 显示全屏语音界面
+            return;
+        }
+        
+            // 显示语音通话界面
             this.showVoiceCallInterface();
+            this.updateVoiceStatus('正在初始化...', 'connecting');
             
-            // 开始录音
-            await this.startRecording();
+            // 获取临时密钥
+            await this.getEphemeralKey();
             
-            // 开始计时
+            // 初始化WebRTC连接
+            await this.initWebRTCConnection();
+            
+            // 建立WebRTC连接
+            await this.establishWebRTCConnection();
+            
+            // 开始通话
+            this.isCallActive = true;
+            this.callStartTime = Date.now();
             this.startCallTimer();
             
-            // 更新状态
-            this.updateVoiceStatus('正在聆听您的声音...', 'listening');
-            
-            // 启动语音可视化
-            this.startVoiceVisualization();
+            this.updateVoiceStatus('通话进行中，可以开始说话', 'connected');
+            this.logMessage('语音通话启动成功，录制已开始');
             
         } catch (error) {
-            console.error('语音通话管理器 - 开始语音通话失败:', error);
+            this.logMessage(`语音通话启动失败: ${error.message}`);
             this.showError('无法开始语音通话: ' + error.message);
+            this.endVoiceCall();
+        }
+    }
+    
+    /**
+     * 结束语音通话
+     */
+    endVoiceCall() {
+        this.logMessage('结束语音通话...');
+        
+        try {
+            // 关闭数据通道
+            if (this.dataChannel) {
+                this.dataChannel.close();
+                this.dataChannel = null;
+            }
+            
+            // 关闭RTCPeerConnection
+            if (this.peerConnection) {
+                this.peerConnection.close();
+                this.peerConnection = null;
+            }
+            
+            // 停止用户媒体流
+            if (this.clientMedia) {
+                this.clientMedia.getTracks().forEach(track => track.stop());
+                this.clientMedia = null;
+            }
+            
+            // 停止计时器
+            this.stopCallTimer();
+            
+            // 重置状态
+            this.isCallActive = false;
+            this.isConnected = false;
+            this.ephemeralKey = null;
+            this.sessionId = null;
+            
+            // 隐藏语音通话界面
+            this.hideVoiceCallInterface();
+            
+            this.logMessage('语音通话已结束');
+            
+        } catch (error) {
+            this.logMessage(`结束语音通话时出错: ${error.message}`);
+        }
+    }
+    
+
+    
+    /**
+     * 切换静音状态
+     */
+    toggleMute() {
+        if (!this.clientMedia) return;
+        
+        const audioTrack = this.clientMedia.getAudioTracks()[0];
+        if (audioTrack) {
+            audioTrack.enabled = !audioTrack.enabled;
+            const isMuted = !audioTrack.enabled;
+            
+            this.logMessage(`麦克风${isMuted ? '已静音' : '已取消静音'}`);
+            
+            // 更新UI
+            if (this.muteButton) {
+                this.muteButton.classList.toggle('muted', isMuted);
+                
+                const micIcon = this.muteButton.querySelector('.mic-icon');
+                const micOffIcon = this.muteButton.querySelector('.mic-off-icon');
+                
+                if (micIcon && micOffIcon) {
+                    micIcon.style.display = isMuted ? 'none' : 'inline';
+                    micOffIcon.style.display = isMuted ? 'inline' : 'none';
+                }
+            }
+            
+            // 更新状态显示
+            if (isMuted) {
+                this.updateVoiceStatus('麦克风已静音', 'muted');
+            } else {
+                this.updateVoiceStatus('通话进行中，可以开始说话', 'connected');
+            }
         }
     }
     
@@ -1048,71 +964,44 @@ class VoiceCallManager {
      * 显示语音通话界面
      */
     showVoiceCallInterface() {
-        if (this.voiceCallFullscreen) {
-            // 直接显示，CSS动画会自动触发
-            this.voiceCallFullscreen.style.display = 'flex';
-            
-            // 移除hiding类（如果存在）
-            this.voiceCallFullscreen.classList.remove('hiding');
+        if (this.voiceCallOverlay) {
+            this.voiceCallOverlay.style.display = 'flex';
+            document.body.classList.add('voice-call-active');
         }
-        
-        // 启动Lottie动画
-        if (this.voiceLottiePlayer) {
-            this.voiceLottiePlayer.play();
-        }
-        
-        console.log('语音通话管理器 - 显示语音通话界面');
     }
     
     /**
      * 隐藏语音通话界面
      */
     hideVoiceCallInterface() {
-        if (this.voiceCallFullscreen) {
-            // 添加hiding类触发隐藏动画
-            this.voiceCallFullscreen.classList.add('hiding');
-            
-            // 等待动画完成后隐藏元素
-            setTimeout(() => {
-                this.voiceCallFullscreen.style.display = 'none';
-                this.voiceCallFullscreen.classList.remove('hiding');
-            }, 300);
+        if (this.voiceCallOverlay) {
+            this.voiceCallOverlay.style.display = 'none';
+            document.body.classList.remove('voice-call-active');
         }
-        
-        // 停止Lottie动画
-        if (this.voiceLottiePlayer) {
-            this.voiceLottiePlayer.pause();
+    }
+    
+    /**
+     * 更新语音状态
+     */
+    updateVoiceStatus(text, className = '') {
+        if (this.voiceStatus) {
+            this.voiceStatus.textContent = text;
+            this.voiceStatus.className = `voice-status ${className}`;
         }
-        
-        console.log('语音通话管理器 - 隐藏语音通话界面');
     }
     
     /**
      * 开始通话计时
      */
     startCallTimer() {
-        this.callStartTime = Date.now();
-        
         this.callTimer = setInterval(() => {
+            if (this.callStartTime && this.voiceTimer) {
             const elapsed = Date.now() - this.callStartTime;
             const minutes = Math.floor(elapsed / 60000);
             const seconds = Math.floor((elapsed % 60000) / 1000);
-            
-            const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            
-            // 更新全屏界面计时器
-            if (this.voiceTimer) {
-                this.voiceTimer.textContent = timeString;
+                this.voiceTimer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             }
-            
-            // 更新弹窗界面计时器
-            if (this.callTimer2) {
-                this.callTimer2.textContent = timeString;
-            }
-            
         }, 1000);
-        
-        console.log('语音通话管理器 - 开始通话计时');
     }
     
     /**
@@ -1123,408 +1012,28 @@ class VoiceCallManager {
             clearInterval(this.callTimer);
             this.callTimer = null;
         }
-        
-        console.log('语音通话管理器 - 停止通话计时');
-    }
-    
-    /**
-     * 更新语音状态显示
-     */
-    updateVoiceStatus(text, status = '') {
-        // 更新全屏界面状态
-        if (this.voiceStatusDisplay) {
-            this.voiceStatusDisplay.textContent = text;
+        if (this.voiceTimer) {
+            this.voiceTimer.textContent = '00:00';
         }
-        
-        // 更新弹窗界面状态
-        if (this.voiceStatusText) {
-            this.voiceStatusText.textContent = text;
-        }
-        
-        if (this.callStatus) {
-            this.callStatus.textContent = text;
-        }
-        
-        console.log('语音通话管理器 - 更新状态:', text, status);
-    }
-    
-    /**
-     * 切换静音状态
-     */
-    toggleMute() {
-        this.isMuted = !this.isMuted;
-        
-        // 更新按钮图标
-        if (this.voiceMuteBtn) {
-            const micIcon = this.voiceMuteBtn.querySelector('.mic-icon');
-            const micOffIcon = this.voiceMuteBtn.querySelector('.mic-off-icon');
-            
-            if (this.isMuted) {
-                if (micIcon) micIcon.style.display = 'none';
-                if (micOffIcon) micOffIcon.style.display = 'block';
-                this.voiceMuteBtn.classList.add('muted');
-                this.updateVoiceStatus('已静音', 'muted');
-            } else {
-                if (micIcon) micIcon.style.display = 'block';
-                if (micOffIcon) micOffIcon.style.display = 'none';
-                this.voiceMuteBtn.classList.remove('muted');
-                this.updateVoiceStatus('正在聆听您的声音...', 'listening');
-            }
-        }
-        
-        console.log('语音通话管理器 - 切换静音状态:', this.isMuted);
-    }
-    
-    /**
-     * 最小化通话窗口
-     */
-    minimizeCall() {
-        // 隐藏弹窗界面，显示最小化指示器
-        if (this.voiceCallOverlay) {
-            this.voiceCallOverlay.style.display = 'none';
-        }
-        
-        // 可以在这里添加最小化指示器的逻辑
-        console.log('语音通话管理器 - 最小化通话窗口');
-    }
-    
-    /**
-     * 开始语音可视化
-     */
-    startVoiceVisualization() {
-        if (!this.audioStream || !this.audioContext) {
-            return;
-        }
-        
-        try {
-            // 创建音频分析器
-            const source = this.audioContext.createMediaStreamSource(this.audioStream);
-            this.analyser = this.audioContext.createAnalyser();
-            this.analyser.fftSize = 256;
-            source.connect(this.analyser);
-            
-            // 开始可视化动画
-            this.animateVoiceVisualization();
-            
-            console.log('语音通话管理器 - 开始语音可视化');
-            
-        } catch (error) {
-            console.error('语音通话管理器 - 语音可视化启动失败:', error);
-        }
-    }
-    
-    /**
-     * 语音可视化动画
-     */
-    animateVoiceVisualization() {
-        if (!this.analyser) {
-            return;
-        }
-        
-        const bufferLength = this.analyser.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
-        
-        const animate = () => {
-            if (!this.isRecording) {
-                return;
-            }
-            
-            this.analyser.getByteFrequencyData(dataArray);
-            
-            // 计算音量级别
-            const average = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
-            const volumeLevel = average / 255;
-            
-            // 更新波形可视化
-            this.updateWaveVisualization(volumeLevel * 100);
-            
-            // 更新Lottie动画速度
-            if (this.voiceLottiePlayer && volumeLevel > 0.1) {
-                this.voiceLottiePlayer.setSpeed(1 + volumeLevel * 2);
-            }
-            
-            this.animationId = requestAnimationFrame(animate);
-        };
-        
-        animate();
-    }
-    
-    /**
-     * 更新波形可视化
-     */
-    updateWaveVisualization(volumeLevel) {
-        // 更新弹窗界面的波形
-        if (this.voiceVisualizer) {
-            const waveBars = this.voiceVisualizer.querySelectorAll('.wave-bar');
-            waveBars.forEach((bar, index) => {
-                const height = Math.random() * volumeLevel * 100 + 10;
-                bar.style.height = `${height}%`;
-                bar.style.animationDelay = `${index * 0.1}s`;
-            });
-        }
-    }
-    
-    /**
-     * 停止语音可视化
-     */
-    stopVoiceVisualization() {
-        if (this.animationId) {
-            cancelAnimationFrame(this.animationId);
-            this.animationId = null;
-        }
-        
-        console.log('语音通话管理器 - 停止语音可视化');
-    }
-    
-    /**
-     * 结束语音通话 - 增强版，包含打断机制清理
-     */
-    async endVoiceCall() {
-        try {
-            console.log('语音通话管理器 - 结束语音通话');
-            
-            // 清理打断机制
-            this.cleanupInterruptionSystem();
-            
-            // 停止录音
-            this.stopRecording();
-            
-            // 停止计时
-            this.stopCallTimer();
-            
-            // 停止可视化
-            this.stopVoiceVisualization();
-            
-            // 清理FastRTC音频处理管道
-            this.cleanupFastRTCAudioPipeline();
-            
-            // 释放音频流
-            this.releaseAudioStream();
-            
-            // 隐藏界面
-            this.hideVoiceCallInterface();
-            
-            // 重置状态
-            this.resetCallState();
-            
-            // 更新UI状态
-            this.updateVoiceStatus('通话已结束', '');
-            
-        } catch (error) {
-            console.error('语音通话管理器 - 结束语音通话失败:', error);
-            this.showError('结束通话时发生错误');
-        }
-    }
-    
-    /**
-     * 清理打断系统
-     */
-    cleanupInterruptionSystem() {
-        // 清除待处理的打断
-        if (this.pendingInterrupt) {
-            clearTimeout(this.pendingInterrupt);
-            this.pendingInterrupt = null;
-        }
-        
-        // 重置打断状态
-        this.isAIResponding = false;
-        this.lastInterruptTime = 0;
-        
-        // 隐藏打断按钮
-        this.hideInterruptButton();
-        
-        // 清理音频缓冲区
-        this.clearAudioBuffers();
-        
-        console.log('语音通话管理器 - 打断系统清理完成');
-    }
-    
-    /**
-     * 停止录音 - FastRTC增强版
-     */
-    stopRecording() {
-        this.isRecording = false;
-        
-        // 清除静音超时
-        if (this.silenceTimeout) {
-            clearTimeout(this.silenceTimeout);
-            this.silenceTimeout = null;
-        }
-        
-        // 发送剩余的音频数据
-        if (this.audioChunks.length > 0) {
-            this.sendAudioChunks();
-        }
-        
-        // 停止MediaRecorder（如果存在）
-        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-            this.mediaRecorder.stop();
-        }
-        
-        console.log('语音通话管理器 - FastRTC增强录音停止');
-    }
-    
-    /**
-     * 清理FastRTC音频处理管道
-     */
-    cleanupFastRTCAudioPipeline() {
-        try {
-            // 断开音频处理器连接
-            if (this.audioProcessor) {
-                this.audioProcessor.disconnect();
-                this.audioProcessor.onaudioprocess = null;
-                this.audioProcessor = null;
-            }
-            
-            // 断开分析器连接
-            if (this.analyser) {
-                this.analyser.disconnect();
-                this.analyser = null;
-            }
-            
-            // 断开增益节点
-            if (this.gainNode) {
-                this.gainNode.disconnect();
-                this.gainNode = null;
-            }
-            
-            // 断开压缩器节点
-            if (this.compressorNode) {
-                this.compressorNode.disconnect();
-                this.compressorNode = null;
-            }
-            
-            // 清理VAD相关状态
-            this.currentVadLevel = 0;
-            this.isSpeaking = false;
-            this.speechStartTime = null;
-            this.audioChunks = [];
-            
-            console.log('语音通话管理器 - FastRTC音频处理管道清理完成');
-            
-        } catch (error) {
-            console.error('语音通话管理器 - 清理FastRTC音频处理管道失败:', error);
-        }
-    }
-    
-    /**
-     * 释放音频流 - FastRTC增强版
-     */
-    releaseAudioStream() {
-        if (this.audioStream) {
-            // 停止所有音频轨道
-            this.audioStream.getTracks().forEach(track => {
-                track.stop();
-                console.log('语音通话管理器 - 音频轨道已停止:', track.kind);
-            });
-            this.audioStream = null;
-        }
-        
-        // 关闭音频上下文（可选，根据需要）
-        if (this.audioContext && this.audioContext.state !== 'closed') {
-            // 暂停而不是关闭，以便后续重用
-            this.audioContext.suspend();
-        }
-        
-        console.log('语音通话管理器 - FastRTC音频流释放完成');
-    }
-    
-    /**
-     * 重置通话状态 - 增强版
-     */
-    resetCallState() {
-        this.isRecording = false;
-        this.isMuted = false;
-        this.callStartTime = null;
-        this.audioChunks = [];
-        this.currentVadLevel = 0;
-        this.isSpeaking = false;
-        this.speechStartTime = null;
-        
-        // 重置打断机制状态
-        this.isAIResponding = false;
-        this.lastInterruptTime = 0;
-        this.pendingInterrupt = null;
-        
-        // 清除所有超时
-        if (this.silenceTimeout) {
-            clearTimeout(this.silenceTimeout);
-            this.silenceTimeout = null;
-        }
-        
-        if (this.pendingInterrupt) {
-            clearTimeout(this.pendingInterrupt);
-            this.pendingInterrupt = null;
-        }
-        
-        console.log('语音通话管理器 - 通话状态重置完成');
-    }
-    
-    /**
-     * 获取FastRTC音频质量统计
-     */
-    getAudioQualityStats() {
-        return {
-            sampleRate: this.sampleRate,
-            bitDepth: this.bitDepth,
-            vadThreshold: this.vadThreshold,
-            currentVadLevel: this.currentVadLevel,
-            isSpeaking: this.isSpeaking,
-            audioChunksCount: this.audioChunks.length,
-            audioContextState: this.audioContext ? this.audioContext.state : 'not_initialized'
-        };
     }
     
     /**
      * 显示错误信息
      */
     showError(message) {
-        console.error('语音通话管理器 - 错误:', message);
-        
-        // 可以在这里添加错误提示UI
-        alert(message);
+        this.logMessage(`错误: ${message}`);
         
         // 更新状态显示
-        this.updateVoiceStatus('发生错误: ' + message, 'error');
-    }
-    
-    /**
-     * 检查浏览器兼容性
-     */
-    checkBrowserSupport() {
-        const support = {
-            mediaDevices: !!navigator.mediaDevices,
-            getUserMedia: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
-            mediaRecorder: !!window.MediaRecorder,
-            audioContext: !!(window.AudioContext || window.webkitAudioContext),
-            webSocket: !!window.WebSocket
-        };
+        this.updateVoiceStatus(message, 'error');
         
-        const unsupported = Object.keys(support).filter(key => !support[key]);
-        
-        if (unsupported.length > 0) {
-            console.warn('语音通话管理器 - 浏览器不支持以下功能:', unsupported);
-            return false;
+        // 可以添加更多的错误处理逻辑，如显示toast通知等
+        if (typeof this.azureVoiceChat.showError === 'function') {
+            this.azureVoiceChat.showError(message);
         }
-        
-        console.log('语音通话管理器 - 浏览器兼容性检查通过');
-        return true;
-    }
-    
-    /**
-     * 获取通话状态
-     */
-    getCallStatus() {
-        return {
-            isRecording: this.isRecording,
-            isMuted: this.isMuted,
-            callDuration: this.callStartTime ? Date.now() - this.callStartTime : 0,
-            hasAudioStream: !!this.audioStream
-        };
     }
 }
 
-// 导出类以供其他模块使用
+// 导出类供其他模块使用
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = VoiceCallManager;
 } 

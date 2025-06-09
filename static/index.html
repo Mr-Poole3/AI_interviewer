@@ -445,9 +445,60 @@
                     <i class="fas fa-microphone-slash mic-off-icon" style="display: none;"></i>
                 </button>
                 
+                <button class="voice-control-btn settings-btn" id="voiceSettingsBtn" title="语音设置">
+                    <i class="fas fa-cog"></i>
+                </button>
+                
                 <button class="voice-control-btn end-btn" id="voiceEndBtn" title="结束面试">
                     <i class="fas fa-phone-slash"></i>
                 </button>
+            </div>
+            
+            <!-- VAD设置面板 -->
+            <div class="vad-settings-panel" id="vadSettingsPanel" style="display: none;">
+                <div class="settings-header">
+                    <h3>语音检测设置</h3>
+                    <button class="close-settings" id="closeVadSettings">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="settings-content">
+                    <div class="setting-group">
+                        <label for="silenceDurationSlider">停顿时长 (毫秒)</label>
+                        <div class="slider-container">
+                            <input type="range" id="silenceDurationSlider" 
+                                   min="500" max="3000" step="250" value="1500">
+                            <span class="slider-value" id="silenceDurationValue">1500ms</span>
+                        </div>
+                        <p class="setting-description">用户停顿多久后AI开始回复</p>
+                    </div>
+                    
+                    <div class="setting-group">
+                        <label for="thresholdSlider">检测阈值</label>
+                        <div class="slider-container">
+                            <input type="range" id="thresholdSlider" 
+                                   min="0.1" max="0.9" step="0.1" value="0.5">
+                            <span class="slider-value" id="thresholdValue">0.5</span>
+                        </div>
+                        <p class="setting-description">语音检测敏感度 (越高越不敏感)</p>
+                    </div>
+                    
+                    <div class="setting-group">
+                        <label for="prefixPaddingSlider">前缀缓冲 (毫秒)</label>
+                        <div class="slider-container">
+                            <input type="range" id="prefixPaddingSlider" 
+                                   min="0" max="1000" step="100" value="300">
+                            <span class="slider-value" id="prefixPaddingValue">300ms</span>
+                        </div>
+                        <p class="setting-description">语音开始前的缓冲时间</p>
+                    </div>
+                    
+                    <div class="settings-actions">
+                        <button class="btn-secondary" id="resetVadSettings">重置默认</button>
+                        <button class="btn-primary" id="applyVadSettings">应用设置</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

@@ -73,97 +73,46 @@ def get_gemini_model() -> str:
     return os.environ.get("GEMINI_MODEL", "gemini-2.0-flash-exp")
 
 
-# FastRTC音频增强配置
-class FastRTCAudioConfig:
-    """FastRTC音频增强配置"""
+# Azure OpenAI Realtime API WebRTC 配置
+class AzureRealtimeConfig:
+    """Azure OpenAI Realtime API WebRTC配置"""
     
-    # 音频质量设置
-    SAMPLE_RATE = 24000  # 采样率 (Hz)
-    BIT_DEPTH = 16       # 位深度
-    CHANNELS = 1         # 声道数（单声道）
-    CHUNK_DURATION = 50  # 音频块持续时间 (ms)
+    # Azure OpenAI 配置
+    SESSIONS_URL = "https://gpt-realtime-4o-mini.openai.azure.com/openai/realtimeapi/sessions?api-version=2025-04-01-preview"
+    DEPLOYMENT = "gpt-4o-mini-realtime-preview"
+    VOICE = "verse"
     
-    # 语音活动检测 (VAD) 设置 - 优化阈值配置
-    VAD_THRESHOLD = 0.003          # VAD阈值（降低以提高灵敏度）
-    VAD_SMOOTHING_FACTOR = 0.6     # VAD平滑因子（降低以提高响应速度）
-    MIN_SPEECH_DURATION = 200      # 最小语音持续时间 (ms) - 降低以捕获短语音
-    MAX_SILENCE_DURATION = 1200    # 最大静音持续时间 (ms) - 降低以提高响应
-    SILENCE_TIMEOUT = 300          # 静音超时 (ms) - 降低以提高响应
+    # WebRTC端点配置（支持多区域回退）
+    WEBRTC_CONFIGS = [
+        # East US 2 (主要区域)
+        {"url": "https://eastus2.realtimeapi-preview.ai.azure.com/v1/realtimertc", "useQuery": True},
+        # Sweden Central (备用区域)
+        {"url": "https://swedencentral.realtimeapi-preview.ai.azure.com/v1/realtimertc", "useQuery": True}
+    ]
     
-    # VAD动态阈值配置
-    MIN_VAD_THRESHOLD = 0.0005     # 最小VAD阈值
-    MAX_VAD_THRESHOLD = 0.02       # 最大VAD阈值
-    NOISE_MULTIPLIER = 2.5         # 噪音倍数，用于动态调整阈值
-    
-    # 音频处理设置
-    AUDIO_CONTEXT_LATENCY = 'interactive'  # 音频上下文延迟模式
-    TARGET_LATENCY = 0.01                  # 目标延迟 (10ms)
-    
-    # 音频滤波器设置
-    HIGH_PASS_FREQUENCY = 80       # 高通滤波器频率 (Hz)
-    LOW_PASS_FREQUENCY = 8000      # 低通滤波器频率 (Hz)
-    FILTER_Q_VALUE = 0.7           # 滤波器Q值
-    
-    # 动态压缩器设置
-    COMPRESSOR_THRESHOLD = -24     # 压缩器阈值 (dB)
-    COMPRESSOR_KNEE = 30           # 压缩器膝点
-    COMPRESSOR_RATIO = 12          # 压缩比
-    COMPRESSOR_ATTACK = 0.003      # 压缩器攻击时间 (s)
-    COMPRESSOR_RELEASE = 0.25      # 压缩器释放时间 (s)
-    
-    # 增益控制设置
-    DEFAULT_GAIN = 1.0             # 默认增益
-    AGC_GAIN = 15                  # 自动增益控制增益
-    
-    # 音频缓冲设置
-    AUDIO_BUFFER_SIZE = 4096       # 音频缓冲区大小
-    FFT_SIZE = 2048                # FFT大小（用于分析）
-    SMOOTHING_TIME_CONSTANT = 0.8  # 平滑时间常数
-    
-    # WebRTC音频约束
-    WEBRTC_CONSTRAINTS = {
+    # 音频配置
+    AUDIO_CONSTRAINTS = {
         'echoCancellation': True,
         'noiseSuppression': True,
-        'autoGainControl': True,
-        'googEchoCancellation': True,
-        'googAutoGainControl': True,
-        'googNoiseSuppression': True,
-        'googHighpassFilter': True,
-        'googTypingNoiseDetection': True,
-        'googAudioMirroring': False,
-        'googNoiseReduction': True
+        'autoGainControl': True
     }
     
-    @classmethod
-    def get_audio_constraints(cls):
-        """获取完整的音频约束配置"""
-        constraints = cls.WEBRTC_CONSTRAINTS.copy()
-        constraints.update({
-            'sampleRate': cls.SAMPLE_RATE,
-            'sampleSize': cls.BIT_DEPTH,
-            'channelCount': cls.CHANNELS,
-            'latency': cls.TARGET_LATENCY,
-            'googAGCGain': cls.AGC_GAIN
-        })
-        return constraints
+    # 会话指令（已迁移到prompts.py）
+    # DEFAULT_INSTRUCTIONS = "已迁移到prompts.py文件中统一管理"
     
     @classmethod
-    def get_audio_context_config(cls):
-        """获取音频上下文配置"""
-        return {
-            'sampleRate': cls.SAMPLE_RATE,
-            'latencyHint': cls.AUDIO_CONTEXT_LATENCY
-        }
+    def get_webrtc_url(cls, config, deployment):
+        """获取WebRTC URL"""
+        if config.get("useQuery"):
+            return f"{config['url']}?model={deployment}"
+        return config["url"]
     
     @classmethod
-    def get_vad_config(cls):
-        """获取VAD配置"""
+    def get_session_payload(cls):
+        """获取会话创建载荷"""
         return {
-            'threshold': cls.VAD_THRESHOLD,
-            'smoothingFactor': cls.VAD_SMOOTHING_FACTOR,
-            'minSpeechDuration': cls.MIN_SPEECH_DURATION,
-            'maxSilenceDuration': cls.MAX_SILENCE_DURATION,
-            'silenceTimeout': cls.SILENCE_TIMEOUT
+            "model": cls.DEPLOYMENT,
+            "voice": cls.VOICE
         }
 
 # 在模块导入时加载环境变量
