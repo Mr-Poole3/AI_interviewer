@@ -234,9 +234,7 @@ class AzureVoiceChat {
         this.audioSources = [];
         this.lastPlayTime = 0;
         this.currentSessionId = '';
-<<<<<<< HEAD
 
-=======
         
         // 面试记录相关
         this.currentInterviewMessages = [];
@@ -244,7 +242,6 @@ class AzureVoiceChat {
         this.isInterviewActive = false;
         this.currentInterviewId = null;
         
->>>>>>> cf5dad206680eccc0dbfc21a9136c1c31ebee1e7
         this.initElements();
         this.bindEvents();
         this.initAudio();
@@ -861,9 +858,7 @@ class AzureVoiceChat {
             alert(message);
         }
     }
-<<<<<<< HEAD
 
-=======
     
     /**
      * 开始面试记录
@@ -1191,7 +1186,6 @@ class AzureVoiceChat {
             }
         }
     }
->>>>>>> cf5dad206680eccc0dbfc21a9136c1c31ebee1e7
 }
 
 /**
@@ -1206,10 +1200,11 @@ class HistoryManager {
         this.sortBy = null;
 
         // 获取模态窗口元素
-        this.evaluationModal = document.getElementById('evaluationModal');
-        this.modalEvaluationContent = document.getElementById('modalEvaluationContent');
-        this.modalLoadingSpinner = this.modalEvaluationContent?.querySelector('.loading-spinner');
-        this.modalActualContent = this.modalEvaluationContent?.querySelector('.evaluation-actual-content');
+        this.evaluationModal = null;
+        this.modalCloseButton = null; // 明确命名为 modalCloseButton
+        this.modalEvaluationContent = null;
+        this.modalLoadingSpinner = null;
+        this.modalActualContent = null;
 
         this.init();
     }
@@ -1219,7 +1214,13 @@ class HistoryManager {
         this.emptyHistory = document.getElementById('emptyHistory');
         this.sortBy = document.getElementById('sortBy');
         
+        this.evaluationModal = document.getElementById('evaluationModal');
+        this.modalEvaluationContent = document.getElementById('modalEvaluationContent');
+        this.modalLoadingSpinner = this.modalEvaluationContent?.querySelector('.loading-spinner');
+        this.modalActualContent = this.modalEvaluationContent?.querySelector('.evaluation-actual-content');
+        this.modalCloseButton = this.evaluationModal?.querySelector('.close-button');
         this.bindHistoryEvents();
+        this.bindModalEvents();
         this.refreshHistoryList();
     }
 
@@ -1248,6 +1249,34 @@ class HistoryManager {
         }
     }
 
+    // 新增方法：绑定模态窗口的关闭事件
+    bindModalEvents() {
+        if (this.evaluationModal && this.modalCloseButton) {
+            // 点击关闭按钮时关闭模态窗口
+            this.modalCloseButton.addEventListener('click', () => {
+                this.evaluationModal.style.display = 'none';
+            });
+
+            // 点击模态窗口外部区域时关闭模态窗口
+            // 注意：这里事件监听器应该绑定到整个 window，但逻辑判断要精确到点击区域
+            window.addEventListener('click', (event) => {
+                // 确保点击事件的目标是模态窗口的背景本身，而不是模态内容
+                if (event.target === this.evaluationModal) {
+                    this.evaluationModal.style.display = 'none';
+                }
+            });
+
+            // 监听 Escape 键关闭模态窗口
+            window.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && this.evaluationModal.style.display === 'flex') {
+                    this.evaluationModal.style.display = 'none';
+                }
+            });
+        } else {
+            console.warn("模态窗口或关闭按钮元素未找到，无法绑定关闭事件。请检查HTML结构和ID/类名。");
+        }
+    }
+    
     refreshHistoryList() {
         const interviews = this.storageManager.getInterviews();
         
@@ -1346,14 +1375,13 @@ class HistoryManager {
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
-                <div class="evaluation-display" id="evaluation-${interview.id}" style="display:none; margin-top: 10px; padding: 10px; background-color: #f0f0f0; border-radius: 5px;">
-                    <div class="loading-spinner" style="display:none;">加载中...</div>
-                    <div class="evaluation-content"></div>
-                </div>
             </div>
         `;
     }
-
+                // <div class="evaluation-display" id="evaluation-${interview.id}" style="display:none; margin-top: 10px; padding: 10px; background-color: #f0f0f0; border-radius: 5px;">
+                //     <div class="loading-spinner" style="display:none;">加载中...</div>
+                //     <div class="evaluation-content"></div>
+                // </div>
     bindHistoryItemEvents() {
         // 事件已在HTML中绑定
             this.historyList.querySelectorAll('.evaluate-btn').forEach(button => {
@@ -1387,52 +1415,56 @@ class HistoryManager {
             this.refreshHistoryList();
         }
     }
-<<<<<<< HEAD
-    /**
-     * 开始评估特定面试记录
-     * @param {string} interviewId - 面试记录的ID
-     */
     async startEvaluation(interviewId) {
-        const evaluationDisplay = document.getElementById(`evaluation-${interviewId}`);
-        const loadingSpinner = evaluationDisplay?.querySelector('.loading-spinner');
-        const evaluationContent = evaluationDisplay?.querySelector('.evaluation-content');
+        const interviews = this.storageManager.getInterviews();
+        let interviewToEvaluate = interviews.find(item => item.id === interviewId);
 
-        if (!evaluationDisplay || !loadingSpinner || !evaluationContent) {
-            console.error("评估显示元素未找到！");
+        if (!interviewToEvaluate || !interviewToEvaluate.messages) {
+            alert("错误：未找到面试记录或对话消息。");
             return;
         }
 
-        // 切换显示状态
-        evaluationDisplay.style.display = 'block';
-        loadingSpinner.style.display = 'block';
-        evaluationContent.innerHTML = ''; // 清空之前的内容
+        // 显示模态窗口
+        if (this.evaluationModal) {
+            this.evaluationModal.style.display = 'flex'; // 使用 flex 来居中
+        }
+        if (this.modalLoadingSpinner) {
+            this.modalLoadingSpinner.style.display = 'block'; // 显示加载指示
+        }
+        if (this.modalActualContent) {
+            this.modalActualContent.innerHTML = ''; // 清空之前的内容
+        }
 
-        try {
-            const interviews = this.storageManager.getInterviews();
-            const interviewToEvaluate = interviews.find(item => item.id === interviewId);
 
-            if (!interviewToEvaluate || !interviewToEvaluate.messages) {
-                evaluationContent.innerHTML = '<p>错误：未找到面试记录或对话消息。</p>';
-                return;
+        // 检查是否已缓存评估结果
+        if (interviewToEvaluate.evaluationMarkdown) {
+            console.log(`从缓存加载评估结果，面试ID: ${interviewId}`);
+            if (this.modalLoadingSpinner) {
+                this.modalLoadingSpinner.style.display = 'none'; // 隐藏加载指示
             }
+            if (this.modalActualContent) {
+                this.modalActualContent.innerHTML = this.renderMarkdownToHtml(interviewToEvaluate.evaluationMarkdown);
+            }
+            return; // 结束函数，不再重新生成
+        }
 
-            // // 获取简历内容（如果需要发送给后端进行更准确评估）
+        // 如果没有缓存，则调用后端生成
+        try {
+            console.log(`调用后端生成评估结果，面试ID: ${interviewId}`);
+
             const resumeData = this.storageManager.getCurrentResume();
             const resumeText = resumeData ? resumeData.fullText : '';
 
-            // 准备要发送给后端的数据
             const requestData = {
                 interviewMessages: interviewToEvaluate.messages,
-                resumeText: resumeText, // 包含简历信息
-                interviewId: interviewToEvaluate.id // 传递ID，方便后端日志
+                resumeText: resumeText,
+                interviewId: interviewToEvaluate.id
             };
 
-            // 调用后端评估 API
-            const response = await fetch('/api/evaluate-interview', { // 这是新的后端评估API路由
+            const response = await fetch('/api/evaluate-interview', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
-                    // 如果后端需要认证，这里可能还需要添加 'Authorization' 头
                 },
                 body: JSON.stringify(requestData)
             });
@@ -1446,61 +1478,44 @@ class HistoryManager {
             const markdownResult = data.evaluationMarkdown;
 
             if (markdownResult) {
-                // 将 Markdown 渲染到 HTML
-                evaluationContent.innerHTML = this.renderMarkdownToHtml(markdownResult);
+                // 缓存评估结果到 interview 对象
+                interviewToEvaluate.evaluationMarkdown = markdownResult;
+                this.storageManager.saveInterview(interviewToEvaluate); // 更新 localStorage 中的记录
+
+                if (this.modalActualContent) {
+                    this.modalActualContent.innerHTML = this.renderMarkdownToHtml(markdownResult);
+                }
             } else {
-                evaluationContent.innerHTML = '<p>未收到评估结果。</p>';
+                if (this.modalActualContent) {
+                    this.modalActualContent.innerHTML = '<p>未收到评估结果。</p>';
+                }
             }
 
         } catch (error) {
             console.error('面试评估失败:', error);
-            evaluationContent.innerHTML = `<p>评估失败: ${error.message}</p>`;
+            if (this.modalActualContent) {
+                this.modalActualContent.innerHTML = `<p>评估失败: ${error.message}</p>`;
+            }
         } finally {
-            loadingSpinner.style.display = 'none'; // 隐藏加载指示
+            if (this.modalLoadingSpinner) {
+                this.modalLoadingSpinner.style.display = 'none'; // 隐藏加载指示
+            }
         }
     }
 
     /**
-     * 简单的 Markdown 到 HTML 渲染器 (你可以使用第三方库，如 'marked.js' 或 'markdown-it')
-     * 这里提供一个非常简化的版本，仅处理基本格式
+     * 使用 marked.js 将 Markdown 渲染到 HTML
      * @param {string} markdown - Markdown 字符串
      * @returns {string} - HTML 字符串
      */
     renderMarkdownToHtml(markdown) {
-        // let html = markdown;
-
-        // // 标题 (H1-H6)
-        // html = html.replace(/^###### (.*$)/gim, '<h6>$1</h6>');
-        // html = html.replace(/^##### (.*$)/gim, '<h5>$1</h5>');
-        // html = html.replace(/^#### (.*$)/gim, '<h4>$1</h4>');
-        // html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
-        // html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
-        // html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
-
-        // // 加粗
-        // html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        // html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
-
-        // // 斜体
-        // html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-        // html = html.replace(/_(.*?)_/g, '<em>$1</em>');
-
-        // // 列表
-        // html = html.replace(/^\s*\*\s+(.*)/gm, '<li>$1</li>');
-        // html = html.replace(/^\s*-\s+(.*)/gm, '<li>$1</li>');
-        // html = html.replace(/(<li>.*<\/li>)/gms, '<ul>$1</ul>');
-
-        // // 有序列表 (简化)
-        // html = html.replace(/^\s*\d+\.\s+(.*)/gm, '<li>$1</li>');
-        // html = html.replace(/(<li>.*<\/li>)/gms, '<ol>$1</ol>');
-
-        // // 换行
-        // html = html.replace(/\n/g, '<br>'); // 注意：这会把所有换行转为 <br>，更精确的Markdown渲染器会区分段落
-
-        // return html;
+        // 确保 marked 库已加载
+        if (typeof marked === 'undefined') {
+            console.error("marked.js 库未加载！请确保在 historyManager.js 之前引入。");
+            return `<pre>${markdown}</pre>`; // 降级处理，直接显示Markdown源码
+        }
         return marked.parse(markdown);
     }
-=======
     
     viewEvaluation(id) {
         const interviews = this.storageManager.getInterviews();
@@ -1518,7 +1533,6 @@ class HistoryManager {
             alert('该面试记录暂无评分信息');
         }
     }
->>>>>>> cf5dad206680eccc0dbfc21a9136c1c31ebee1e7
 }
 
 /**
@@ -2158,7 +2172,7 @@ function generateHistoryItem(item) {
                 </button>
                 <button class="btn btn-primary btn-sm" onclick="continueInterview('${item.id}')">
                     <i class="fas fa-play"></i> 继续面试
-                </button>
+                   </button>
             </div>
         </div>
     `;
@@ -2504,3 +2518,10 @@ window.downloadFile = downloadFile;
 window.formatFileSize = formatFileSize;
 window.formatDate = formatDate;
 window.formatDuration = formatDuration;
+
+window.addEventListener('keydown', (event) => {
+    const modal = document.getElementById('evaluationModal');
+    if (event.key === 'Escape' && modal.style.display === 'flex') {
+        modal.style.display = 'none';
+    }
+});
