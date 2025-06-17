@@ -31,6 +31,9 @@ from openai import AsyncAzureOpenAI
 # 导入提示词配置
 from prompts import get_interviewer_prompt, get_voice_call_prompt
 
+from dotenv import load_dotenv
+load_dotenv()
+
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
@@ -516,7 +519,7 @@ async def get_voice_call_default_prompt() -> JSONResponse:
         
         return JSONResponse(content={
             "success": True,
-            "instructions": InterviewPrompts.VOICE_CALL_INTERVIEWER,
+            "instructions": InterviewPrompts.BASE_INTERVIEWER,
             "source": "prompts.py - VOICE_CALL_INTERVIEWER"
         })
         
@@ -642,6 +645,8 @@ async def get_resume_content(session_id: str) -> JSONResponse:
     except Exception as e:
         logger.error(f"获取简历内容失败: {e}")
         raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
+
+
 
 @app.post("/api/upload-resume")
 async def upload_resume(file: UploadFile = File(...)) -> JSONResponse:
@@ -818,6 +823,72 @@ async def health_check():
         "service": "Azure Voice Interview System",
         "azure_client_ready": azure_voice_service.client is not None if azure_voice_service else False
     }
+
+class InterviewEvaluationRequest(BaseModel):
+    interviewMessages: List[Dict]
+    resumeText: Optional[str]
+    interviewId: Optional[str]
+
+@app.post("/api/evaluate-interview", response_model=dict)
+async def evaluate_interview(request_body: InterviewEvaluationRequest):
+    """
+    接收面试对话消息和简历文本，调用OpenAI API进行面试评估。
+    """
+    interview_messages = request_body.interviewMessages
+    resume_text = request_body.resumeText
+    interview_id = request_body.interviewId
+
+    if not interview_messages:
+        raise HTTPException(status_code=400, detail="请提供有效的面试对话消息。")
+
+    logger.info(f"收到面试评估请求，面试ID: {interview_id}")
+    logger.info(f"对话消息数量: {len(interview_messages)}")
+    logger.info(f"简历文本长度: {len(resume_text)}")
+
+    try:
+        from prompts import InterviewPrompts
+        
+        messages_for_llm = []
+
+        # 添加系统提示，指导AI进行评估
+        system_prompt = InterviewPrompts.BASE_EVALUATION
+        messages_for_llm.append({"role": "system", "content": system_prompt})
+
+        if resume_text:
+            messages_for_llm.append({"role": "user", "content": f"候选人提供的简历信息，请在评估时参考：\n```\n{resume_text}\n```"})
+
+
+        # 将面试对话消息添加到 messages 数组
+        # 过滤掉前端可能传递过来的原始系统指令，因为我们在这里构造了自己的评估系统指令
+        logger.info(interview_messages)
+        filtered_messages = json.dumps(interview_messages)
+        messages_for_llm.append({"role": "user", "content": f"以下是候选人（user）和面试官（assistant）的对话记录，请评估： \n```\n{filtered_messages}\n```"})
+        # 调用 OpenAI API
+        from openai import AzureOpenAI
+        client = AzureOpenAI(
+            api_key=os.getenv("AZURE_OPENAI_API_KEY_FOR_EVALUATION"),
+            api_version=os.getenv("AZURE_API_VERSION_FOR_EVALUATION"),
+            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT_FOR_EVALUATION")
+        )
+
+        chat_completion = client.chat.completions.create(
+            model=os.getenv("AZURE_DEPLOYMENT_FOR_EVALUATION"),
+            messages=messages_for_llm,
+            temperature=0.7,
+            max_tokens=1500, # 确保有足够空间生成详细评估
+        )
+
+        evaluation_markdown = chat_completion.choices[0].message.content
+        logger.info("evaluation markdown: ", evaluation_markdown)
+        return JSONResponse(content={'evaluationMarkdown': evaluation_markdown})
+
+    except Exception as e:
+        print(f"调用OpenAI API失败: {e}")
+        import traceback
+        print(traceback.format_exc())
+        # 返回更详细的错误信息，方便调试
+        raise HTTPException(status_code=500, detail=f"面试评估服务内部错误: {str(e)}")
+
 
 if __name__ == "__main__":
     

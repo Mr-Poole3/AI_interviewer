@@ -234,7 +234,7 @@ class AzureVoiceChat {
         this.audioSources = [];
         this.lastPlayTime = 0;
         this.currentSessionId = '';
-        
+
         this.initElements();
         this.bindEvents();
         this.initAudio();
@@ -366,6 +366,7 @@ class AzureVoiceChat {
         };
     }
     
+
     setStatus(text, className = '') {
         console.log('更新状态:', text, className);
         
@@ -842,6 +843,7 @@ class AzureVoiceChat {
             alert(message);
         }
     }
+
 }
 
 /**
@@ -854,7 +856,13 @@ class HistoryManager {
         this.historyList = null;
         this.emptyHistory = null;
         this.sortBy = null;
-        
+
+        // 获取模态窗口元素
+        this.evaluationModal = document.getElementById('evaluationModal');
+        this.modalEvaluationContent = document.getElementById('modalEvaluationContent');
+        this.modalLoadingSpinner = this.modalEvaluationContent?.querySelector('.loading-spinner');
+        this.modalActualContent = this.modalEvaluationContent?.querySelector('.evaluation-actual-content');
+
         this.init();
     }
 
@@ -972,9 +980,16 @@ class HistoryManager {
                     <button class="history-action-btn" onclick="historyManager.continueInterview('${interview.id}')" title="继续面试">
                         <i class="fas fa-play"></i>
                     </button>
+                    <button class="history-action-btn evaluate-btn" data-id="${interview.id}" onclick="historyManager.startEvaluation('${interview.id}')" title="开始评估">
+                        <i class="fas fa-star"></i>
+                    </button>
                     <button class="history-action-btn" onclick="historyManager.deleteInterview('${interview.id}')" title="删除记录">
                         <i class="fas fa-trash"></i>
                     </button>
+                </div>
+                <div class="evaluation-display" id="evaluation-${interview.id}" style="display:none; margin-top: 10px; padding: 10px; background-color: #f0f0f0; border-radius: 5px;">
+                    <div class="loading-spinner" style="display:none;">加载中...</div>
+                    <div class="evaluation-content"></div>
                 </div>
             </div>
         `;
@@ -982,6 +997,9 @@ class HistoryManager {
 
     bindHistoryItemEvents() {
         // 事件已在HTML中绑定
+            this.historyList.querySelectorAll('.evaluate-btn').forEach(button => {
+            button.onclick = () => this.startEvaluation(button.dataset.id);
+        });
     }
 
     continueInterview(id) {
@@ -1009,6 +1027,118 @@ class HistoryManager {
             this.storageManager.clearInterviews();
             this.refreshHistoryList();
         }
+    }
+    /**
+     * 开始评估特定面试记录
+     * @param {string} interviewId - 面试记录的ID
+     */
+    async startEvaluation(interviewId) {
+        const evaluationDisplay = document.getElementById(`evaluation-${interviewId}`);
+        const loadingSpinner = evaluationDisplay?.querySelector('.loading-spinner');
+        const evaluationContent = evaluationDisplay?.querySelector('.evaluation-content');
+
+        if (!evaluationDisplay || !loadingSpinner || !evaluationContent) {
+            console.error("评估显示元素未找到！");
+            return;
+        }
+
+        // 切换显示状态
+        evaluationDisplay.style.display = 'block';
+        loadingSpinner.style.display = 'block';
+        evaluationContent.innerHTML = ''; // 清空之前的内容
+
+        try {
+            const interviews = this.storageManager.getInterviews();
+            const interviewToEvaluate = interviews.find(item => item.id === interviewId);
+
+            if (!interviewToEvaluate || !interviewToEvaluate.messages) {
+                evaluationContent.innerHTML = '<p>错误：未找到面试记录或对话消息。</p>';
+                return;
+            }
+
+            // // 获取简历内容（如果需要发送给后端进行更准确评估）
+            const resumeData = this.storageManager.getCurrentResume();
+            const resumeText = resumeData ? resumeData.fullText : '';
+
+            // 准备要发送给后端的数据
+            const requestData = {
+                interviewMessages: interviewToEvaluate.messages,
+                resumeText: resumeText, // 包含简历信息
+                interviewId: interviewToEvaluate.id // 传递ID，方便后端日志
+            };
+
+            // 调用后端评估 API
+            const response = await fetch('/api/evaluate-interview', { // 这是新的后端评估API路由
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                    // 如果后端需要认证，这里可能还需要添加 'Authorization' 头
+                },
+                body: JSON.stringify(requestData)
+            });
+
+            if (!response.ok) {
+                const errorDetail = await response.text();
+                throw new Error(`后端评估API请求失败: ${response.status} ${response.statusText} - ${errorDetail}`);
+            }
+
+            const data = await response.json();
+            const markdownResult = data.evaluationMarkdown;
+
+            if (markdownResult) {
+                // 将 Markdown 渲染到 HTML
+                evaluationContent.innerHTML = this.renderMarkdownToHtml(markdownResult);
+            } else {
+                evaluationContent.innerHTML = '<p>未收到评估结果。</p>';
+            }
+
+        } catch (error) {
+            console.error('面试评估失败:', error);
+            evaluationContent.innerHTML = `<p>评估失败: ${error.message}</p>`;
+        } finally {
+            loadingSpinner.style.display = 'none'; // 隐藏加载指示
+        }
+    }
+
+    /**
+     * 简单的 Markdown 到 HTML 渲染器 (你可以使用第三方库，如 'marked.js' 或 'markdown-it')
+     * 这里提供一个非常简化的版本，仅处理基本格式
+     * @param {string} markdown - Markdown 字符串
+     * @returns {string} - HTML 字符串
+     */
+    renderMarkdownToHtml(markdown) {
+        // let html = markdown;
+
+        // // 标题 (H1-H6)
+        // html = html.replace(/^###### (.*$)/gim, '<h6>$1</h6>');
+        // html = html.replace(/^##### (.*$)/gim, '<h5>$1</h5>');
+        // html = html.replace(/^#### (.*$)/gim, '<h4>$1</h4>');
+        // html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+        // html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+        // html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+
+        // // 加粗
+        // html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        // html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
+
+        // // 斜体
+        // html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+        // html = html.replace(/_(.*?)_/g, '<em>$1</em>');
+
+        // // 列表
+        // html = html.replace(/^\s*\*\s+(.*)/gm, '<li>$1</li>');
+        // html = html.replace(/^\s*-\s+(.*)/gm, '<li>$1</li>');
+        // html = html.replace(/(<li>.*<\/li>)/gms, '<ul>$1</ul>');
+
+        // // 有序列表 (简化)
+        // html = html.replace(/^\s*\d+\.\s+(.*)/gm, '<li>$1</li>');
+        // html = html.replace(/(<li>.*<\/li>)/gms, '<ol>$1</ol>');
+
+        // // 换行
+        // html = html.replace(/\n/g, '<br>'); // 注意：这会把所有换行转为 <br>，更精确的Markdown渲染器会区分段落
+
+        // return html;
+        return marked.parse(markdown);
     }
 }
 
@@ -1341,7 +1471,7 @@ class AzureVoiceInterviewApp {
      */
     initVoiceCallManager() {
         try {
-            this.voiceCallManager = new VoiceCallManager(this.voiceChat);
+            this.voiceCallManager = new VoiceCallManager(this.voiceChat, this.storageManager);
             
             // 浏览器兼容性检查现在在startVoiceCall方法中进行
             console.log('语音通话管理器初始化完成');

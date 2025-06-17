@@ -2662,3 +2662,65 @@ body {
         font-size: 0.8rem;
     }
 }
+
+/* 模态窗口背景 */
+.modal {
+    display: none; /* 默认隐藏 */
+    position: fixed; /* 固定定位 */
+    z-index: 1000; /* 放在所有内容之上 */
+    left: 0;
+    top: 0;
+    width: 100%; /* 全宽 */
+    height: 100%; /* 全高 */
+    overflow: auto; /* 如果内容溢出则提供滚动条 */
+    background-color: rgba(0,0,0,0.4); /* 半透明黑色背景 */
+    display: flex; /* 使用 flexbox 居中内容 */
+    justify-content: center; /* 水平居中 */
+    align-items: center; /* 垂直居中 */
+}
+
+/* 模态窗口内容 */
+.modal-content {
+    background-color: #fefefe;
+    margin: auto; /* 自动外边距用于旧浏览器居中，flexbox已处理 */
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%; /* 内容宽度 */
+    max-width: 900px; /* 最大宽度 */
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    position: relative; /* 相对定位，为了关闭按钮 */
+    max-height: 90vh; /* 最大高度，防止内容过长溢出屏幕 */
+    overflow-y: auto; /* 内容溢出时滚动 */
+}
+
+/* 关闭按钮 */
+.close-button {
+    color: #aaa;
+    float: right; /* 浮动到右侧 */
+    font-size: 28px;
+    font-weight: bold;
+    position: absolute; /* 绝对定位到右上角 */
+    top: 10px;
+    right: 15px;
+    cursor: pointer;
+}
+
+.close-button:hover,
+.close-button:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* 评估内容的样式可以复用原有的 .evaluation-display */
+.evaluation-display {
+    padding-top: 20px; /* 给关闭按钮留出空间 */
+}
+
+.loading-spinner {
+    text-align: center;
+    font-style: italic;
+    color: #888;
+    padding: 20px 0;
+}

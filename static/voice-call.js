@@ -13,9 +13,9 @@
  * - 实时事件处理和调试日志
  */
 class VoiceCallManager {
-    constructor(azureVoiceChat) {
+    constructor(azureVoiceChat, storageManager) {
         this.azureVoiceChat = azureVoiceChat;
-        
+        this.storageManager = storageManager;
         // Azure配置
         this.SESSIONS_URL = "https://gpt-realtime-4o-mini.openai.azure.com/openai/realtimeapi/sessions?api-version=2025-04-01-preview";
         this.API_KEY = "1CPbxJPoYjJzTmG2296QXpJ8LT8jHJ0NmgKDv56sQ5tjonM6RXgOJQQJ99BEACHYHv6XJ3w3AAABACOG45bg";
@@ -38,6 +38,7 @@ class VoiceCallManager {
         this.ephemeralKey = null;
         this.sessionId = null;
         
+        this.currentInterviewMessages = []; // 用于存储当前通话的对话历史
         // 状态管理
         this.isConnected = false;
         this.isCallActive = false;
@@ -524,6 +525,9 @@ class VoiceCallManager {
 
         this.dataChannel.addEventListener('error', (error) => {
             this.logMessage(`数据通道错误: ${error}`);
+            if (error.error) {
+                this.logMessage(`详细错误信息: ${error.error.message || error.error}`);
+            }
         });
     }
     
@@ -532,7 +536,8 @@ class VoiceCallManager {
      */
     handleRealtimeEvent(event) {
         this.logMessage(`收到服务器事件: ${JSON.stringify(event, null, 2)}`);
-        
+        if (!this.currentTurnUserText) this.currentTurnUserText = "";
+        if (!this.currentTurnAIText) this.currentTurnAIText = "";        
         switch (event.type) {
             case "session.created":
                 this.logMessage("会话已创建");
@@ -552,13 +557,25 @@ class VoiceCallManager {
                 
             case "session.end":
                 this.logMessage("会话已结束");
+                this.saveCurrentInterview();
                 this.endVoiceCall();
                 break;
                 
             case "conversation.item.created":
                 this.logMessage("对话项已创建");
+                this.currentTurnUserText = "";
+                this.currentTurnAIText = "";
                 break;
                 
+            case "conversation.item.input_audio_transcription.completed":
+                this.logMessage(`用户输入transcript: "${event.transcript}"`);
+                this.currentTurnUserText = event.transcript; 
+                if (this.currentTurnUserText) {
+                    this.logMessage(`用户输入提交: "${this.currentTurnUserText}"`);
+                    this.currentInterviewMessages.push({ role: "user", content: this.currentTurnUserText });
+                }
+                break;
+
             case "input_audio_buffer.speech_started":
                 this.logMessage("检测到用户开始说话");
                 this.updateVoiceStatus('正在聆听...', 'listening');
@@ -577,9 +594,20 @@ class VoiceCallManager {
                 // 音频数据流，不记录详细日志避免刷屏
                 this.updateVoiceStatus('AI正在回复...', 'speaking');
                 break;
-                
+
+            case "response.audio_transcript.done":
+                this.currentTurnAIText = event.transcript;
+                break;
+
             case "response.done":
                 this.logMessage("响应完成");
+                if (this.currentTurnAIText && this.currentTurnAIText.trim() !== "") {
+                    this.logMessage(`AI回复完成: "${this.currentTurnAIText}"`);
+                    this.currentInterviewMessages.push({ role: "assistant", content: this.currentTurnAIText });
+                    // 每次AI回复后保存当前面试，确保数据不丢失
+                    // this.saveCurrentInterview(); // 可以考虑在通话结束时统一保存
+                    this.currentTurnAIText = "";
+                }
                 this.updateVoiceStatus('通话进行中...', 'connected');
                 break;
                 
@@ -601,12 +629,15 @@ class VoiceCallManager {
         
         // 构建系统指令
         const instructions = await this.buildInstructions(resumeContext);
-        
+
         const event = {
             type: "session.update",
             session: {
                 instructions: instructions,
                 // 配置语音活动检测（VAD）参数
+                input_audio_transcription: {
+                    model: "whisper-1"
+                },
                 turn_detection: {
                     type: "server_vad",
                     threshold: this.vadConfig.threshold,
@@ -838,7 +869,7 @@ class VoiceCallManager {
     /**
      * 开始语音通话
      */
-    async startVoiceCall() {
+    async startVoiceCall(initialInterviewId = null) {
         try {
             this.logMessage('开始语音通话...');
             
@@ -854,7 +885,22 @@ class VoiceCallManager {
             // 显示语音通话界面
             this.showVoiceCallInterface();
             this.updateVoiceStatus('正在初始化...', 'connecting');
-            
+            // 重置当前通话历史
+            this.currentInterviewMessages = [];
+
+            // 如果提供了 interviewId，尝试加载该历史记录
+            if (initialInterviewId) {
+                const interviews = this.storageManager.getInterviews();
+                const historicalInterview = interviews.find(int => int.id === initialInterviewId);
+                if (historicalInterview && historicalInterview.messages) {
+                    this.currentInterviewMessages = historicalInterview.messages;
+                    this.logMessage(`已加载历史面试 '${initialInterviewId}' 的 ${this.currentInterviewMessages.length} 条消息。`);
+                } else {
+                    this.logMessage(`未找到历史面试 '${initialInterviewId}' 或其没有消息历史。`);
+                }
+            } else {
+                this.logMessage("开始新面试，对话历史已清空。");
+            }            
             // 获取临时密钥
             await this.getEphemeralKey();
             
@@ -917,13 +963,32 @@ class VoiceCallManager {
             this.hideVoiceCallInterface();
             
             this.logMessage('语音通话已结束');
-            
+
+            // // Retrieve session messages
+            // const sessionId = this.azureVoiceChat.currentSessionId;
+            // const messages = this.azureVoiceChat.getSessionMessages(sessionId);
+
+            // // Prepare interview data
+            // const interviewData = {
+            //     id: sessionId,
+            //     createdAt: new Date().toISOString(),
+            //     messages: messages,
+            //     duration: this.callDuration, // Example: duration of the call
+            //     // Add other relevant data
+            // };
+
+            // // Save the interview
+            // this.storageManager.saveInterview(interviewData);
+
+            this.logMessage('Interview has been saved successfully.');
+            // **在通话结束后统一保存面试记录**
+            this.saveCurrentInterview();
+            // 清空当前面试历史，为下一次通话做准备
+            this.currentInterviewMessages = [];
         } catch (error) {
             this.logMessage(`结束语音通话时出错: ${error.message}`);
         }
     }
-    
-
     
     /**
      * 切换静音状态
@@ -959,7 +1024,25 @@ class VoiceCallManager {
             }
         }
     }
-    
+    saveCurrentInterview() {
+        // 只有当有对话内容时才保存
+        if (this.currentInterviewMessages.length > 0) {
+            const resumeData = this.storageManager.getCurrentResume();
+            const interviewRecord = {
+                id: this.sessionId, // 使用 Azure 会话ID 作为面试记录的ID
+                createdAt: new Date().toISOString(),
+                duration: this.callTimer ? this.voiceTimer.textContent : 'N/A', // 从计时器获取时长
+                messages: this.currentInterviewMessages,
+                resumeFileName: resumeData ? resumeData.fileName : '无简历',
+                // 可以添加其他元数据，例如面试状态、AI模型等
+            };
+            this.logMessage(`面试记录 '${interviewRecord}' 已保存到本地存储。`);
+            this.storageManager.saveInterview(interviewRecord);
+            this.logMessage(`面试记录 '${interviewRecord.id}' 已保存到本地存储。`);
+        } else {
+            this.logMessage('当前面试无对话内容，不保存记录。');
+        }
+    }    
     /**
      * 显示语音通话界面
      */
