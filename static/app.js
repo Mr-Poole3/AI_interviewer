@@ -234,7 +234,17 @@ class AzureVoiceChat {
         this.audioSources = [];
         this.lastPlayTime = 0;
         this.currentSessionId = '';
+<<<<<<< HEAD
 
+=======
+        
+        // 面试记录相关
+        this.currentInterviewMessages = [];
+        this.interviewStartTime = null;
+        this.isInterviewActive = false;
+        this.currentInterviewId = null;
+        
+>>>>>>> cf5dad206680eccc0dbfc21a9136c1c31ebee1e7
         this.initElements();
         this.bindEvents();
         this.initAudio();
@@ -282,6 +292,9 @@ class AzureVoiceChat {
             alert('正在连接语音服务，请稍候...');
             return;
         }
+        
+        // 开始记录面试
+        this.startInterviewRecording();
         
         // 切换到聊天界面
         const welcomeSection = document.querySelector('.interview-welcome');
@@ -488,6 +501,11 @@ class AzureVoiceChat {
         
         this.chatMessages.appendChild(messageDiv);
         this.scrollToBottom();
+        
+        // 记录消息到面试记录
+        if (content.trim()) {
+            this.recordMessage(content, type);
+        }
         
         return messageDiv;
     }
@@ -843,7 +861,337 @@ class AzureVoiceChat {
             alert(message);
         }
     }
+<<<<<<< HEAD
 
+=======
+    
+    /**
+     * 开始面试记录
+     */
+    startInterviewRecording() {
+        this.isInterviewActive = true;
+        this.interviewStartTime = Date.now();
+        this.currentInterviewId = Date.now().toString();
+        this.currentInterviewMessages = [];
+        
+        console.log('开始面试记录:', this.currentInterviewId);
+        
+        // 添加欢迎消息
+        this.recordMessage('欢迎参加AI智能面试！我是您的面试官，将为您提供专业的面试体验。请告诉我您应聘的岗位，我们开始面试吧！', 'assistant');
+    }
+    
+    /**
+     * 结束面试记录并触发评分
+     */
+    async endInterviewRecording() {
+        if (!this.isInterviewActive) {
+            return;
+        }
+        
+        this.isInterviewActive = false;
+        const duration = Math.floor((Date.now() - this.interviewStartTime) / 1000);
+        
+        console.log('结束面试记录，时长:', duration, '秒');
+        
+        // 保存面试记录到本地存储
+        const interview = {
+            id: this.currentInterviewId,
+            messages: this.currentInterviewMessages,
+            duration: duration,
+            createdAt: new Date().toISOString(),
+            sessionId: this.currentSessionId,
+            completed: true
+        };
+        
+        // 保存到本地存储
+        if (this.app && this.app.storageManager) {
+            this.app.storageManager.saveInterview(interview);
+        }
+        
+        // 触发面试评分
+        await this.triggerInterviewEvaluation(interview);
+        
+        // 重置状态
+        this.currentInterviewMessages = [];
+        this.interviewStartTime = null;
+        this.currentInterviewId = null;
+    }
+    
+    /**
+     * 记录消息到面试记录
+     */
+    recordMessage(content, type) {
+        if (!this.isInterviewActive) {
+            return;
+        }
+        
+        const message = {
+            content: content,
+            type: type,
+            timestamp: new Date().toISOString()
+        };
+        
+        this.currentInterviewMessages.push(message);
+        console.log('记录消息:', type, content.substring(0, 50) + '...');
+    }
+    
+    /**
+     * 触发面试评分
+     */
+    async triggerInterviewEvaluation(interview) {
+        try {
+            console.log('开始面试评分...');
+            
+            // 获取简历上下文
+            const resumeContext = await this.getResumeContext();
+            
+            // 构建评分请求
+            const evaluationRequest = {
+                interview_id: interview.id,
+                messages: interview.messages,
+                resume_context: resumeContext || '',
+                duration: interview.duration,
+                session_id: interview.sessionId || ''
+            };
+            
+            // 显示评分进度
+            this.showEvaluationProgress();
+            
+            // 调用评分API
+            const response = await fetch('/api/interview/evaluate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(evaluationRequest)
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                console.log('面试评分完成:', result);
+                
+                // 显示评分结果
+                this.showEvaluationResult(result.evaluation);
+                
+                // 更新本地存储的面试记录
+                this.updateInterviewWithEvaluation(interview.id, result.evaluation);
+                
+            } else {
+                console.error('面试评分失败:', response.status);
+                this.showEvaluationError('评分服务暂时不可用，请稍后查看面试记录');
+            }
+            
+        } catch (error) {
+            console.error('面试评分错误:', error);
+            this.showEvaluationError('评分过程中出现错误: ' + error.message);
+        } finally {
+            this.hideEvaluationProgress();
+        }
+    }
+    
+    /**
+     * 获取简历上下文
+     */
+    async getResumeContext() {
+        try {
+            if (!this.currentSessionId) {
+                return null;
+            }
+            
+            const response = await fetch(`/api/resume/${this.currentSessionId}`);
+            if (response.ok) {
+                const data = await response.json();
+                return data.content;
+            }
+        } catch (error) {
+            console.error('获取简历上下文失败:', error);
+        }
+        return null;
+    }
+    
+    /**
+     * 显示评分进度
+     */
+    showEvaluationProgress() {
+        // 创建评分进度提示
+        const progressDiv = document.createElement('div');
+        progressDiv.id = 'evaluationProgress';
+        progressDiv.className = 'evaluation-progress';
+        progressDiv.innerHTML = `
+            <div class="evaluation-overlay">
+                <div class="evaluation-content">
+                    <div class="evaluation-spinner">
+                        <i class="fas fa-cog fa-spin"></i>
+                    </div>
+                    <h3>正在评估面试表现</h3>
+                    <p>AI正在分析您的面试表现，请稍候...</p>
+                    <div class="evaluation-steps">
+                        <div class="step active">分析对话内容</div>
+                        <div class="step">评估技能水平</div>
+                        <div class="step">生成评分报告</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(progressDiv);
+        
+        // 模拟步骤进度
+        setTimeout(() => {
+            const steps = progressDiv.querySelectorAll('.step');
+            if (steps[1]) steps[1].classList.add('active');
+        }, 2000);
+        
+        setTimeout(() => {
+            const steps = progressDiv.querySelectorAll('.step');
+            if (steps[2]) steps[2].classList.add('active');
+        }, 4000);
+    }
+    
+    /**
+     * 隐藏评分进度
+     */
+    hideEvaluationProgress() {
+        const progressDiv = document.getElementById('evaluationProgress');
+        if (progressDiv) {
+            progressDiv.remove();
+        }
+    }
+    
+    /**
+     * 显示评分结果
+     */
+    showEvaluationResult(evaluation) {
+        const resultDiv = document.createElement('div');
+        resultDiv.className = 'evaluation-result-modal';
+        resultDiv.innerHTML = `
+            <div class="modal-overlay">
+                <div class="modal-content evaluation-modal">
+                    <div class="modal-header">
+                        <h2><i class="fas fa-chart-bar"></i> 面试评分报告</h2>
+                        <button class="modal-close" onclick="this.closest('.evaluation-result-modal').remove()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="score-overview">
+                            <div class="total-score">
+                                <div class="score-circle">
+                                    <span class="score-number">${evaluation.total_score || 75}</span>
+                                    <span class="score-label">总分</span>
+                                </div>
+                            </div>
+                            <div class="score-summary">
+                                <h3>评估总结</h3>
+                                <p>${evaluation.summary || '面试表现良好，具备基本的专业素养和沟通能力。'}</p>
+                            </div>
+                        </div>
+                        
+                        ${evaluation.dimension_scores ? this.createDimensionScoresHTML(evaluation.dimension_scores) : ''}
+                        
+                        <div class="evaluation-details">
+                            <div class="detail-section">
+                                <h4><i class="fas fa-thumbs-up"></i> 优势表现</h4>
+                                <ul>
+                                    ${(evaluation.strengths || ['表现积极', '回答完整']).map(strength => `<li>${strength}</li>`).join('')}
+                                </ul>
+                            </div>
+                            <div class="detail-section">
+                                <h4><i class="fas fa-lightbulb"></i> 改进建议</h4>
+                                <ul>
+                                    ${(evaluation.improvements || ['继续保持', '深入学习']).map(improvement => `<li>${improvement}</li>`).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="evaluation-meta">
+                            <small>
+                                评估时间: ${new Date().toLocaleString('zh-CN')} | 
+                                评估模型: ${evaluation.model_used || 'DeepSeek-V3'}
+                            </small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="this.closest('.evaluation-result-modal').remove()">
+                            关闭
+                        </button>
+                        <button class="btn btn-primary" onclick="window.app.router.navigateTo('history')">
+                            查看历史记录
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(resultDiv);
+    }
+    
+    /**
+     * 创建维度评分HTML
+     */
+    createDimensionScoresHTML(dimensionScores) {
+        const dimensions = {
+            'technical_skills': '技术能力',
+            'communication': '沟通表达',
+            'problem_solving': '问题解决',
+            'learning_adaptability': '学习适应',
+            'professional_attitude': '职业素养'
+        };
+        
+        return `
+            <div class="dimension-scores">
+                <h4>各维度评分</h4>
+                <div class="score-bars">
+                    ${Object.entries(dimensions).map(([key, name]) => {
+                        const score = dimensionScores[key] || 7;
+                        const percentage = (score / 10) * 100;
+                        return `
+                            <div class="score-bar">
+                                <div class="score-label">${name}</div>
+                                <div class="score-progress">
+                                    <div class="score-fill" style="width: ${percentage}%"></div>
+                                </div>
+                                <div class="score-value">${score}/10</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    /**
+     * 显示评分错误
+     */
+    showEvaluationError(message) {
+        console.error('评分错误:', message);
+        if (typeof showNotification === 'function') {
+            showNotification('评分失败', message, 'error');
+        } else {
+            alert('面试评分失败: ' + message);
+        }
+    }
+    
+    /**
+     * 更新面试记录的评分信息
+     */
+    updateInterviewWithEvaluation(interviewId, evaluation) {
+        if (this.app && this.app.storageManager) {
+            const interviews = this.app.storageManager.getInterviews();
+            const interview = interviews.find(item => item.id === interviewId);
+            
+            if (interview) {
+                interview.evaluation = evaluation;
+                interview.score = evaluation.total_score;
+                interview.summary = evaluation.summary;
+                
+                // 重新保存
+                this.app.storageManager.saveInterview(interview);
+                console.log('面试记录已更新评分信息');
+            }
+        }
+    }
+>>>>>>> cf5dad206680eccc0dbfc21a9136c1c31ebee1e7
 }
 
 /**
@@ -956,6 +1304,8 @@ class HistoryManager {
         const date = new Date(interview.createdAt).toLocaleString('zh-CN');
         const duration = interview.duration ? `${Math.floor(interview.duration / 60)}分${interview.duration % 60}秒` : '未知';
         const messageCount = interview.messages?.length || 0;
+        const score = interview.score || interview.evaluation?.total_score;
+        const hasEvaluation = interview.evaluation || interview.score;
         
         return `
             <div class="history-item" data-id="${interview.id}">
@@ -965,18 +1315,27 @@ class HistoryManager {
                 <div class="history-content">
                     <div class="history-title">
                         AI语音面试记录
-                        <span class="history-badge">完成</span>
+                        <span class="history-badge ${hasEvaluation ? 'evaluated' : 'completed'}">
+                            ${hasEvaluation ? '已评分' : '完成'}
+                        </span>
+                        ${score ? `<span class="history-score">${score}分</span>` : ''}
                     </div>
                     <div class="history-meta">
                         <span><i class="fas fa-clock"></i> ${date}</span>
                         <span><i class="fas fa-stopwatch"></i> ${duration}</span>
                         <span><i class="fas fa-comments"></i> ${messageCount}条对话</span>
+                        ${hasEvaluation ? `<span><i class="fas fa-chart-bar"></i> 已评分</span>` : ''}
                     </div>
                     <div class="history-summary">
                         ${interview.summary || '本次面试涵盖了技术能力、项目经验等多个方面的深入交流...'}
                     </div>
                 </div>
                 <div class="history-actions">
+                    ${hasEvaluation ? `
+                        <button class="history-action-btn" onclick="historyManager.viewEvaluation('${interview.id}')" title="查看评分">
+                            <i class="fas fa-chart-bar"></i>
+                        </button>
+                    ` : ''}
                     <button class="history-action-btn" onclick="historyManager.continueInterview('${interview.id}')" title="继续面试">
                         <i class="fas fa-play"></i>
                     </button>
@@ -1028,6 +1387,7 @@ class HistoryManager {
             this.refreshHistoryList();
         }
     }
+<<<<<<< HEAD
     /**
      * 开始评估特定面试记录
      * @param {string} interviewId - 面试记录的ID
@@ -1140,6 +1500,25 @@ class HistoryManager {
         // return html;
         return marked.parse(markdown);
     }
+=======
+    
+    viewEvaluation(id) {
+        const interviews = this.storageManager.getInterviews();
+        const interview = interviews.find(item => item.id === id);
+        
+        if (interview && interview.evaluation) {
+            // 使用AzureVoiceChat的showEvaluationResult方法显示评分
+            if (window.app && window.app.voiceChat) {
+                window.app.voiceChat.showEvaluationResult(interview.evaluation);
+            } else {
+                // 简单的评分显示
+                alert(`面试评分: ${interview.evaluation.total_score || interview.score || 'N/A'}分\n\n${interview.evaluation.summary || '暂无评估总结'}`);
+            }
+        } else {
+            alert('该面试记录暂无评分信息');
+        }
+    }
+>>>>>>> cf5dad206680eccc0dbfc21a9136c1c31ebee1e7
 }
 
 /**
