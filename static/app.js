@@ -899,12 +899,12 @@ class AzureVoiceChat {
         };
         
         // 保存到本地存储
-        if (this.app && this.app.storageManager) {
-            this.app.storageManager.saveInterview(interview);
-        }
+        // if (this.app && this.app.storageManager) {
+        //     this.app.storageManager.saveInterview(interview);
+        // }
         
         // 触发面试评分
-        await this.triggerInterviewEvaluation(interview);
+        // await this.triggerInterviewEvaluation(interview);
         
         // 重置状态
         this.currentInterviewMessages = [];
@@ -1219,6 +1219,7 @@ class HistoryManager {
         this.modalLoadingSpinner = this.modalEvaluationContent?.querySelector('.loading-spinner');
         this.modalActualContent = this.modalEvaluationContent?.querySelector('.evaluation-actual-content');
         this.modalCloseButton = this.evaluationModal?.querySelector('.close-button');
+        
         this.bindHistoryEvents();
         this.bindModalEvents();
         this.refreshHistoryList();
@@ -1343,7 +1344,7 @@ class HistoryManager {
                 </div>
                 <div class="history-content">
                     <div class="history-title">
-                        AI语音面试记录
+                        ${interview.title || 'AI语音面试记录'}
                         <span class="history-badge ${hasEvaluation ? 'evaluated' : 'completed'}">
                             ${hasEvaluation ? '已评分' : '完成'}
                         </span>

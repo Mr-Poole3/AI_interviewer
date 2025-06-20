@@ -557,7 +557,7 @@ class VoiceCallManager {
                 
             case "session.end":
                 this.logMessage("会话已结束");
-                this.saveCurrentInterview();
+                // this.saveCurrentInterview();
                 this.endVoiceCall();
                 break;
                 
@@ -719,7 +719,7 @@ class VoiceCallManager {
         this.logMessage('⚠️ 使用硬编码回退prompt，建议检查prompts.py配置和API连接');
         
         // 从prompts.py的VOICE_CALL_INTERVIEWER获取的内容（硬编码备份）
-        let instructions = "你是一位专业的AI面试官，请用自然、友好的语调进行面试对话。根据候选人的简历内容，提出相关的技术和行为问题。保持对话流畅，适时给出反馈和鼓励。";
+        let instructions = "你是一位专业的AI面试官，请用自然、友好的语调进行面试对话。根据候选人的简历内容，提出相关的技术和行为问题。保持对话流畅，适时给出反馈和鼓励。若未提供面试简历， 提醒候选人上传简历，并邀请候选人进行详细的自我介绍。";
         
         if (resumeContext) {
             instructions += `\n\n候选人简历信息：\n${resumeContext}\n\n请根据简历内容进行针对性的面试提问。`;
@@ -933,10 +933,10 @@ class VoiceCallManager {
         
         try {
             // 触发面试评分（在关闭连接之前）
-            if (this.azureVoiceChat && this.azureVoiceChat.isInterviewActive) {
-                this.logMessage('触发面试评分...');
-                await this.azureVoiceChat.endInterviewRecording();
-            }
+            // if (this.azureVoiceChat && this.azureVoiceChat.isInterviewActive) {
+            //     this.logMessage('触发面试评分...');
+            //     await this.azureVoiceChat.endInterviewRecording();
+            // }
             
             // 关闭数据通道
             if (this.dataChannel) {
@@ -970,25 +970,9 @@ class VoiceCallManager {
             
             this.logMessage('语音通话已结束');
 
-            // // Retrieve session messages
-            // const sessionId = this.azureVoiceChat.currentSessionId;
-            // const messages = this.azureVoiceChat.getSessionMessages(sessionId);
-
-            // // Prepare interview data
-            // const interviewData = {
-            //     id: sessionId,
-            //     createdAt: new Date().toISOString(),
-            //     messages: messages,
-            //     duration: this.callDuration, // Example: duration of the call
-            //     // Add other relevant data
-            // };
-
-            // // Save the interview
-            // this.storageManager.saveInterview(interviewData);
-
             this.logMessage('Interview has been saved successfully.');
             // **在通话结束后统一保存面试记录**
-            this.saveCurrentInterview();
+            await this.saveCurrentInterview();
             // 清空当前面试历史，为下一次通话做准备
             this.currentInterviewMessages = [];
         } catch (error) {
@@ -1030,18 +1014,54 @@ class VoiceCallManager {
             }
         }
     }
-    saveCurrentInterview() {
+    async saveCurrentInterview() {
         // 只有当有对话内容时才保存
         if (this.currentInterviewMessages.length > 0) {
             const resumeData = this.storageManager.getCurrentResume();
-            const interviewRecord = {
+            if(!this.sessionId){
+                this.sessionId = this.azureVoiceChat.currentSessionId || resumeData.sessionId;
+            }
+            var interviewRecord = {
                 id: this.sessionId, // 使用 Azure 会话ID 作为面试记录的ID
                 createdAt: new Date().toISOString(),
-                duration: this.callTimer ? this.voiceTimer.textContent : 'N/A', // 从计时器获取时长
+                duration: Math.floor((Date.now() - this.azureVoiceChat.interviewStartTime) / 1000), // 从计时器获取时长
                 messages: this.currentInterviewMessages,
                 resumeFileName: resumeData ? resumeData.fileName : '无简历',
                 // 可以添加其他元数据，例如面试状态、AI模型等
             };
+            const resumeContext = await this.getResumeContext();
+            try {
+                const extractionRequest = {
+                    interview_id: interviewRecord.id,
+                    messages: interviewRecord.messages,
+                    resume_context: resumeContext || '',
+                };
+                console.log(extractionRequest);                
+                // 调用提取API
+                const response = await fetch('/api/interview/extract', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(extractionRequest)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('面试数据提取完成:', result);
+                    if (result.success) {
+                        interviewRecord.title = result.extraction.title;
+                        interviewRecord.summary = result.extraction.summary;
+                    } else {
+                        console.error('面试数据提取失败:', result.message);
+                    }
+                } else {
+                    console.error('面试数据提取失败:', response.status);
+                }
+            } catch (error) {
+                this.logMessage(`解析面试记录失败: ${error.message}`);
+            }
+
             this.logMessage(`面试记录 '${interviewRecord}' 已保存到本地存储。`);
             this.storageManager.saveInterview(interviewRecord);
             this.logMessage(`面试记录 '${interviewRecord.id}' 已保存到本地存储。`);

@@ -31,7 +31,7 @@ from docx import Document
 from openai import AsyncAzureOpenAI
 
 # 导入提示词配置
-from prompts import get_interviewer_prompt, get_voice_call_prompt, get_interview_evaluation_prompt
+from prompts import get_interviewer_prompt, get_voice_call_prompt, get_interview_evaluation_prompt, get_interview_extraction_prompt
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -57,6 +57,7 @@ app.add_middleware(
 # 挂载静态文件
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+        
 class InterviewEvaluationService:
     """面试评分服务"""
     
@@ -95,9 +96,6 @@ class InterviewEvaluationService:
             evaluation_prompt = get_interview_evaluation_prompt(
                 resume_context=resume_context,
                 conversation_history=conversation_analysis['formatted_conversation'],
-                duration=self._format_duration(duration),
-                question_count=conversation_analysis['question_count'],
-                answer_count=conversation_analysis['answer_count']
             )
             
             # 调用DeepSeek V3进行评估
@@ -124,6 +122,78 @@ class InterviewEvaluationService:
                 'total_score': 0,
                 'summary': '评估过程中出现错误，请稍后重试。'
             }
+        
+    def _parse_extraction_result(self, evaluation_text: str) -> dict:
+        """解析评估结果"""
+        try:
+            # 尝试从评估文本中提取结构化信息
+            response = json.loads(evaluation_text.split("```json\n")[-1].split("\n```")[0])
+
+            result = {
+                'success': True,
+                'title': response.get('title', ''),
+                'summary': response.get('summary', '')
+            }
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"评估结果解析失败: {e}")
+            return {
+                'success': True,
+                'title': '',
+                'summary': '解析过程中出现错误，请稍后重试。'
+            }
+
+    async def extract_interview(self, interview_data: dict) -> dict:
+        """
+        提取面试数据
+        
+        Args:
+            interview_data: 面试数据，包含对话历史、简历信息等
+        Returns:
+            dict: 评估结果
+        """
+        try:
+            logger.info(f"开始解析面试数据: ID={interview_data.get('id', 'unknown')}")
+            
+            # 提取面试信息
+            messages = interview_data.get('messages', [])
+            resume_context = interview_data.get('resume_context', '')
+            # duration = interview_data.get('duration', 0)
+            
+            # 分析对话内容
+            # conversation_analysis = self._analyze_conversation(messages)
+            
+            # 构建评估prompt
+            extraction_prompt = get_interview_extraction_prompt(
+                resume_context=resume_context,
+                conversation_history=str(messages),
+            )
+            
+            # 调用DeepSeek V3进行评估
+            extraction_result = await self._call_deepseek_evaluation(extraction_prompt)
+            
+            # 解析评估结果
+            parsed_result = self._parse_extraction_result(extraction_result)
+            
+            # 添加统计信息
+            parsed_result.update({
+                'evaluation_timestamp': datetime.now().isoformat(),
+                'model_used': self.DEEPSEEK_MODEL
+            })
+            
+            logger.info(f"面试数据解析完成: {parsed_result}")
+            return parsed_result
+            
+        except Exception as e:
+            logger.error(f"面试数据解析失败: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'summary': '解析过程中出现错误，请稍后重试。'
+            }
+            
     
     def _analyze_conversation(self, messages: list) -> dict:
         """分析对话内容"""
@@ -173,6 +243,42 @@ class InterviewEvaluationService:
             minutes = (duration_seconds % 3600) // 60
             return f"{hours}小时{minutes}分钟"
     
+    async def _call_deepseek_with_messages(self, messages: list) -> str:
+        """调用DeepSeek V3进行评估"""
+        try:
+            headers = {
+                'Authorization': f'Bearer {self.DEEPSEEK_API_KEY}',
+                'Content-Type': 'application/json'
+            }
+            payload = {
+                'model': self.DEEPSEEK_MODEL,
+                'messages': messages,
+                'temperature': 0.3,  # 较低的温度确保评估的一致性
+                'max_tokens': 2000,
+                'top_p': 0.9
+            }
+            
+            response = await self.http_client.post(
+                f"{self.DEEPSEEK_API_URL}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=30.0
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                return result['choices'][0]['message']['content']
+            else:
+                logger.error(f"DeepSeek API调用失败: {response.status_code}, {response.text}")
+                raise Exception(f"API调用失败: {response.status_code}")
+            
+        except Exception as e:
+            logger.error(f"DeepSeek API调用失败: {e}")
+            import traceback
+            print(traceback.format_exc())
+            raise Exception(f"评估服务暂时不可用: {str(e)}")
+    
+
     async def _call_deepseek_evaluation(self, prompt: str) -> str:
         """调用DeepSeek V3进行评估"""
         try:
@@ -939,6 +1045,53 @@ async def save_evaluation_to_interview(interview_id: str, evaluation_result: dic
     except Exception as e:
         logger.error(f"保存评估结果失败: {e}")
         return False
+    
+async def save_extraction_to_interview(interview_id: str, extraction_result: dict) -> bool:
+    """
+    保存面试数据提取结果
+    """
+    try:
+        logger.info(f"保存面试数据提取结果: ID={interview_id}")
+        return True
+    except Exception as e:
+        logger.error(f"保存面试数据提取结果失败: {e}")
+        return False
+
+class InterviewExtractionRequest(BaseModel):
+    interview_id: str
+    messages: list
+    resume_context: str = ""
+
+@app.post("/api/interview/extract")
+async def save_interview_extract_data(request: InterviewExtractionRequest) -> JSONResponse:
+    """
+    保存面试数据提取结果
+    """
+    try:
+        logger.info(f"保存面试数据提取结果: ID={request.interview_id}")
+        
+        # 构建面试数据
+        interview_data = {
+            'id': request.interview_id,
+            'resume_context': request.resume_context,
+            'messages': request.messages
+        }
+        
+        # 调用提取服务
+        extraction_result = await evaluation_service.extract_interview(interview_data)
+        
+        # 保存提取结果
+        await save_extraction_to_interview(request.interview_id, extraction_result)
+        
+        return JSONResponse(content={
+            "success": True,
+            "extraction": extraction_result,
+            "message": "面试数据提取完成"
+        })
+    except Exception as e:
+        logger.error(f"保存面试数据提取结果失败: {e}")
+        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
+
 
 @app.get("/api/resume/{session_id}")
 async def get_resume_content(session_id: str) -> JSONResponse:
@@ -1154,6 +1307,7 @@ class InterviewEvaluationRequest(BaseModel):
     resumeText: Optional[str]
     interviewId: Optional[str]
 
+
 @app.post("/api/evaluate-interview", response_model=dict)
 async def evaluate_interview(request_body: InterviewEvaluationRequest):
     """
@@ -1182,29 +1336,30 @@ async def evaluate_interview(request_body: InterviewEvaluationRequest):
         if resume_text:
             messages_for_llm.append({"role": "user", "content": f"候选人提供的简历信息，请在评估时参考：\n```\n{resume_text}\n```"})
 
-
         # 将面试对话消息添加到 messages 数组
         # 过滤掉前端可能传递过来的原始系统指令，因为我们在这里构造了自己的评估系统指令
-        logger.info(interview_messages)
         filtered_messages = json.dumps(interview_messages)
         messages_for_llm.append({"role": "user", "content": f"以下是候选人（user）和面试官（assistant）的对话记录，请评估： \n```\n{filtered_messages}\n```"})
+
         # 调用 OpenAI API
-        from openai import AzureOpenAI
-        client = AzureOpenAI(
-            api_key=os.getenv("AZURE_OPENAI_API_KEY_FOR_EVALUATION"),
-            api_version=os.getenv("AZURE_API_VERSION_FOR_EVALUATION"),
-            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT_FOR_EVALUATION")
-        )
+        # from openai import AzureOpenAI
+        # client = AzureOpenAI(
+        #     api_key=os.getenv("AZURE_OPENAI_API_KEY_FOR_EVALUATION"),
+        #     api_version=os.getenv("AZURE_API_VERSION_FOR_EVALUATION"),
+        #     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT_FOR_EVALUATION")
+        # )
 
-        chat_completion = client.chat.completions.create(
-            model=os.getenv("AZURE_DEPLOYMENT_FOR_EVALUATION"),
-            messages=messages_for_llm,
-            temperature=0.7,
-            max_tokens=1500, # 确保有足够空间生成详细评估
-        )
+        # chat_completion = client.chat.completions.create(
+        #     model=os.getenv("AZURE_DEPLOYMENT_FOR_EVALUATION"),
+        #     messages=messages_for_llm,
+        #     temperature=0.7,
+        #     max_tokens=1500, # 确保有足够空间生成详细评估
+        # )
 
-        evaluation_markdown = chat_completion.choices[0].message.content
-        logger.info("evaluation markdown: ", evaluation_markdown)
+        # evaluation_markdown = chat_completion.choices[0].message.content
+        logger.info(messages_for_llm)
+        evaluation_markdown = await evaluation_service._call_deepseek_with_messages(messages_for_llm)
+        logger.info(f"evaluation markdown: {evaluation_markdown}")
         return JSONResponse(content={'evaluationMarkdown': evaluation_markdown})
 
     except Exception as e:

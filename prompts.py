@@ -523,3 +523,30 @@ def get_quick_evaluation_prompt(conversation_snippet):
     return InterviewEvaluationPrompts.QUICK_EVALUATION_PROMPT.format(
         conversation_snippet=conversation_snippet
     ) 
+
+def get_interview_extraction_prompt(resume_context=None, conversation_history=None):
+    """
+    获取面试数据提取提示词
+    
+    Args:
+        resume_context: 简历上下文
+        conversation_history: 对话历史
+    
+    Returns:
+        str: 完整的面试数据提取提示词
+    """
+    system_prompt = """
+    请分析以下对话，提取面试数据，并返回json格式数据，返回要求如下：
+    ```json
+    {{
+        "summary": "总结此次面试内容，如：这是一场技术面试，面试官主要考察了候选人的技术能力、沟通能力、逻辑思维能力等。",
+        "title": "请为本场面试取一个简洁的标题，如：xxx（面试者姓名）的xxx（岗位名称）面试",
+    }}
+    ```
+    """
+    
+    extraction_content = f"""
+    简历信息：{resume_context}
+    对话历史：{conversation_history}
+    """
+    return f"{system_prompt}\n\n{extraction_content}"
