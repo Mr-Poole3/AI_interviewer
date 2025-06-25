@@ -1004,7 +1004,7 @@ body {
     box-shadow: var(--shadow-md);
 }
 
-.filter-group {
+/* .filter-group {
     display: flex;
     align-items: center;
     gap: var(--spacing-md);
@@ -1017,7 +1017,60 @@ body {
     font-weight: 600;
     color: var(--text-primary);
     font-size: 0.875rem;
+} */
+
+/* --- Focused Additions for the Search Input Field --- */
+
+/* Ensure filter-group stacks label and input for the search field */
+.filter-group {
+    /* If your existing .filter-group is `display: flex; align-items: center; gap: var(--spacing-md);`,
+       you'll need to make a specific exception for the search input's group, or generalize it.
+       Assuming you want labels above inputs for ALL filter groups for consistency,
+       you can add/modify the base .filter-group: */
+    display: flex;
+    flex-direction: column; /* Stacks label and input/select vertically */
+    align-items: flex-start; /* Aligns label and input to the left */
+    gap: var(--spacing-xs); /* Reduced gap between label and input for closer association */
+    /* Remove min-width or flex-grow if you want the panel's existing layout to strictly control size.
+       If your original .filter-group didn't have flex-direction: column, adding it here will change
+       how ALL .filter-group elements behave. */
 }
+
+/* Add a small bottom margin to the label to separate it from the input */
+.filter-label {
+    margin-bottom: var(--spacing-xs);
+    /* Retain all other existing filter-label properties */
+}
+
+
+/* New and improved styling for the Search Input (id="searchHistoryInput" via class="filter-input") */
+.filter-input {
+    width: 100%; /* Make the input take full width of its container */
+    padding: var(--spacing-sm) var(--spacing-md); /* Consistent padding with filter-select */
+    border: 1px solid var(--border-medium); /* Consistent border */
+    border-radius: var(--radius-md); /* Consistent border-radius */
+    background: var(--bg-primary); /* Consistent background */
+    color: var(--text-primary); /* Consistent text color */
+    font-size: 0.875rem; /* Consistent font size */
+    transition: all var(--transition-fast); /* Consistent transition for hover/focus effects */
+    -webkit-appearance: none; /* Remove default browser styling */
+    -moz-appearance: none; /* Remove default browser styling */
+    appearance: none; /* Remove default browser styling */
+}
+
+/* Placeholder text styling */
+.filter-input::placeholder {
+    color: var(--text-secondary); /* Use secondary text color for placeholder */
+    opacity: 0.7; /* Make placeholder slightly faded */
+}
+
+/* Focus state for the input field */
+.filter-input:focus {
+    outline: none; /* Remove default browser outline */
+    border-color: var(--primary-color); /* Highlight border with primary color on focus */
+    box-shadow: 0 0 0 3px var(--primary-light); /* Add a subtle glow on focus */
+}
+
 
 .filter-select {
     padding: var(--spacing-sm) var(--spacing-md);

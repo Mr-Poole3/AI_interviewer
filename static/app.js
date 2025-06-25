@@ -1198,6 +1198,7 @@ class HistoryManager {
         this.historyList = null;
         this.emptyHistory = null;
         this.sortBy = null;
+        this.searchHistoryInput = null; 
 
         // 获取模态窗口元素
         this.evaluationModal = null;
@@ -1213,7 +1214,8 @@ class HistoryManager {
         this.historyList = document.getElementById('historyList');
         this.emptyHistory = document.getElementById('emptyHistory');
         this.sortBy = document.getElementById('sortBy');
-        
+        this.searchHistoryInput = document.getElementById('searchHistoryInput'); 
+
         this.evaluationModal = document.getElementById('evaluationModal');
         this.modalEvaluationContent = document.getElementById('modalEvaluationContent');
         this.modalLoadingSpinner = this.modalEvaluationContent?.querySelector('.loading-spinner');
@@ -1221,6 +1223,7 @@ class HistoryManager {
         this.modalCloseButton = this.evaluationModal?.querySelector('.close-button');
         
         this.bindHistoryEvents();
+        this.bindSearchEvents(); 
         this.bindModalEvents();
         this.refreshHistoryList();
     }
@@ -1250,7 +1253,7 @@ class HistoryManager {
         }
     }
 
-    // 新增方法：绑定模态窗口的关闭事件
+    // 绑定模态窗口的关闭事件
     bindModalEvents() {
         if (this.evaluationModal && this.modalCloseButton) {
             // 点击关闭按钮时关闭模态窗口
@@ -1277,25 +1280,104 @@ class HistoryManager {
             console.warn("模态窗口或关闭按钮元素未找到，无法绑定关闭事件。请检查HTML结构和ID/类名。");
         }
     }
+
+    bindSearchEvents() {
+        if (this.searchHistoryInput) {
+            this.searchHistoryInput.addEventListener('input', () => {
+                this.refreshHistoryList(); // Re-render the list on every input
+            });
+        }
+    }
     
     refreshHistoryList() {
         const interviews = this.storageManager.getInterviews();
-        
-        if (interviews.length === 0) {
-            this.showEmptyState();
+
+        // NEW: Filter interviews first
+        const filteredInterviews = this.filterInterviews(interviews);
+        // Then sort the filtered interviews
+        const sortedAndFilteredInterviews = this.sortInterviews(filteredInterviews);
+
+        if (sortedAndFilteredInterviews.length === 0) {
+            // Show different empty states based on whether a search query is active
+            if (this.searchHistoryInput && this.searchHistoryInput.value.trim() !== '') {
+                this.showEmptyState('没有找到匹配的面试记录。');
+            } else {
+                this.showEmptyState(); // Default empty state for no records at all
+            }
         } else {
-            this.showHistoryList(interviews);
+            this.showHistoryList(sortedAndFilteredInterviews);
+        }
+
+        // NEW: Update stats based on the currently displayed (filtered/sorted) interviews
+        this.updateStats(sortedAndFilteredInterviews);
+    }
+
+        // if (interviews.length === 0) {
+        //     this.showEmptyState();
+        // } else {
+        //     this.showHistoryList(interviews);
+        // }
+    // }
+
+    // NEW: Filter interviews based on search query
+    filterInterviews(interviews) {
+        const searchQuery = this.searchHistoryInput?.value.trim().toLowerCase() || '';
+        if (!searchQuery) {
+            return interviews; // If no search query, return all interviews
+        }
+
+        return interviews.filter(interview => {
+            const title = (interview.title || '').toLowerCase();
+            const summary = (interview.summary || '').toLowerCase();
+            return title.includes(searchQuery) || summary.includes(searchQuery);
+        });
+    }
+
+    // NEW: Update statistics display
+    updateStats(interviews) {
+        const totalInterviewsSpan = document.querySelector('.filter-stats .stat-item:nth-child(1) .stat-number');
+        const totalDurationSpan = document.querySelector('.filter-stats .stat-item:nth-child(2) .stat-number');
+
+        if (totalInterviewsSpan) {
+            totalInterviewsSpan.textContent = interviews.length;
+        }
+
+        if (totalDurationSpan) {
+            const totalSeconds = interviews.reduce((sum, interview) => sum + (interview.duration || 0), 0);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            totalDurationSpan.textContent = `${hours}h ${minutes}m`;
         }
     }
 
-    showEmptyState() {
+    // showEmptyState() {
+    //     if (this.emptyHistory) {
+    //         this.emptyHistory.style.display = 'block';
+    //     }
+    //     if (this.historyList) {
+    //         this.historyList.innerHTML = '';
+    //     }
+    // }
+
+    showEmptyState(message = '开始您的第一次AI语音面试，记录将自动保存在这里') {
         if (this.emptyHistory) {
             this.emptyHistory.style.display = 'block';
+            const emptyHistoryText = this.emptyHistory.querySelector('p');
+            if (emptyHistoryText) {
+                emptyHistoryText.textContent = message; // Set custom message
+            }
+            // Ensure the start button is visible in default empty state
+            const startButton = this.emptyHistory.querySelector('#startFirstInterviewBtn');
+            if (startButton) {
+                 startButton.style.display = (message === '开始您的第一次AI语音面试，记录将自动保存在这里') ? 'block' : 'none';
+            }
+
         }
         if (this.historyList) {
             this.historyList.innerHTML = '';
         }
     }
+
 
     showHistoryList(interviews) {
         if (this.emptyHistory) {
