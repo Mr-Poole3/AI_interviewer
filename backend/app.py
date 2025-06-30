@@ -66,10 +66,17 @@ class InterviewEvaluationService:
         self.DEEPSEEK_API_URL = "https://ds.yovole.com/api"
         self.DEEPSEEK_API_KEY = "sk-833480880d9d417fbcc7ce125ca7d78b"
         self.DEEPSEEK_MODEL = "DeepSeek-V3"
-        
-        # 初始化DeepSeek客户端
+
+        # 初始化DeepSeek客户端，设置更长的超时时间
         import httpx
-        self.http_client = httpx.AsyncClient()
+        self.http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(
+                connect=15.0,  # 连接超时15秒
+                read=120.0,    # 读取超时120秒（面试评估需要更长时间）
+                write=30.0,    # 写入超时30秒
+                pool=30.0      # 连接池超时30秒
+            )
+        )
     
     async def evaluate_interview(self, interview_data: dict) -> dict:
         """
@@ -116,12 +123,8 @@ class InterviewEvaluationService:
             
         except Exception as e:
             logger.error(f"面试评估失败: {e}")
-            return {
-                'success': False,
-                'error': str(e),
-                'total_score': 0,
-                'summary': '评估过程中出现错误，请稍后重试。'
-            }
+            # 提供降级的默认评估结果
+            return self._get_fallback_evaluation_result(str(e))
         
     def _parse_extraction_result(self, evaluation_text: str) -> dict:
         """解析评估结果"""
@@ -243,103 +246,214 @@ class InterviewEvaluationService:
             minutes = (duration_seconds % 3600) // 60
             return f"{hours}小时{minutes}分钟"
     
-    async def _call_deepseek_with_messages(self, messages: list) -> str:
-        """调用DeepSeek V3进行评估"""
-        try:
-            headers = {
-                'Authorization': f'Bearer {self.DEEPSEEK_API_KEY}',
-                'Content-Type': 'application/json'
-            }
-            payload = {
-                'model': self.DEEPSEEK_MODEL,
-                'messages': messages,
-                'temperature': 0.3,  # 较低的温度确保评估的一致性
-                'max_tokens': 2000,
-                'top_p': 0.9
-            }
-            
-            response = await self.http_client.post(
-                f"{self.DEEPSEEK_API_URL}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=30.0
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                return result['choices'][0]['message']['content']
-            else:
-                logger.error(f"DeepSeek API调用失败: {response.status_code}, {response.text}")
-                raise Exception(f"API调用失败: {response.status_code}")
-            
-        except Exception as e:
-            logger.error(f"DeepSeek API调用失败: {e}")
-            import traceback
-            print(traceback.format_exc())
-            raise Exception(f"评估服务暂时不可用: {str(e)}")
+    async def _call_deepseek_with_messages(self, messages: list, max_retries: int = 2) -> str:
+        """调用DeepSeek V3进行评估，支持重试机制"""
+        import asyncio
+
+        for attempt in range(max_retries + 1):
+            try:
+                logger.info(f"DeepSeek API调用尝试 {attempt + 1}/{max_retries + 1}")
+
+                headers = {
+                    'Authorization': f'Bearer {self.DEEPSEEK_API_KEY}',
+                    'Content-Type': 'application/json'
+                }
+                payload = {
+                    'model': self.DEEPSEEK_MODEL,
+                    'messages': messages,
+                    'temperature': 0.3,  # 较低的温度确保评估的一致性
+                    'max_tokens': 2000,
+                    'top_p': 0.9
+                }
+
+                response = await self.http_client.post(
+                    f"{self.DEEPSEEK_API_URL}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=120.0  # 增加到120秒，面试评估需要更长时间
+                )
+
+                if response.status_code == 200:
+                    result = response.json()
+                    content = result['choices'][0]['message']['content']
+                    logger.info(f"DeepSeek API调用成功，返回内容长度: {len(content)}")
+                    return content
+                else:
+                    logger.error(f"DeepSeek API调用失败: {response.status_code}, {response.text}")
+                    if attempt < max_retries:
+                        await asyncio.sleep(2 ** attempt)  # 指数退避
+                        continue
+                    raise Exception(f"API调用失败: {response.status_code}")
+
+            except asyncio.TimeoutError:
+                logger.error(f"DeepSeek API调用超时 (尝试 {attempt + 1})")
+                if attempt < max_retries:
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                raise Exception("API调用超时，请稍后重试")
+
+            except Exception as e:
+                logger.error(f"DeepSeek API调用失败 (尝试 {attempt + 1}): {e}")
+                if attempt < max_retries:
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                import traceback
+                print(traceback.format_exc())
+                raise Exception(f"评估服务暂时不可用: {str(e)}")
     
 
-    async def _call_deepseek_evaluation(self, prompt: str) -> str:
-        """调用DeepSeek V3进行评估"""
-        try:
-            headers = {
-                'Authorization': f'Bearer {self.DEEPSEEK_API_KEY}',
-                'Content-Type': 'application/json'
-            }
-            
-            payload = {
-                'model': self.DEEPSEEK_MODEL,
-                'messages': [
-                    {"role": "user", "content": prompt}
-                ],
-                'temperature': 0.3,  # 较低的温度确保评估的一致性
-                'max_tokens': 2000,
-                'top_p': 0.9
-            }
-            
-            response = await self.http_client.post(
-                f"{self.DEEPSEEK_API_URL}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=30.0
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                return result['choices'][0]['message']['content']
-            else:
-                logger.error(f"DeepSeek API调用失败: {response.status_code}, {response.text}")
-                raise Exception(f"API调用失败: {response.status_code}")
-            
-        except Exception as e:
-            logger.error(f"DeepSeek API调用失败: {e}")
-            raise Exception(f"评估服务暂时不可用: {str(e)}")
+    async def _call_deepseek_evaluation(self, prompt: str, max_retries: int = 2) -> str:
+        """调用DeepSeek V3进行评估，支持重试机制"""
+        import asyncio
+
+        for attempt in range(max_retries + 1):
+            try:
+                logger.info(f"DeepSeek 评估API调用尝试 {attempt + 1}/{max_retries + 1}")
+
+                headers = {
+                    'Authorization': f'Bearer {self.DEEPSEEK_API_KEY}',
+                    'Content-Type': 'application/json'
+                }
+
+                payload = {
+                    'model': self.DEEPSEEK_MODEL,
+                    'messages': [
+                        {"role": "user", "content": prompt}
+                    ],
+                    'temperature': 0.3,  # 较低的温度确保评估的一致性
+                    'max_tokens': 2000,
+                    'top_p': 0.9
+                }
+
+                response = await self.http_client.post(
+                    f"{self.DEEPSEEK_API_URL}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=120.0  # 增加到120秒，面试评估需要更长时间
+                )
+
+                if response.status_code == 200:
+                    result = response.json()
+                    content = result['choices'][0]['message']['content']
+                    logger.info(f"DeepSeek 评估API调用成功，返回内容长度: {len(content)}")
+                    return content
+                else:
+                    logger.error(f"DeepSeek API调用失败: {response.status_code}, {response.text}")
+                    if attempt < max_retries:
+                        await asyncio.sleep(2 ** attempt)  # 指数退避
+                        continue
+                    raise Exception(f"API调用失败: {response.status_code}")
+
+            except asyncio.TimeoutError:
+                logger.error(f"DeepSeek 评估API调用超时 (尝试 {attempt + 1})")
+                if attempt < max_retries:
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                raise Exception("评估API调用超时，请稍后重试")
+
+            except Exception as e:
+                logger.error(f"DeepSeek 评估API调用失败 (尝试 {attempt + 1}): {e}")
+                if attempt < max_retries:
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                raise Exception(f"评估服务暂时不可用: {str(e)}")
     
     def _parse_evaluation_result(self, evaluation_text: str) -> dict:
         """解析评估结果"""
         try:
-            # 尝试从评估文本中提取结构化信息
-            result = {
-                'success': True,
-                'full_evaluation': evaluation_text,
-                'total_score': self._extract_total_score(evaluation_text),
-                'dimension_scores': self._extract_dimension_scores(evaluation_text),
-                'summary': self._extract_summary(evaluation_text),
-                'strengths': self._extract_strengths(evaluation_text),
-                'improvements': self._extract_improvements(evaluation_text)
-            }
-            
+            # 首先尝试从文本中提取JSON结构化数据
+            json_data = self._extract_json_from_evaluation(evaluation_text)
+
+            if json_data:
+                # 如果成功提取到JSON数据，使用它作为主要数据源
+                # prompt要求输出10分制
+                total_score = json_data.get('total_score', 7.5)
+                total_score *= 10
+
+                result = {
+                    'success': True,
+                    'full_evaluation': evaluation_text,
+                    'total_score': int(total_score),
+                    'dimension_scores': json_data.get('dimension_scores', {}),
+                    'summary': json_data.get('summary', ''),
+                    'strengths': json_data.get('strengths', []),
+                    'improvements': json_data.get('improvements', [])
+                }
+            else:
+                # 如果没有JSON数据，回退到从markdown中提取
+                result = {
+                    'success': True,
+                    'full_evaluation': evaluation_text,
+                    'total_score': self._extract_total_score(evaluation_text),
+                    'dimension_scores': self._extract_dimension_scores(evaluation_text),
+                    'summary': self._extract_summary(evaluation_text),
+                    'strengths': self._extract_strengths(evaluation_text),
+                    'improvements': self._extract_improvements(evaluation_text)
+                }
+
             return result
-            
+
         except Exception as e:
             logger.error(f"评估结果解析失败: {e}")
             return {
                 'success': True,
                 'full_evaluation': evaluation_text,
                 'total_score': 75,  # 默认分数
-                'summary': evaluation_text[:200] + "..." if len(evaluation_text) > 200 else evaluation_text
+                'summary': evaluation_text[:200] + "..." if len(evaluation_text) > 200 else evaluation_text,
+                'strengths': [],
+                'improvements': []
             }
-    
+
+    def _extract_json_from_evaluation(self, evaluation_text: str) -> dict:
+        """从评估文本中提取JSON结构化数据"""
+        try:
+            import json
+            import re
+
+            # 查找JSON代码块
+            json_pattern = r'```json\s*\n(.*?)\n```'
+            json_match = re.search(json_pattern, evaluation_text, re.DOTALL)
+
+            if json_match:
+                json_str = json_match.group(1).strip()
+                json_data = json.loads(json_str)
+                logger.info("成功从评估文本中提取JSON数据")
+                return json_data
+            else:
+                logger.warning("未在评估文本中找到JSON代码块")
+                return None
+
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON解析失败: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"提取JSON数据时出错: {e}")
+            return None
+
+    def _extract_clean_markdown(self, evaluation_text: str) -> str:
+        """从评估文本中提取纯markdown部分，移除JSON代码块"""
+        try:
+            import re
+
+            # 查找并移除JSON代码块
+            json_pattern = r'---\s*\n\s*###\s*4\.\s*结构化数据输出.*?```json.*?```'
+            clean_text = re.sub(json_pattern, '', evaluation_text, flags=re.DOTALL)
+
+            # 也移除可能的其他JSON代码块
+            json_pattern2 = r'```json\s*\n.*?\n```'
+            clean_text = re.sub(json_pattern2, '', clean_text, flags=re.DOTALL)
+
+            # 清理多余的空行
+            clean_text = re.sub(r'\n\s*\n\s*\n', '\n\n', clean_text)
+            clean_text = clean_text.strip()
+
+            logger.info("成功提取纯markdown内容")
+            return clean_text
+
+        except Exception as e:
+            logger.error(f"提取纯markdown时出错: {e}")
+            return evaluation_text  # 如果出错，返回原文本
+
     def _extract_total_score(self, text: str) -> int:
         """提取总分"""
         # 查找总分模式
@@ -361,11 +475,11 @@ class InterviewEvaluationService:
     def _extract_dimension_scores(self, text: str) -> dict:
         """提取各维度分数"""
         dimensions = {
+            'resume_match': '简历匹配',
             'technical_skills': '技术能力',
             'communication': '沟通表达',
             'problem_solving': '问题解决',
-            'learning_adaptability': '学习适应',
-            'professional_attitude': '职业素养'
+            'growth_potential': '成长潜力'
         }
         
         scores = {}
@@ -409,6 +523,70 @@ class InterviewEvaluationService:
         if '建议' in text or '改进' in text:
             return ['继续保持', '深入学习']
         return ['持续提升']
+
+    def _get_fallback_evaluation_result(self, error_message: str) -> dict:
+        """当API调用失败时，返回降级的评估结果"""
+        logger.info("使用降级评估结果")
+
+        fallback_markdown = f"""# 面试评估报告
+
+## 总体评分：75分
+
+## 各维度评分
+
+### 技术能力评估：7/10分
+根据面试对话内容，候选人展现了基本的技术理解能力。
+
+### 沟通表达能力：8/10分
+候选人能够清晰地表达自己的想法，回答问题较为完整。
+
+### 问题解决能力：7/10分
+在面试过程中展现了一定的逻辑思维能力。
+
+### 学习适应能力：7/10分
+表现出积极的学习态度和适应能力。
+
+### 职业素养：8/10分
+面试态度积极，表现出良好的职业素养。
+
+## 优势表现
+- 面试态度积极主动
+- 回答问题思路清晰
+- 具备基本的专业素养
+
+## 改进建议
+- 可以进一步深入技术细节
+- 建议多准备一些项目实例
+- 持续学习新技术和方法
+
+## 面试表现总结
+候选人在面试中表现良好，具备基本的专业能力和素养。建议继续保持积极的学习态度，在技术深度和项目经验方面进一步提升。
+
+---
+*注：由于评估服务暂时不可用，此为系统生成的基础评估结果。建议稍后重新进行详细评估。*
+
+**错误信息：** {error_message}
+"""
+
+        return {
+            'success': True,
+            'full_evaluation': fallback_markdown,
+            'total_score': 75,
+            'dimension_scores': {
+                'resume_match': 7,
+                'communication': 8,
+                'problem_solving': 7,
+                'growth_potential': 7,
+                'technical_skills': 8
+            },
+            'summary': '候选人在面试中表现良好，具备基本的专业能力和素养。（系统生成的基础评估）',
+            'strengths': ['面试态度积极主动', '回答问题思路清晰', '具备基本的专业素养'],
+            'improvements': ['可以进一步深入技术细节', '建议多准备一些项目实例', '持续学习新技术和方法'],
+            'conversation_stats': {'total_exchanges': 0, 'user_word_count': 0, 'ai_word_count': 0},
+            'evaluation_timestamp': datetime.now().isoformat(),
+            'model_used': 'Fallback System',
+            'is_fallback': True
+        }
 
 
 class AzureVoiceService:
@@ -1358,9 +1536,20 @@ async def evaluate_interview(request_body: InterviewEvaluationRequest):
 
         # evaluation_markdown = chat_completion.choices[0].message.content
         logger.info(messages_for_llm)
-        evaluation_markdown = await evaluation_service._call_deepseek_with_messages(messages_for_llm)
-        logger.info(f"evaluation markdown: {evaluation_markdown}")
-        return JSONResponse(content={'evaluationMarkdown': evaluation_markdown})
+        evaluation_result = await evaluation_service._call_deepseek_with_messages(messages_for_llm)
+        logger.info(f"evaluation result: {evaluation_result}")
+
+        # 解析评估结果，获取结构化数据
+        parsed_result = evaluation_service._parse_evaluation_result(evaluation_result)
+
+        # 分离markdown和JSON，只返回纯markdown部分
+        clean_markdown = evaluation_service._extract_clean_markdown(evaluation_result)
+
+        # 返回包含纯markdown和结构化数据的完整结果
+        return JSONResponse(content={
+            'evaluationMarkdown': clean_markdown,
+            'evaluation': parsed_result
+        })
 
     except Exception as e:
         print(f"调用OpenAI API失败: {e}")

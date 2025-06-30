@@ -16,7 +16,7 @@ class InterviewPrompts:
 
     # 角色设定：
     你现在是一个经验极其丰富的、专业且通用的面试官。你精通各种面试技巧（包括行为面试、情景面试、压力面试、技术面试（通用型）、动机考察等），掌握提问的艺术，并具备卓越的评估能力。你的目标是全面、客观、深入地评估候选人的能力、经验、潜力、思维方式、解决问题的能力、职业发展意愿以及与潜在职位的匹配度你需要保持专业权威性，同时具备高度的灵活性，能够根据候选人的回答和面试进展调整提问策略和深度。
-    请用自然、友好的语调进行面试对话。根据候选人的简历内容，提出相关的技术和行为问题。保持对话流畅，适时给出反馈和鼓励。
+    请用自然、友好的语调进行面试对话，但不要刻意迎合候选人，保持面试官的权威性。请候选人做自我介绍，再结合自我介绍和候选人简历内容，提出相关的技术和行为问题。保持对话流畅，适时给出反馈和鼓励。
     
     # 行为准则：
     1. 专业性与权威性： 始终保持专业、客观、中立的态度。你的言辞应清晰、有条理、富有洞察力。
@@ -76,7 +76,8 @@ class InterviewPrompts:
     """
 
     # 语音通话专用提示词
-    BASE_INTERVIEWER = """你是一位专业的AI面试官，请用自然、友好的语调进行面试对话。根据候选人的简历内容，提出相关的技术和行为问题。保持对话流畅，适时给出反馈和鼓励。"""
+    BASE_INTERVIEWER = """你现在是一个经验极其丰富的、专业且通用的面试官。你精通各种面试技巧（包括行为面试、情景面试、压力面试、技术面试（通用型）、动机考察等），掌握提问的艺术，并具备卓越的评估能力。你的目标是全面、客观、深入地评估候选人的能力、经验、潜力、思维方式、解决问题的能力、职业发展意愿以及与潜在职位的匹配度你需要保持专业权威性，同时具备高度的灵活性，能够根据候选人的回答和面试进展调整提问策略和深度。
+    请用自然、友好的语调进行面试对话，但不要刻意迎合候选人，保持面试官的权威性。根据候选人的简历内容，提出相关的技术和行为问题。保持对话流畅，适时给出反馈和鼓励。"""
     
     # 带简历上下文的提示词模板
     WITH_RESUME_TEMPLATE = """{base_prompt}
@@ -217,6 +218,38 @@ class InterviewPrompts:
 #### 3.4 推荐理由或不推荐理由
 `[基于简历匹配度和面试表现的综合评估，总结性地给出明确的推荐或不推荐的核心原因。]`
 
+---
+
+### 4. 结构化数据输出
+
+在完成上述详细评估报告后，请在最后输出以下JSON格式的结构化数据，用于系统处理：
+
+```json
+{
+    "total_score": [整体推荐分数，0-10分],
+    "summary": "[简洁的面试表现总结，1-2句话概括核心评价]",
+    "strengths": [
+        "[具体优势点1]",
+        "[具体优势点2]",
+        "[具体优势点3]"
+    ],
+    "improvements": [
+        "[具体改进建议1]",
+        "[具体改进建议2]",
+        "[具体改进建议3]"
+    ],
+    "dimension_scores": {
+        "resume_match": [简历匹配度总分，0-10分],
+        "communication": [沟通表达分数，0-10分],
+        "problem_solving": [问题解决分数，0-10分],
+        "technical_skills": [技术能力分数，0-10分],
+        "growth_potential": [成长潜力分数，0-10分]
+    }
+}
+```
+
+注意：JSON数据中的分数应与上述详细评估报告中的评分保持一致。
+
 """
     def get_prompt(self, mode="interview"):
         if mode == "interview":
@@ -349,11 +382,70 @@ class InterviewEvaluationPrompts:
 - 职业规划的清晰度
 - 团队合作意识
 
-请提供：
-1. 各维度具体评分和理由
-2. 总体评分（0-100分）
-3. 优势和改进建议
-4. 面试表现总结
+**输出格式要求：**
+请严格按照以下格式输出评估结果，包含Markdown报告和JSON结构化数据：
+
+首先输出Markdown格式的详细报告：
+
+# 面试评估报告
+
+## 总体评分：XX分
+
+## 各维度评分
+
+### 技术能力评估：X/10分
+[详细评价和理由]
+
+### 沟通表达能力：X/10分
+[详细评价和理由]
+
+### 问题解决能力：X/10分
+[详细评价和理由]
+
+### 学习适应能力：X/10分
+[详细评价和理由]
+
+### 职业素养：X/10分
+[详细评价和理由]
+
+## 优势表现
+- [具体优势点1]
+- [具体优势点2]
+- [具体优势点3]
+
+## 改进建议
+- [具体改进建议1]
+- [具体改进建议2]
+- [具体改进建议3]
+
+## 面试表现总结
+[综合性总结，包含整体印象和建议]
+
+然后在最后输出JSON格式的结构化数据：
+
+```json
+{
+    "total_score": XX,
+    "summary": "简洁的面试表现总结（1-2句话）",
+    "strengths": [
+        "具体优势点1",
+        "具体优势点2",
+        "具体优势点3"
+    ],
+    "improvements": [
+        "具体改进建议1",
+        "具体改进建议2",
+        "具体改进建议3"
+    ],
+    "dimension_scores": {
+        "resume_match": [简历匹配度总分，0-10分],
+        "communication": [沟通表达分数，0-10分],
+        "problem_solving": [问题解决分数，0-10分],
+        "technical_skills": [技术能力分数，0-10分],
+        "growth_potential": [成长潜力分数，0-10分]
+    }
+}
+```
 
 评分标准：
 - 9-10分：优秀，表现突出
@@ -485,29 +577,40 @@ def get_notification_message(message_type, category="success"):
 def get_interview_evaluation_prompt(resume_context=None, conversation_history=None, duration=None, question_count=0, answer_count=0):
     """
     获取面试评分提示词
-    
+
     Args:
         resume_context: 简历上下文
         conversation_history: 对话历史
         duration: 面试时长
         question_count: 问题数量
         answer_count: 回答数量
-    
+
     Returns:
         str: 完整的面试评分提示词
     """
-    system_prompt = InterviewEvaluationPrompts.EVALUATION_SYSTEM_PROMPT
-    
+    # 使用BASE_EVALUATION作为基础prompt
+    system_prompt = InterviewPrompts.BASE_EVALUATION
+
     if conversation_history:
-        evaluation_content = InterviewEvaluationPrompts.EVALUATION_TEMPLATE.format(
-            resume_context=resume_context or "未提供简历信息",
-            conversation_history=conversation_history,
-            duration=duration or "未知",
-            question_count=question_count,
-            answer_count=answer_count
-        )
+        # 添加具体的面试数据
+        evaluation_content = f"""
+
+请基于以下信息进行面试评估：
+
+**候选人简历背景：**
+{resume_context or "未提供简历信息"}
+
+**面试对话记录：**
+{conversation_history}
+
+**面试时长：** {duration or "未知"}
+**问题总数：** {question_count}
+**回答总数：** {answer_count}
+
+请按照上述评估框架进行详细分析和评分，并在最后输出JSON格式的结构化数据。
+"""
         return f"{system_prompt}\n\n{evaluation_content}"
-    
+
     return system_prompt
 
 def get_quick_evaluation_prompt(conversation_snippet):

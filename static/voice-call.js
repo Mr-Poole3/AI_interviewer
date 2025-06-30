@@ -511,6 +511,8 @@ class VoiceCallManager {
             this.logMessage('数据通道已打开');
             this.isConnected = true;
             await this.updateSessionInstructions();
+            this.logMessage('数据通道打开，尝试触发AI首次发言...');
+            await this.triggerAIInitialResponse();
         });
 
         this.dataChannel.addEventListener('message', (event) => {
@@ -530,7 +532,46 @@ class VoiceCallManager {
             }
         });
     }
+
+    async triggerAIInitialResponse() {
+        if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+            this.logMessage('数据通道未打开或未就绪，无法触发AI首次回复。');
+            return;
+        }
     
+        this.logMessage('发送初始对话项以触发AI响应...');
+    
+ 
+        const initialUserPromptEvent = {
+            type: "conversation.item.create",
+            item: {
+                type: "message",
+                role: "user", // 模拟用户角色，让AI知道这是一个需要它回应的输入
+                content: [{
+                    type: "input_text",
+                    text: "请开始面试。" 
+                }]
+            }
+        };
+    
+        try {
+            this.dataChannel.send(JSON.stringify(initialUserPromptEvent));
+            this.logMessage('已发送 conversation.item.create (模拟用户开始) 事件。');
+    
+            await new Promise(resolve => setTimeout(resolve, 100)); // 100ms 延时
+    
+            const triggerResponseEvent = {
+                type: "response.create",
+            };
+            this.dataChannel.send(JSON.stringify(triggerResponseEvent));
+            this.logMessage('已发送 response.create 事件以触发AI回复。');
+    
+        } catch (error) {
+            this.logMessage(`发送初始AI触发事件失败: ${error.message}`);
+            console.error("Failed to send initial AI trigger events:", error);
+        }
+    }
+
     /**
      * 处理实时事件
      */

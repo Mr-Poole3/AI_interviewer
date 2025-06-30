@@ -520,6 +520,32 @@
         </div>
     </div>
     <!-- JavaScript 文件 -->
+    <!-- 直接加载PDF库 - 使用不同的CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- 备用CDN -->
+    <script>
+        // 检查jsPDF是否加载成功，如果没有则尝试备用CDN
+        setTimeout(() => {
+            if (typeof window.jsPDF === 'undefined') {
+                console.log('主CDN失败，加载备用jsPDF...');
+                const script = document.createElement('script');
+                script.src = 'https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js';
+                script.onload = () => {
+                    console.log('备用jsPDF加载成功');
+                    if (window.pdfExporter) {
+                        window.pdfExporter.isLibrariesLoaded = window.pdfExporter.testLibraries();
+                    }
+                };
+                script.onerror = () => {
+                    console.error('备用jsPDF也加载失败');
+                };
+                document.head.appendChild(script);
+            }
+        }, 1000);
+    </script>
+    <!-- PDF导出模块 -->
+    <script src="/static/pdf-export.js"></script>
     <script src="/static/voice-call.js?v=2024010103"></script>
     <script src="/static/app.js?v=2024010103"></script>
 </body>

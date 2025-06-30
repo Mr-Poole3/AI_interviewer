@@ -1110,6 +1110,9 @@ class AzureVoiceChat {
                         <button class="btn btn-secondary" onclick="this.closest('.evaluation-result-modal').remove()">
                             关闭
                         </button>
+                        <button class="btn btn-outline" onclick="window.app.voiceChat.exportEvaluationToPDF(this.closest('.evaluation-result-modal'))">
+                            <i class="fas fa-file-pdf"></i> 导出PDF
+                        </button>
                         <button class="btn btn-primary" onclick="window.app.router.navigateTo('history')">
                             查看历史记录
                         </button>
@@ -1120,7 +1123,100 @@ class AzureVoiceChat {
         
         document.body.appendChild(resultDiv);
     }
-    
+
+    /**
+     * 导出评估结果为PDF
+     */
+    async exportEvaluationToPDF(modalElement) {
+        try {
+            // 检查PDF导出器是否可用
+            if (!window.pdfExporter) {
+                alert('PDF导出功能未初始化，请刷新页面重试。');
+                return;
+            }
+
+            // 测试PDF库状态
+            console.log('测试PDF库状态...');
+            const isReady = window.pdfExporter.testLibraries();
+
+            if (!isReady) {
+                // 尝试重新加载库
+                this.showNotification('正在加载PDF库', '请稍等片刻...', 'info');
+                try {
+                    await window.pdfExporter.loadLibraries();
+                    console.log('PDF库重新加载完成');
+                } catch (loadError) {
+                    console.error('PDF库重新加载失败:', loadError);
+                    this.showNotification('加载失败', 'PDF库加载失败，请检查网络连接', 'error');
+                    return;
+                }
+            }
+
+            // 生成文件名
+            const now = new Date();
+            const fileName = `面试评估报告_${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}.pdf`;
+
+            // 使用PDF导出器导出
+            await window.pdfExporter.exportToPDF(modalElement, fileName);
+
+            // 显示成功提示
+            this.showNotification('PDF导出成功', `文件已保存为: ${fileName}`, 'success');
+
+        } catch (error) {
+            console.error('PDF导出失败:', error);
+
+            let errorMessage = 'PDF导出失败';
+            if (error.message.includes('PDF库未正确加载')) {
+                errorMessage = 'PDF库加载失败，请检查网络连接后刷新页面重试。';
+            } else if (error.message) {
+                errorMessage = `PDF导出失败: ${error.message}`;
+            }
+
+            this.showNotification('导出失败', errorMessage, 'error');
+        }
+    }
+
+    /**
+     * 显示通知消息
+     */
+    showNotification(title, message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `
+            <div class="notification-content">
+                <div class="notification-title">${title}</div>
+                <div class="notification-message">${message}</div>
+            </div>
+            <button class="notification-close" onclick="this.parentElement.remove()">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+
+        // 添加样式
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#007bff'};
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 10000;
+            max-width: 300px;
+            animation: slideIn 0.3s ease-out;
+        `;
+
+        document.body.appendChild(notification);
+
+        // 3秒后自动移除
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.remove();
+            }
+        }, 3000);
+    }
+
     /**
      * 创建维度评分HTML
      */
@@ -1174,12 +1270,16 @@ class AzureVoiceChat {
         if (this.app && this.app.storageManager) {
             const interviews = this.app.storageManager.getInterviews();
             const interview = interviews.find(item => item.id === interviewId);
-            
+
             if (interview) {
                 interview.evaluation = evaluation;
                 interview.score = evaluation.total_score;
-                interview.summary = evaluation.summary;
-                
+
+                // 只有在原来没有summary的情况下才设置评估总结
+                if (!interview.summary && evaluation.summary) {
+                    interview.summary = evaluation.summary;
+                }
+
                 // 重新保存
                 this.app.storageManager.saveInterview(interview);
                 console.log('面试记录已更新评分信息');
@@ -1259,6 +1359,8 @@ class HistoryManager {
             // 点击关闭按钮时关闭模态窗口
             this.modalCloseButton.addEventListener('click', () => {
                 this.evaluationModal.style.display = 'none';
+                // 关闭模态框后刷新历史记录列表
+                this.refreshHistoryList();
             });
 
             // 点击模态窗口外部区域时关闭模态窗口
@@ -1267,6 +1369,8 @@ class HistoryManager {
                 // 确保点击事件的目标是模态窗口的背景本身，而不是模态内容
                 if (event.target === this.evaluationModal) {
                     this.evaluationModal.style.display = 'none';
+                    // 关闭模态框后刷新历史记录列表
+                    this.refreshHistoryList();
                 }
             });
 
@@ -1274,6 +1378,8 @@ class HistoryManager {
             window.addEventListener('keydown', (event) => {
                 if (event.key === 'Escape' && this.evaluationModal.style.display === 'flex') {
                     this.evaluationModal.style.display = 'none';
+                    // 关闭模态框后刷新历史记录列表
+                    this.refreshHistoryList();
                 }
             });
         } else {
@@ -1430,7 +1536,7 @@ class HistoryManager {
                         <span class="history-badge ${hasEvaluation ? 'evaluated' : 'completed'}">
                             ${hasEvaluation ? '已评分' : '完成'}
                         </span>
-                        ${score ? `<span class="history-score">${score}分</span>` : ''}
+                        ${score ? `<span class="history-score ${this.getScoreColorClass(score)}">${score}分</span>` : ''}
                     </div>
                     <div class="history-meta">
                         <span><i class="fas fa-clock"></i> ${date}</span>
@@ -1518,56 +1624,91 @@ class HistoryManager {
             this.modalActualContent.innerHTML = ''; // 清空之前的内容
         }
 
-
-        // 检查是否已缓存评估结果
-        if (interviewToEvaluate.evaluationMarkdown) {
-            console.log(`从缓存加载评估结果，面试ID: ${interviewId}`);
+        // 检查是否已缓存完整评估结果（包含markdown和评分）
+        if (interviewToEvaluate.evaluationMarkdown && interviewToEvaluate.evaluationScore) {
+            console.log(`从缓存加载完整评估结果，面试ID: ${interviewId}`);
+            this.displayCompleteEvaluation(interviewToEvaluate);
             if (this.modalLoadingSpinner) {
-                this.modalLoadingSpinner.style.display = 'none'; // 隐藏加载指示
+                this.modalLoadingSpinner.style.display = 'none';
             }
-            if (this.modalActualContent) {
-                this.modalActualContent.innerHTML = this.renderMarkdownToHtml(interviewToEvaluate.evaluationMarkdown);
-            }
-            return; // 结束函数，不再重新生成
+            return;
         }
 
-        // 如果没有缓存，则调用后端生成
+        // 如果没有缓存，则并行调用后端生成评估和提取数据
         try {
-            console.log(`调用后端生成评估结果，面试ID: ${interviewId}`);
+            console.log(`调用后端生成完整评估结果，面试ID: ${interviewId}`);
 
             const resumeData = this.storageManager.getCurrentResume();
             const resumeText = resumeData ? resumeData.fullText : '';
 
-            const requestData = {
-                interviewMessages: interviewToEvaluate.messages,
-                resumeText: resumeText,
-                interviewId: interviewToEvaluate.id
-            };
-
-            const response = await fetch('/api/evaluate-interview', {
+            // 先尝试调用评估API
+            console.log('正在调用评估API...');
+            const evaluationResponse = await fetch('/api/evaluate-interview', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(requestData)
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    interviewMessages: interviewToEvaluate.messages,
+                    resumeText: resumeText,
+                    interviewId: interviewToEvaluate.id
+                })
             });
 
-            if (!response.ok) {
-                const errorDetail = await response.text();
-                throw new Error(`后端评估API请求失败: ${response.status} ${response.statusText} - ${errorDetail}`);
+            if (!evaluationResponse.ok) {
+                const errorDetail = await evaluationResponse.text();
+                throw new Error(`评估API请求失败: ${evaluationResponse.status} ${evaluationResponse.statusText} - ${errorDetail}`);
             }
 
-            const data = await response.json();
-            const markdownResult = data.evaluationMarkdown;
+            const evaluationData = await evaluationResponse.json();
+            const markdownResult = evaluationData.evaluationMarkdown;
+            const structuredEvaluation = evaluationData.evaluation;
 
-            if (markdownResult) {
-                // 缓存评估结果到 interview 对象
+            if (markdownResult && structuredEvaluation) {
+                // 缓存评估结果到 interview 对象，但保持原有的标题和基本信息
                 interviewToEvaluate.evaluationMarkdown = markdownResult;
+
+                // 使用结构化数据中的分数，如果没有则从markdown提取
+                interviewToEvaluate.evaluationScore = structuredEvaluation.total_score || this.extractScoreFromMarkdown(markdownResult);
+                interviewToEvaluate.score = interviewToEvaluate.evaluationScore; // 确保score字段也被设置
+
+                // 不修改原有的title，保持原面试记录的标题
+                // 如果原来没有title，才设置默认标题
+                if (!interviewToEvaluate.title) {
+                    interviewToEvaluate.title = 'AI语音面试记录';
+                }
+
+                // 使用结构化数据中的总结，如果没有则从markdown提取
+                const evaluationSummary = structuredEvaluation.summary || this.extractSummaryFromMarkdown(markdownResult);
+                if (evaluationSummary && !interviewToEvaluate.summary) {
+                    interviewToEvaluate.summary = evaluationSummary;
+                }
+
+                // 创建完整的evaluation对象，包含所有结构化数据
+                interviewToEvaluate.evaluation = {
+                    total_score: interviewToEvaluate.evaluationScore,
+                    summary: evaluationSummary || '面试评估已完成',
+                    full_evaluation: markdownResult,
+                    strengths: structuredEvaluation.strengths || [],
+                    improvements: structuredEvaluation.improvements || [],
+                    dimension_scores: structuredEvaluation.dimension_scores || {}
+                };
+
                 this.storageManager.saveInterview(interviewToEvaluate); // 更新 localStorage 中的记录
 
-                if (this.modalActualContent) {
-                    this.modalActualContent.innerHTML = this.renderMarkdownToHtml(markdownResult);
+                // 使用AzureVoiceChat的showEvaluationResult方法显示结构化评分结果
+                if (window.app && window.app.voiceChat) {
+                    // 关闭当前模态框
+                    if (this.evaluationModal) {
+                        this.evaluationModal.style.display = 'none';
+                    }
+                    // 显示结构化评分结果
+                    window.app.voiceChat.showEvaluationResult(interviewToEvaluate.evaluation);
+                } else {
+                    // 降级显示
+                    this.displayCompleteEvaluation(interviewToEvaluate);
                 }
+
+                // 刷新历史记录列表以显示新的评分
+                this.refreshHistoryList();
             } else {
                 if (this.modalActualContent) {
                     this.modalActualContent.innerHTML = '<p>未收到评估结果。</p>';
@@ -1577,7 +1718,32 @@ class HistoryManager {
         } catch (error) {
             console.error('面试评估失败:', error);
             if (this.modalActualContent) {
-                this.modalActualContent.innerHTML = `<p>评估失败: ${error.message}</p>`;
+                this.modalActualContent.innerHTML = `
+                    <div class="evaluation-error">
+                        <div class="error-icon">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <h3>评估服务暂时不可用</h3>
+                        <p>抱歉，面试评估服务当前遇到了一些技术问题。这可能是由于网络连接问题或服务器繁忙导致的。</p>
+                        <div class="error-message">
+                            <strong>错误详情：</strong> ${error.message}
+                        </div>
+                        <div class="error-actions">
+                            <button class="btn btn-primary" onclick="window.app.historyManager.startEvaluation('${interviewId}')">
+                                <i class="fas fa-redo"></i> 重试评估
+                            </button>
+                            <button class="btn btn-secondary" onclick="this.closest('.modal').style.display='none'">
+                                <i class="fas fa-times"></i> 关闭
+                            </button>
+                        </div>
+                        <div class="error-details">
+                            <small>
+                                建议：请检查网络连接，稍后重试。如果问题持续存在，请联系技术支持。<br>
+                                评估服务通常在几分钟内会恢复正常。
+                            </small>
+                        </div>
+                    </div>
+                `;
             }
         } finally {
             if (this.modalLoadingSpinner) {
@@ -1598,6 +1764,165 @@ class HistoryManager {
             return `<pre>${markdown}</pre>`; // 降级处理，直接显示Markdown源码
         }
         return marked.parse(markdown);
+    }
+
+    /**
+     * 从Markdown文本中提取评分
+     * @param {string} markdown - Markdown 文本
+     * @returns {number} - 提取的分数，默认75
+     */
+    extractScoreFromMarkdown(markdown) {
+        if (!markdown) return 75;
+
+        // 优先匹配新格式的总体评分
+        const newFormatPatterns = [
+            /##\s*总体评分[：:]\s*(\d+)\s*分/i,
+            /总体评分[：:]\s*(\d+)\s*分/i,
+            /总分[：:]\s*(\d+)\s*分/i
+        ];
+
+        for (const pattern of newFormatPatterns) {
+            const match = markdown.match(pattern);
+            if (match) {
+                const score = parseInt(match[1]);
+                if (score >= 0 && score <= 100) {
+                    console.log(`从新格式中提取到评分: ${score}`);
+                    return score;
+                }
+            }
+        }
+
+        // 兼容旧格式的评分提取
+        const legacyPatterns = [
+            /综合得分[：:]\s*(\d+)/,
+            /评分[：:]\s*(\d+)/,
+            /(\d+)\s*分/
+        ];
+
+        for (const pattern of legacyPatterns) {
+            const match = markdown.match(pattern);
+            if (match) {
+                const score = parseInt(match[1]);
+                if (score >= 0 && score <= 100) {
+                    console.log(`从兼容格式中提取到评分: ${score}`);
+                    return score;
+                }
+            }
+        }
+
+        console.log('未能提取到有效评分，使用默认值75');
+        return 75; // 默认分数
+    }
+
+    /**
+     * 从Markdown文本中提取评估总结
+     * @param {string} markdown - Markdown 文本
+     * @returns {string} - 提取的总结
+     */
+    extractSummaryFromMarkdown(markdown) {
+        if (!markdown) return '';
+
+        // 尝试提取总结部分
+        const summaryPatterns = [
+            /##\s*总结[：:]?\s*\n(.*?)(?=\n##|\n\n|$)/s,
+            /##\s*评估总结[：:]?\s*\n(.*?)(?=\n##|\n\n|$)/s,
+            /总结[：:]\s*(.*?)(?=\n##|\n\n|$)/s,
+            /评估总结[：:]\s*(.*?)(?=\n##|\n\n|$)/s
+        ];
+
+        for (const pattern of summaryPatterns) {
+            const match = markdown.match(pattern);
+            if (match && match[1]) {
+                const summary = match[1].trim().replace(/\n+/g, ' ').substring(0, 200);
+                if (summary.length > 10) {
+                    console.log(`提取到评估总结: ${summary.substring(0, 50)}...`);
+                    return summary;
+                }
+            }
+        }
+
+        // 如果没有找到专门的总结，尝试提取第一段内容
+        const firstParagraphMatch = markdown.match(/^(.*?)(?=\n\n|\n##|$)/s);
+        if (firstParagraphMatch && firstParagraphMatch[1]) {
+            const firstParagraph = firstParagraphMatch[1].trim().replace(/\n+/g, ' ').substring(0, 150);
+            if (firstParagraph.length > 20) {
+                console.log(`使用第一段作为总结: ${firstParagraph.substring(0, 50)}...`);
+                return firstParagraph;
+            }
+        }
+
+        return '面试评估已完成';
+    }
+
+    /**
+     * 显示完整的评估结果（包含评分卡片和详细markdown）
+     * @param {Object} interview - 面试对象
+     */
+    displayCompleteEvaluation(interview) {
+        if (!this.modalActualContent) return;
+
+        const score = interview.evaluationScore || 75;
+        const title = interview.title || `面试评估 - ${new Date().toLocaleDateString()}`;
+        const summary = interview.summary || '面试评估已完成';
+
+        // 创建评分卡片和详细内容的组合HTML
+        const completeHTML = `
+            <div class="evaluation-complete-view">
+                <!-- 评分概览卡片 -->
+                <div class="evaluation-score-card">
+                    <div class="score-header">
+                        <h3><i class="fas fa-chart-bar"></i> ${title}</h3>
+                        <div class="score-badge ${this.getScoreLevel(score)}">${score}分</div>
+                    </div>
+                    <div class="score-summary">
+                        <p>${summary}</p>
+                    </div>
+                    <div class="score-actions">
+                        <button class="btn btn-sm btn-outline" onclick="this.closest('.evaluation-complete-view').querySelector('.evaluation-details').scrollIntoView({behavior: 'smooth'})">
+                            <i class="fas fa-arrow-down"></i> 查看详细评估
+                        </button>
+                        <button class="btn btn-sm btn-primary" onclick="window.app.voiceChat.exportEvaluationToPDF(this.closest('.modal'))">
+                            <i class="fas fa-file-pdf"></i> 导出PDF
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 详细评估内容 -->
+                <div class="evaluation-details">
+                    <div class="markdown-content">
+                        ${this.renderMarkdownToHtml(interview.evaluationMarkdown)}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        this.modalActualContent.innerHTML = completeHTML;
+    }
+
+    /**
+     * 根据分数获取等级样式
+     * @param {number} score - 分数
+     * @returns {string} - CSS类名
+     */
+    getScoreLevel(score) {
+        if (score >= 90) return 'excellent';
+        if (score >= 80) return 'good';
+        if (score >= 70) return 'average';
+        if (score >= 60) return 'below-average';
+        return 'poor';
+    }
+
+    /**
+     * 根据分数获取历史记录中的颜色样式类
+     * @param {number} score - 分数
+     * @returns {string} - CSS类名
+     */
+    getScoreColorClass(score) {
+        if (score >= 90) return 'score-excellent';
+        if (score >= 80) return 'score-good';
+        if (score >= 70) return 'score-average';
+        if (score >= 60) return 'score-below-average';
+        return 'score-poor';
     }
     
     viewEvaluation(id) {
