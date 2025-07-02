@@ -498,6 +498,64 @@ body {
     display: flex;
 }
 
+/* 面试准备模式样式 */
+.interview-chat.preparation-mode {
+    display: flex;
+}
+
+.interview-chat.preparation-mode .system-message {
+    background: #f0f9ff;
+    border: 2px solid var(--primary-color);
+    animation: preparation-pulse 2s ease-in-out infinite;
+}
+
+.interview-chat.preparation-mode .system-content h4::before {
+    content: "📋 ";
+    margin-right: 0.5rem;
+}
+
+.interview-chat.preparation-mode .system-content h4 {
+    color: var(--primary-dark);
+    font-weight: 600;
+}
+
+.interview-chat.preparation-mode .system-content li {
+    color: var(--text-primary);
+}
+
+.interview-chat.preparation-mode .voice-start-btn {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    animation: preparation-button-pulse 1.5s ease-in-out infinite;
+}
+
+.interview-chat.preparation-mode .voice-start-btn:hover {
+    background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
+    transform: translateY(-2px);
+}
+
+.interview-chat.preparation-mode .status-title {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+@keyframes preparation-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.3);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(37, 99, 235, 0);
+    }
+}
+
+@keyframes preparation-button-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 12px rgba(37, 99, 235, 0);
+    }
+}
+
 .chat-container {
     max-width: 1000px;
     margin: 0 auto;
@@ -507,7 +565,7 @@ body {
     box-shadow: var(--shadow-xl);
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 160px);
+    height: calc(100vh - 120px);
     overflow: hidden;
 }
 
@@ -1551,6 +1609,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden; /* 移除滚动 */
 }
 
 .voice-call-backdrop {
@@ -1566,65 +1625,42 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--spacing-2xl);
     color: white;
     text-align: center;
-    padding: var(--spacing-2xl);
+    width: 100%;
+    max-width: 900px;
+    height: 100vh;
+    padding: var(--spacing-md);
+    box-sizing: border-box;
+    justify-content: space-between; /* 改为空间分布 */
 }
 
-/* 面试官头像区域 */
+/* 面试官头像区域 - 中心主要内容 */
 .interviewer-section {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--spacing-lg);
-}
-
-.interviewer-avatar-large {
-    position: relative;
-    width: 120px;
-    height: 120px;
-}
-
-.avatar-ring {
-    position: absolute;
-    inset: 0;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 50%;
-    animation: avatar-pulse 2s infinite;
-}
-
-.avatar-ring.delay-1 {
-    animation-delay: 0.5s;
-}
-
-.avatar-ring.delay-2 {
-    animation-delay: 1s;
-}
-
-.avatar-content {
-    position: absolute;
-    inset: 8px;
-    background: rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(10px);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
+    gap: var(--spacing-md);
+    flex: 1;
     justify-content: center;
-    font-size: 3rem;
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    min-height: 0; /* 允许弹性收缩 */
 }
+
+/* 以下样式已删除，因为对应的HTML元素已被移除：
+.interviewer-avatar-large, .avatar-ring, .avatar-content */
 
 .interviewer-name {
-    font-size: 2rem;
+    font-size: 1.75rem;
     font-weight: 800;
     margin: 0;
+    line-height: 1.2;
 }
 
 .interviewer-title {
-    font-size: 1.125rem;
+    font-size: 1rem;
     opacity: 0.8;
     margin: 0;
+    line-height: 1.2;
 }
 
 /* 语音动画容器 */
@@ -1635,16 +1671,18 @@ body {
     background: rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(10px);
     border-radius: var(--radius-2xl);
-    padding: var(--spacing-xl);
+    padding: var(--spacing-md);
     border: 1px solid rgba(255, 255, 255, 0.2);
+    margin: var(--spacing-sm) 0;
 }
 
-/* 状态显示 */
+/* 底部状态和控制区域 */
 .voice-status-section {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--spacing-md);
+    gap: var(--spacing-sm);
+    flex-shrink: 0;
 }
 
 .status-display {
@@ -1652,20 +1690,22 @@ body {
 }
 
 .voice-status-text {
-    font-size: 1.25rem;
+    font-size: 1rem;
     font-weight: 600;
-    margin-bottom: var(--spacing-sm);
+    margin-bottom: var(--spacing-xs);
+    line-height: 1.2;
 }
 
 .voice-timer {
-    font-size: 2rem;
+    font-size: 1.5rem;
     font-weight: 800;
     font-family: var(--font-mono);
     background: rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(10px);
-    padding: var(--spacing-md) var(--spacing-lg);
-    border-radius: var(--radius-lg);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
     border: 1px solid rgba(255, 255, 255, 0.2);
+    line-height: 1;
 }
 
 /* 语音控制按钮 */
@@ -1727,20 +1767,7 @@ body {
     }
 }
 
-@keyframes avatar-pulse {
-    0% {
-        transform: scale(1);
-        opacity: 1;
-    }
-    50% {
-        transform: scale(1.1);
-        opacity: 0.7;
-    }
-    100% {
-        transform: scale(1);
-        opacity: 1;
-    }
-}
+/* avatar-pulse 动画已删除，因为头像元素已被移除 */
 
 /* ===== 消息样式 ===== */
 .message {
@@ -1860,14 +1887,7 @@ body {
         gap: var(--spacing-lg);
     }
     
-    .interviewer-avatar-large {
-        width: 80px;
-        height: 80px;
-    }
-    
-    .avatar-content {
-        font-size: 2rem;
-    }
+    /* 已删除的avatar相关样式：interviewer-avatar-large, avatar-content */
     
     .interviewer-name {
         font-size: 1.5rem;
@@ -2732,6 +2752,213 @@ body {
     align-items: center; /* 垂直居中 */
 }
 
+/* 保存面试确认对话框特殊样式 */
+.save-interview-modal {
+    max-width: 600px;
+    width: 90%;
+    background: var(--bg-primary);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-xl);
+    overflow: hidden;
+}
+
+.save-interview-header {
+    text-align: center;
+    padding: var(--spacing-xl) var(--spacing-lg) var(--spacing-lg);
+    background: linear-gradient(135deg, var(--primary-light), var(--bg-secondary));
+    border-bottom: 1px solid var(--border-light);
+}
+
+.save-interview-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto var(--spacing-md);
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    border-radius: var(--radius-xl);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 2rem;
+    box-shadow: var(--shadow-md);
+}
+
+.save-interview-header h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 var(--spacing-sm) 0;
+}
+
+.save-interview-header p {
+    color: var(--text-secondary);
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+.save-interview-info {
+    padding: var(--spacing-lg);
+}
+
+.interview-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-xl);
+}
+
+.interview-stats .stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: var(--spacing-md);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-light);
+}
+
+.interview-stats .stat-item i {
+    font-size: 1.5rem;
+    color: var(--primary-color);
+    margin-bottom: var(--spacing-sm);
+}
+
+.interview-stats .stat-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-xs);
+    font-weight: 500;
+}
+
+.interview-stats .stat-value {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.save-benefits {
+    background: var(--success-light);
+    border: 1px solid var(--success-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+}
+
+.save-benefits h4 {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--success-dark);
+    margin: 0 0 var(--spacing-md) 0;
+}
+
+.save-benefits h4 i {
+    color: var(--success-color);
+}
+
+.save-benefits ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.save-benefits li {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs) 0;
+    color: var(--success-dark);
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.save-benefits li i {
+    color: var(--success-color);
+    width: 16px;
+    flex-shrink: 0;
+}
+
+.save-interview-actions {
+    display: flex;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-light);
+}
+
+.save-interview-actions .btn-secondary,
+.save-interview-actions .btn-primary {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-lg);
+    font-weight: 600;
+    border-radius: var(--radius-lg);
+    transition: all var(--transition-normal);
+    cursor: pointer;
+    border: none;
+    font-size: 1rem;
+}
+
+.save-interview-actions .btn-secondary {
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-medium);
+}
+
+.save-interview-actions .btn-secondary:hover {
+    background: var(--error-light);
+    color: var(--error-color);
+    border-color: var(--error-color);
+    transform: translateY(-1px);
+}
+
+.save-interview-actions .btn-primary {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+    box-shadow: var(--shadow-md);
+}
+
+.save-interview-actions .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* 响应式适配 */
+@media (max-width: 768px) {
+    .save-interview-modal {
+        width: 95%;
+        max-width: none;
+    }
+    
+    .interview-stats {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-sm);
+    }
+    
+    .save-interview-actions {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+    
+    .save-interview-header {
+        padding: var(--spacing-lg) var(--spacing-md) var(--spacing-md);
+    }
+    
+    .save-interview-info {
+        padding: var(--spacing-md);
+    }
+    
+    .save-interview-actions {
+        padding: var(--spacing-md);
+    }
+}
+
 /* 模态窗口内容 */
 .modal-content {
     background-color: #fefefe;
@@ -2776,4 +3003,517 @@ body {
     font-style: italic;
     color: #888;
     padding: 20px 0;
+}
+
+/* 面试状态面板相关样式已删除 */
+
+/* ===== 语音通话全屏界面增强样式 ===== */
+
+/* 顶部状态栏 */
+.voice-call-status-bar {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(10px);
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    flex-shrink: 0; /* 防止压缩 */
+    z-index: 10; /* 确保在其他元素之上 */
+    position: relative;
+}
+
+.status-bar-left,
+.status-bar-center,
+.status-bar-right {
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+.status-bar-center {
+    justify-content: center;
+}
+
+.status-bar-right {
+    justify-content: flex-end;
+}
+
+/* 连接质量显示 */
+.connection-quality {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    color: white;
+}
+
+.signal-bars {
+    display: flex;
+    align-items: end;
+    gap: 2px;
+    height: 16px;
+}
+
+.signal-bar {
+    width: 3px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    transition: all var(--transition-fast);
+}
+
+.signal-bar:nth-child(1) { height: 25%; }
+.signal-bar:nth-child(2) { height: 50%; }
+.signal-bar:nth-child(3) { height: 75%; }
+.signal-bar:nth-child(4) { height: 100%; }
+
+.signal-bars.excellent .signal-bar {
+    background: var(--success-color);
+    box-shadow: 0 0 4px var(--success-color);
+}
+
+.signal-bars.good .signal-bar:nth-child(-n+3) {
+    background: var(--success-color);
+    box-shadow: 0 0 4px var(--success-color);
+}
+
+.signal-bars.fair .signal-bar:nth-child(-n+2) {
+    background: var(--warning-color);
+    box-shadow: 0 0 4px var(--warning-color);
+}
+
+.signal-bars.poor .signal-bar:nth-child(1) {
+    background: var(--error-color);
+    box-shadow: 0 0 4px var(--error-color);
+}
+
+.quality-text {
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+/* 通话状态显示 */
+.call-status {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    color: white;
+}
+
+.status-indicator-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success-color);
+    animation: status-pulse 2s infinite;
+}
+
+.status-indicator-dot.listening {
+    background: var(--primary-color);
+}
+
+.status-indicator-dot.processing {
+    background: var(--warning-color);
+}
+
+.status-indicator-dot.speaking {
+    background: var(--success-color);
+}
+
+.call-status .status-text {
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+/* 面试进度显示 */
+.interview-progress {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    color: white;
+}
+
+.progress-label {
+    font-size: 0.75rem;
+    opacity: 0.8;
+    margin-bottom: 2px;
+}
+
+.progress-count {
+    font-size: 1.25rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+}
+
+/* 当前状态显示 */
+.current-status {
+    text-align: center;
+    margin: var(--spacing-sm) 0;
+    position: relative;
+    z-index: 5; /* 确保状态显示在其他元素之上 */
+}
+
+.status-icon {
+    width: 36px;
+    height: 36px;
+    margin: 0 auto var(--spacing-sm);
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.125rem;
+    color: white;
+    transition: all var(--transition-normal);
+}
+
+.status-icon.listening {
+    background: rgba(37, 99, 235, 0.3);
+    color: var(--primary-color);
+    animation: status-glow 2s infinite;
+}
+
+.status-icon.processing {
+    background: rgba(245, 158, 11, 0.3);
+    color: var(--warning-color);
+    animation: status-spin 1s linear infinite;
+}
+
+.status-icon.speaking {
+    background: rgba(16, 185, 129, 0.3);
+    color: var(--success-color);
+    animation: status-bounce 1s infinite;
+}
+
+.status-message {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+@keyframes status-glow {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 10px rgba(37, 99, 235, 0);
+    }
+}
+
+@keyframes status-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes status-bounce {
+    0%, 20%, 50%, 80%, 100% {
+        transform: translateY(0);
+    }
+    40% {
+        transform: translateY(-10px);
+    }
+    60% {
+        transform: translateY(-5px);
+    }
+}
+
+/* 语音级别显示 */
+.voice-level-display {
+    margin: var(--spacing-sm) 0;
+}
+
+.level-meter {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.level-bar-container {
+    display: flex;
+    align-items: end;
+    gap: 3px;
+    height: 30px;
+    padding: var(--spacing-xs) var(--spacing-md);
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-lg);
+    backdrop-filter: blur(10px);
+}
+
+.voice-level-display .level-bar {
+    width: 4px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    transition: all var(--transition-fast);
+}
+
+.voice-level-display .level-bar[data-level="1"] { height: 12.5%; }
+.voice-level-display .level-bar[data-level="2"] { height: 25%; }
+.voice-level-display .level-bar[data-level="3"] { height: 37.5%; }
+.voice-level-display .level-bar[data-level="4"] { height: 50%; }
+.voice-level-display .level-bar[data-level="5"] { height: 62.5%; }
+.voice-level-display .level-bar[data-level="6"] { height: 75%; }
+.voice-level-display .level-bar[data-level="7"] { height: 87.5%; }
+.voice-level-display .level-bar[data-level="8"] { height: 100%; }
+
+.voice-level-display .level-bar.active {
+    background: var(--success-color);
+    box-shadow: 0 0 4px var(--success-color);
+}
+
+.voice-level-display .level-bar.active.medium {
+    background: var(--warning-color);
+    box-shadow: 0 0 4px var(--warning-color);
+}
+
+.voice-level-display .level-bar.active.high {
+    background: var(--error-color);
+    box-shadow: 0 0 4px var(--error-color);
+}
+
+.level-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.level-text {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: white;
+    line-height: 1;
+}
+
+.level-tip {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1;
+}
+
+/* 实时提示区域 - 简化版本 */
+.voice-tips {
+    max-width: 500px;
+    width: 90%;
+    margin: var(--spacing-xs) 0;
+}
+
+.voice-tips .tip-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-lg);
+    color: white;
+    font-size: 0.75rem;
+    line-height: 1.3;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all var(--transition-normal);
+    text-align: center;
+    justify-content: center;
+}
+
+.voice-tips .tip-item.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.voice-tips .tip-item i {
+    color: var(--warning-color);
+    flex-shrink: 0;
+    font-size: 0.75rem;
+}
+
+/* 状态显示区域重新设计 */
+.voice-status-section {
+    margin: var(--spacing-lg) 0;
+    position: relative;
+    z-index: 5; /* 确保状态区域显示在其他元素之上 */
+}
+
+.voice-status-section .status-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.timer-label {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 500;
+}
+
+/* 控制按钮区域增强 */
+.voice-controls {
+    display: flex;
+    gap: var(--spacing-lg);
+    flex-shrink: 0;
+}
+
+.voice-control-btn {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    font-size: 1.25rem;
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    overflow: hidden;
+}
+
+.voice-control-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(255, 255, 255, 0.1), transparent);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.voice-control-btn:hover::before {
+    opacity: 1;
+}
+
+.voice-control-btn:active {
+    transform: scale(0.95);
+}
+
+/* 响应式适配 */
+@media (max-width: 768px) {
+    .voice-interface {
+        padding: var(--spacing-sm);
+        max-width: 100%;
+    }
+    
+    .voice-call-status-bar {
+        padding: var(--spacing-xs) var(--spacing-sm);
+        flex-direction: column;
+        gap: var(--spacing-xs);
+        background: rgba(0, 0, 0, 0.3);
+    }
+    
+    .status-bar-left,
+    .status-bar-center,
+    .status-bar-right {
+        flex: none;
+        width: 100%;
+        justify-content: center;
+    }
+    
+    /* 已删除的avatar相关样式：interviewer-avatar-large, avatar-content */
+    
+    .interviewer-name {
+        font-size: 1.5rem;
+    }
+    
+    .interviewer-title {
+        font-size: 0.875rem;
+    }
+    
+    .voice-tips .tip-item {
+        padding: var(--spacing-xs) var(--spacing-sm);
+        font-size: 0.7rem;
+    }
+    
+    .level-bar-container {
+        padding: var(--spacing-xs) var(--spacing-sm);
+        height: 24px;
+    }
+    
+    .voice-level-display .level-bar {
+        width: 3px;
+    }
+    
+    .voice-timer {
+        font-size: 1.25rem;
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+    
+    .voice-controls {
+        gap: var(--spacing-md);
+    }
+    
+    .voice-control-btn {
+        width: 48px;
+        height: 48px;
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .voice-interface {
+        padding: var(--spacing-xs);
+    }
+    
+    .voice-call-status-bar {
+        padding: var(--spacing-xs);
+        font-size: 0.75rem;
+    }
+    
+    /* 已删除的avatar相关样式：interviewer-avatar-large, avatar-content */
+    
+    .interviewer-name {
+        font-size: 1.25rem;
+    }
+    
+    .interviewer-title {
+        font-size: 0.8rem;
+    }
+    
+    .current-status .status-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 1rem;
+    }
+    
+    .status-message {
+        font-size: 0.75rem;
+    }
+    
+    .voice-timer {
+        font-size: 1.125rem;
+        padding: var(--spacing-xs);
+    }
+    
+    .level-bar-container {
+        height: 20px;
+        padding: 2px var(--spacing-xs);
+    }
+    
+    .voice-level-display .level-bar {
+        width: 2px;
+    }
+    
+    .voice-controls {
+        gap: var(--spacing-sm);
+    }
+    
+    .voice-control-btn {
+        width: 44px;
+        height: 44px;
+        font-size: 0.875rem;
+    }
+    
+    .voice-tips .tip-item {
+        font-size: 0.65rem;
+        padding: var(--spacing-xs);
+    }
 }

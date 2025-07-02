@@ -137,8 +137,9 @@
                     </div>
                 </div>
 
-                <!-- 聊天界面 -->
-                <div class="interview-chat">
+                <!-- 面试聊天界面 -->
+                <div class="interview-chat" id="interviewChat">
+                    <!-- 聊天容器 -->
                     <div class="chat-container">
                         <!-- 聊天头部 -->
                         <div class="chat-header">
@@ -411,18 +412,48 @@
         
         <!-- 语音界面内容 -->
         <div class="voice-interface">
-            <!-- 面试官头像区域 -->
-            <div class="interviewer-section">
-                <div class="interviewer-avatar-large">
-                    <div class="avatar-ring"></div>
-                    <div class="avatar-ring delay-1"></div>
-                    <div class="avatar-ring delay-2"></div>
-                    <div class="avatar-content">
-                        <i class="fas fa-robot"></i>
+            <!-- 顶部状态栏 -->
+            <div class="voice-call-status-bar">
+                <div class="status-bar-left">
+                    <div class="connection-quality" id="connectionQuality">
+                        <div class="signal-bars">
+                            <div class="signal-bar"></div>
+                            <div class="signal-bar"></div>
+                            <div class="signal-bar"></div>
+                            <div class="signal-bar"></div>
+                        </div>
+                        <span class="quality-text">连接良好</span>
                     </div>
                 </div>
+                
+                <div class="status-bar-center">
+                    <div class="call-status" id="callStatus">
+                        <div class="status-indicator-dot"></div>
+                        <span class="status-text">通话进行中</span>
+                    </div>
+                </div>
+                
+                <div class="status-bar-right">
+                    <div class="interview-progress" id="interviewProgress">
+                        <span class="progress-label">对话轮次</span>
+                        <span class="progress-count" id="progressCount">0</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 面试官头像区域 -->
+            <div class="interviewer-section">
+                <!-- 圆形头像背景已删除 -->
                 <h2 class="interviewer-name">天汇AI面试官</h2>
                 <p class="interviewer-title">专业技术面试官</p>
+                
+                <!-- 当前状态显示 -->
+                <div class="current-status" id="currentStatus">
+                    <div class="status-icon" style="display: none;">
+                        <!-- 麦克风图标已删除 -->
+                    </div>
+                    <p class="status-message" id="statusMessage">正在聆听您的声音...</p>
+                </div>
             </div>
             
             <!-- Lottie动画容器 -->
@@ -438,28 +469,60 @@
                 ></dotlottie-player>
             </div>
             
+            <!-- 语音级别显示 -->
+            <div class="voice-level-display" id="voiceLevelDisplay">
+                <div class="level-meter">
+                    <div class="level-bar-container">
+                        <div class="level-bar" data-level="1"></div>
+                        <div class="level-bar" data-level="2"></div>
+                        <div class="level-bar" data-level="3"></div>
+                        <div class="level-bar" data-level="4"></div>
+                        <div class="level-bar" data-level="5"></div>
+                        <div class="level-bar" data-level="6"></div>
+                        <div class="level-bar" data-level="7"></div>
+                        <div class="level-bar" data-level="8"></div>
+                    </div>
+                    <div class="level-label">
+                        <span class="level-text" id="levelText">静音</span>
+                        <span class="level-tip">说话音量</span>
+                    </div>
+                </div>
+            </div>
+            
             <!-- 状态显示 -->
             <div class="voice-status-section">
                 <div class="status-display">
-                <p class="voice-status-text" id="voiceStatusDisplay">正在聆听您的声音...</p>
                 <div class="voice-timer" id="voiceTimer">00:00</div>
+                    <div class="timer-label">通话时长</div>
+                </div>
+            </div>
+            
+            <!-- 实时提示区域 -->
+            <div class="voice-tips" id="voiceTips">
+                <div class="tip-item active">
+                    <i class="fas fa-lightbulb"></i>
+                    <span>保持自然对话，AI会根据您的回答进行深入提问</span>
                 </div>
             </div>
             
             <!-- 控制按钮 -->
             <div class="voice-controls">
-                <button class="voice-control-btn mute-btn" id="voiceMuteBtn" title="静音/取消静音">
+                <!-- 静音按钮 -->
+                <button class="voice-control-btn mute-btn" id="muteButton" title="静音/取消静音">
                     <i class="fas fa-microphone mic-icon"></i>
                     <i class="fas fa-microphone-slash mic-off-icon" style="display: none;"></i>
                 </button>
                 
-                <button class="voice-control-btn settings-btn" id="voiceSettingsBtn" title="语音设置">
+                <!-- VAD设置按钮 -->
+                <button class="voice-control-btn settings-btn" id="vadSettingsButton" title="语音检测设置">
                     <i class="fas fa-cog"></i>
                 </button>
                 
-                <button class="voice-control-btn end-btn" id="voiceEndBtn" title="结束面试">
+                <!-- 结束通话按钮 -->
+                <button class="voice-control-btn end-btn" id="endCallButton" title="结束通话">
                     <i class="fas fa-phone-slash"></i>
                 </button>
+            </div>
             </div>
             
             <!-- VAD设置面板 -->
@@ -470,42 +533,37 @@
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
-                
                 <div class="settings-content">
                     <div class="setting-group">
-                        <label for="silenceDurationSlider">停顿时长 (毫秒)</label>
+                    <label for="vadThreshold">检测敏感度</label>
                         <div class="slider-container">
-                            <input type="range" id="silenceDurationSlider" 
-                                   min="500" max="3000" step="250" value="1500">
-                            <span class="slider-value" id="silenceDurationValue">1500ms</span>
-                        </div>
-                        <p class="setting-description">用户停顿多久后AI开始回复</p>
+                        <input type="range" id="vadThreshold" min="0.1" max="1.0" step="0.1" value="0.5">
+                        <span class="slider-value" id="vadThresholdValue">0.5</span>
+                    </div>
+                    <p class="setting-description">调整语音检测的敏感度，值越小越敏感</p>
                     </div>
                     
                     <div class="setting-group">
-                        <label for="thresholdSlider">检测阈值</label>
+                    <label for="vadSilenceDuration">静音检测时长</label>
                         <div class="slider-container">
-                            <input type="range" id="thresholdSlider" 
-                                   min="0.1" max="0.9" step="0.1" value="0.5">
-                            <span class="slider-value" id="thresholdValue">0.5</span>
-                        </div>
-                        <p class="setting-description">语音检测敏感度 (越高越不敏感)</p>
+                        <input type="range" id="vadSilenceDuration" min="500" max="3000" step="100" value="1000">
+                        <span class="slider-value" id="vadSilenceDurationValue">1000ms</span>
+                    </div>
+                    <p class="setting-description">检测到静音后等待多长时间停止录音</p>
                     </div>
                     
                     <div class="setting-group">
-                        <label for="prefixPaddingSlider">前缀缓冲 (毫秒)</label>
+                    <label for="vadPrefixPadding">前缀填充时长</label>
                         <div class="slider-container">
-                            <input type="range" id="prefixPaddingSlider" 
-                                   min="0" max="1000" step="100" value="300">
-                            <span class="slider-value" id="prefixPaddingValue">300ms</span>
-                        </div>
-                        <p class="setting-description">语音开始前的缓冲时间</p>
+                        <input type="range" id="vadPrefixPadding" min="100" max="1000" step="50" value="300">
+                        <span class="slider-value" id="vadPrefixPaddingValue">300ms</span>
+                    </div>
+                    <p class="setting-description">在检测到语音前包含的音频时长</p>
                     </div>
                     
                     <div class="settings-actions">
                         <button class="btn-secondary" id="resetVadSettings">重置默认</button>
                         <button class="btn-primary" id="applyVadSettings">应用设置</button>
-                    </div>
                 </div>
             </div>
         </div>
@@ -516,6 +574,60 @@
             <div id="modalEvaluationContent" class="evaluation-display">
                 <div class="loading-spinner" style="display:none;">加载中...</div>
                 <div class="evaluation-actual-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 面试保存确认对话框 -->
+    <div id="saveInterviewModal" class="modal" style="display: none;">
+        <div class="modal-content save-interview-modal">
+            <div class="save-interview-header">
+                <div class="save-interview-icon">
+                    <i class="fas fa-save"></i>
+                </div>
+                <h3>保存面试记录</h3>
+                <p>您的面试对话已结束，是否需要保存本次面试记录？</p>
+            </div>
+            
+            <div class="save-interview-info">
+                <div class="interview-stats">
+                    <div class="stat-item">
+                        <i class="fas fa-clock"></i>
+                        <span class="stat-label">面试时长</span>
+                        <span class="stat-value" id="interviewDurationDisplay">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <i class="fas fa-comments"></i>
+                        <span class="stat-label">对话轮次</span>
+                        <span class="stat-value" id="interviewMessageCountDisplay">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <i class="fas fa-file-alt"></i>
+                        <span class="stat-label">简历状态</span>
+                        <span class="stat-value" id="resumeStatusDisplay">--</span>
+                    </div>
+                </div>
+                
+                <div class="save-benefits">
+                    <h4><i class="fas fa-star"></i> 保存后您可以：</h4>
+                    <ul>
+                        <li><i class="fas fa-chart-bar"></i> 获得详细的面试评分和分析</li>
+                        <li><i class="fas fa-history"></i> 在历史记录中随时查看回顾</li>
+                        <li><i class="fas fa-file-pdf"></i> 导出面试报告为PDF文档</li>
+                        <li><i class="fas fa-lightbulb"></i> 收到个性化的改进建议</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="save-interview-actions">
+                <button class="btn-secondary" id="discardInterviewBtn">
+                    <i class="fas fa-trash-alt"></i>
+                    不保存
+                </button>
+                <button class="btn-primary" id="saveInterviewBtn">
+                    <i class="fas fa-save"></i>
+                    保存记录
+                </button>
             </div>
         </div>
     </div>

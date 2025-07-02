@@ -33,7 +33,7 @@ class VoiceCallManager {
         // WebRTC连接相关
         this.peerConnection = null;
         this.dataChannel = null;
-        this.audioElement = null;
+        // audioElement 现在在 initElements() 中创建
         this.clientMedia = null;
         this.ephemeralKey = null;
         this.sessionId = null;
@@ -67,53 +67,89 @@ class VoiceCallManager {
      * 初始化DOM元素
      */
     initElements() {
-        // 语音通话界面元素
+        // 语音通话相关元素
         this.voiceCallOverlay = document.getElementById('voiceCallFullscreen');
         this.voiceStatus = document.getElementById('voiceStatusDisplay');
         this.voiceTimer = document.getElementById('voiceTimer');
-        this.endCallButton = document.getElementById('voiceEndBtn');
-        this.muteButton = document.getElementById('voiceMuteBtn');
-        this.settingsButton = document.getElementById('voiceSettingsBtn');
-        this.voiceVisualization = document.getElementById('voiceAnimationContainer');
-        
-        // VAD设置面板元素
+        this.endCallButton = document.getElementById('endCallButton');
+        this.muteButton = document.getElementById('muteButton');
+        this.vadSettingsButton = document.getElementById('vadSettingsButton');
         this.vadSettingsPanel = document.getElementById('vadSettingsPanel');
-        this.closeVadSettings = document.getElementById('closeVadSettings');
-        this.silenceDurationSlider = document.getElementById('silenceDurationSlider');
-        this.silenceDurationValue = document.getElementById('silenceDurationValue');
-        this.thresholdSlider = document.getElementById('thresholdSlider');
-        this.thresholdValue = document.getElementById('thresholdValue');
-        this.prefixPaddingSlider = document.getElementById('prefixPaddingSlider');
-        this.prefixPaddingValue = document.getElementById('prefixPaddingValue');
-        this.resetVadSettings = document.getElementById('resetVadSettings');
-        this.applyVadSettings = document.getElementById('applyVadSettings');
+        this.voiceCallButton = document.getElementById('voiceCallButton');
         
-        // 创建音频播放元素
+        // 语音通话界面状态显示元素
+        this.connectionQuality = document.getElementById('connectionQuality');
+        this.callStatus = document.getElementById('callStatus');
+        this.progressCount = document.getElementById('progressCount');
+        this.currentStatus = document.getElementById('currentStatus');
+        this.statusIcon = document.getElementById('statusIcon');
+        this.statusMessage = document.getElementById('statusMessage');
+        this.voiceLevelDisplay = document.getElementById('voiceLevelDisplay');
+        this.levelText = document.getElementById('levelText');
+        this.voiceTips = document.getElementById('voiceTips');
+        
+        // 保存面试确认对话框相关元素
+        this.saveInterviewModal = document.getElementById('saveInterviewModal');
+        this.confirmSaveButton = document.getElementById('saveInterviewBtn');
+        this.confirmDiscardButton = document.getElementById('discardInterviewBtn');
+        this.interviewDurationDisplay = document.getElementById('interviewDurationDisplay');
+        this.interviewMessageCountDisplay = document.getElementById('interviewMessageCountDisplay');
+        this.resumeStatusDisplay = document.getElementById('resumeStatusDisplay');
+        
+        // 状态面板相关元素已删除
+        
+        // VAD设置相关元素
+        this.vadThresholdSlider = document.getElementById('vadThreshold');
+        this.vadSilenceDurationSlider = document.getElementById('vadSilenceDuration');
+        this.vadPrefixPaddingSlider = document.getElementById('vadPrefixPadding');
+        this.closeVadSettingsButton = document.getElementById('closeVadSettings');
+        this.resetVadSettingsButton = document.getElementById('resetVadSettings');
+        this.applyVadSettingsButton = document.getElementById('applyVadSettings');
+        
+        // 初始化语音级别条
+        this.voiceLevelBars = document.querySelectorAll('.voice-level-display .level-bar');
+        
+        // 创建音频播放元素（用于播放AI音频delta）
+        this.audioPlayer = document.createElement('audio');
+        this.audioPlayer.style.display = 'none';
+        this.audioPlayer.volume = 1.0; // 确保音量最大
+        this.audioPlayer.preload = 'auto';
+        this.audioPlayer.controls = false;
+        document.body.appendChild(this.audioPlayer);
+        
+        // 创建远程音频流播放元素（用于WebRTC远程流）
         this.audioElement = document.createElement('audio');
-        this.audioElement.autoplay = true;
         this.audioElement.style.display = 'none';
+        this.audioElement.volume = 1.0;
+        this.audioElement.autoplay = true; // 自动播放远程流
+        this.audioElement.controls = false;
         document.body.appendChild(this.audioElement);
         
         // 创建调试日志容器
         this.logContainer = document.createElement('div');
-        this.logContainer.id = 'debugLogContainer';
+        this.logContainer.id = 'voiceCallDebugLog';
         this.logContainer.style.cssText = `
             position: fixed;
-            top: 10px;
+            bottom: 10px;
             right: 10px;
             width: 400px;
-            height: 300px;
-            background: rgba(0,0,0,0.9);
-            color: #00ff00;
+            max-height: 300px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
             font-family: monospace;
             font-size: 12px;
             padding: 10px;
-            border-radius: 5px;
+            border-radius: 8px;
             overflow-y: auto;
             z-index: 10000;
             display: none;
         `;
         document.body.appendChild(this.logContainer);
+        
+        // 状态面板已删除
+        
+        // 初始化语音通话界面状态
+        this.initVoiceCallStatus();
     }
     
     /**
@@ -131,8 +167,27 @@ class VoiceCallManager {
         }
         
         // 设置按钮
-        if (this.settingsButton) {
-            this.settingsButton.addEventListener('click', () => this.toggleVadSettings());
+        if (this.vadSettingsButton) {
+            this.vadSettingsButton.addEventListener('click', () => this.toggleVadSettings());
+        }
+        
+        // 保存确认对话框事件
+        if (this.confirmSaveButton) {
+            this.confirmSaveButton.addEventListener('click', () => this.confirmSaveInterview());
+        }
+        
+        if (this.confirmDiscardButton) {
+            this.confirmDiscardButton.addEventListener('click', () => this.confirmDiscardInterview());
+        }
+        
+        // 点击模态窗口背景关闭（保存确认对话框）
+        if (this.saveInterviewModal) {
+            this.saveInterviewModal.addEventListener('click', (e) => {
+                if (e.target === this.saveInterviewModal) {
+                    // 点击背景时不关闭，防止误操作
+                    // this.hideSaveInterviewModal();
+                }
+            });
         }
         
         // VAD设置面板事件
@@ -242,37 +297,37 @@ class VoiceCallManager {
      */
     bindVadSettingsEvents() {
         // 关闭设置面板
-        if (this.closeVadSettings) {
-            this.closeVadSettings.addEventListener('click', () => this.hideVadSettings());
+        if (this.closeVadSettingsButton) {
+            this.closeVadSettingsButton.addEventListener('click', () => this.hideVadSettings());
         }
         
         // 滑块事件
-        if (this.silenceDurationSlider) {
-            this.silenceDurationSlider.addEventListener('input', (e) => {
-                this.silenceDurationValue.textContent = `${e.target.value}ms`;
+        if (this.vadSilenceDurationSlider) {
+            this.vadSilenceDurationSlider.addEventListener('input', (e) => {
+                this.vadConfig.silence_duration_ms = parseInt(e.target.value);
             });
         }
         
-        if (this.thresholdSlider) {
-            this.thresholdSlider.addEventListener('input', (e) => {
-                this.thresholdValue.textContent = e.target.value;
+        if (this.vadThresholdSlider) {
+            this.vadThresholdSlider.addEventListener('input', (e) => {
+                this.vadConfig.threshold = parseFloat(e.target.value);
             });
         }
         
-        if (this.prefixPaddingSlider) {
-            this.prefixPaddingSlider.addEventListener('input', (e) => {
-                this.prefixPaddingValue.textContent = `${e.target.value}ms`;
+        if (this.vadPrefixPaddingSlider) {
+            this.vadPrefixPaddingSlider.addEventListener('input', (e) => {
+                this.vadConfig.prefix_padding_ms = parseInt(e.target.value);
             });
         }
         
         // 重置按钮
-        if (this.resetVadSettings) {
-            this.resetVadSettings.addEventListener('click', () => this.resetVadSettingsToDefault());
+        if (this.resetVadSettingsButton) {
+            this.resetVadSettingsButton.addEventListener('click', () => this.resetVadSettingsToDefault());
         }
         
         // 应用按钮
-        if (this.applyVadSettings) {
-            this.applyVadSettings.addEventListener('click', () => this.applyVadSettingsFromPanel());
+        if (this.applyVadSettingsButton) {
+            this.applyVadSettingsButton.addEventListener('click', () => this.applyVadSettingsFromPanel());
         }
         
         // 点击面板外部关闭
@@ -280,7 +335,7 @@ class VoiceCallManager {
             if (this.vadSettingsPanel && 
                 this.vadSettingsPanel.style.display === 'block' &&
                 !this.vadSettingsPanel.contains(e.target) &&
-                !this.settingsButton.contains(e.target)) {
+                !this.vadSettingsButton.contains(e.target)) {
                 this.hideVadSettings();
             }
         });
@@ -319,19 +374,16 @@ class VoiceCallManager {
      * 更新VAD设置面板的值
      */
     updateVadSettingsPanel() {
-        if (this.silenceDurationSlider) {
-            this.silenceDurationSlider.value = this.vadConfig.silence_duration_ms;
-            this.silenceDurationValue.textContent = `${this.vadConfig.silence_duration_ms}ms`;
+        if (this.vadSilenceDurationSlider) {
+            this.vadSilenceDurationSlider.value = this.vadConfig.silence_duration_ms;
         }
         
-        if (this.thresholdSlider) {
-            this.thresholdSlider.value = this.vadConfig.threshold;
-            this.thresholdValue.textContent = this.vadConfig.threshold;
+        if (this.vadThresholdSlider) {
+            this.vadThresholdSlider.value = this.vadConfig.threshold;
         }
         
-        if (this.prefixPaddingSlider) {
-            this.prefixPaddingSlider.value = this.vadConfig.prefix_padding_ms;
-            this.prefixPaddingValue.textContent = `${this.vadConfig.prefix_padding_ms}ms`;
+        if (this.vadPrefixPaddingSlider) {
+            this.vadPrefixPaddingSlider.value = this.vadConfig.prefix_padding_ms;
         }
     }
     
@@ -346,19 +398,16 @@ class VoiceCallManager {
         };
         
         // 更新滑块显示
-        if (this.silenceDurationSlider) {
-            this.silenceDurationSlider.value = defaultConfig.silence_duration_ms;
-            this.silenceDurationValue.textContent = `${defaultConfig.silence_duration_ms}ms`;
+        if (this.vadSilenceDurationSlider) {
+            this.vadSilenceDurationSlider.value = defaultConfig.silence_duration_ms;
         }
         
-        if (this.thresholdSlider) {
-            this.thresholdSlider.value = defaultConfig.threshold;
-            this.thresholdValue.textContent = defaultConfig.threshold;
+        if (this.vadThresholdSlider) {
+            this.vadThresholdSlider.value = defaultConfig.threshold;
         }
         
-        if (this.prefixPaddingSlider) {
-            this.prefixPaddingSlider.value = defaultConfig.prefix_padding_ms;
-            this.prefixPaddingValue.textContent = `${defaultConfig.prefix_padding_ms}ms`;
+        if (this.vadPrefixPaddingSlider) {
+            this.vadPrefixPaddingSlider.value = defaultConfig.prefix_padding_ms;
         }
         
         this.logMessage('VAD设置已重置为默认值');
@@ -369,9 +418,9 @@ class VoiceCallManager {
      */
     applyVadSettingsFromPanel() {
         const newConfig = {
-            threshold: parseFloat(this.thresholdSlider.value),
-            silence_duration_ms: parseInt(this.silenceDurationSlider.value),
-            prefix_padding_ms: parseInt(this.prefixPaddingSlider.value)
+            threshold: parseFloat(this.vadThresholdSlider.value),
+            silence_duration_ms: parseInt(this.vadSilenceDurationSlider.value),
+            prefix_padding_ms: parseInt(this.vadPrefixPaddingSlider.value)
         };
         
         this.updateVADConfig(newConfig);
@@ -471,7 +520,25 @@ class VoiceCallManager {
             // 设置音频播放
             this.peerConnection.ontrack = (event) => {
                 this.logMessage('收到远程音频流');
-                this.audioElement.srcObject = event.streams[0];
+                if (event.streams && event.streams.length > 0) {
+                    this.logMessage(`设置远程音频流，流数量: ${event.streams.length}`);
+                    this.audioElement.srcObject = event.streams[0];
+                    
+                    // 监听音频播放事件
+                    this.audioElement.onloadedmetadata = () => {
+                        this.logMessage('远程音频流元数据已加载');
+                    };
+                    
+                    this.audioElement.onplay = () => {
+                        this.logMessage('✅ 远程音频流开始播放');
+                    };
+                    
+                    this.audioElement.onerror = (error) => {
+                        this.logMessage(`❌ 远程音频流播放错误: ${error.message || error}`, 'error');
+                    };
+                } else {
+                    this.logMessage('远程音频流事件但没有流数据', 'warning');
+                }
             };
             
             // 获取用户媒体 - 根据官方文档配置音频参数
@@ -632,28 +699,110 @@ class VoiceCallManager {
                 break;
                 
             case "response.audio.delta":
-                // 音频数据流，不记录详细日志避免刷屏
+                // 音频数据流
                 this.updateVoiceStatus('AI正在回复...', 'speaking');
-                break;
-
-            case "response.audio_transcript.done":
-                this.currentTurnAIText = event.transcript;
-                break;
-
-            case "response.done":
-                this.logMessage("响应完成");
-                if (this.currentTurnAIText && this.currentTurnAIText.trim() !== "") {
-                    this.logMessage(`AI回复完成: "${this.currentTurnAIText}"`);
-                    this.currentInterviewMessages.push({ role: "assistant", content: this.currentTurnAIText });
-                    // 每次AI回复后保存当前面试，确保数据不丢失
-                    // this.saveCurrentInterview(); // 可以考虑在通话结束时统一保存
-                    this.currentTurnAIText = "";
+                if (event.delta) {
+                    this.logMessage(`收到音频delta，长度: ${event.delta.length}`);
+                    this.playAudioDelta(event.delta);
+                } else {
+                    this.logMessage('收到空的音频delta');
                 }
-                this.updateVoiceStatus('通话进行中...', 'connected');
+                break;
+                
+            case "response.audio_transcript.delta":
+                // 音频转录增量，可以用于实时显示AI的回复文本
+                if (event.delta) {
+                    this.logMessage(`AI回复转录: ${event.delta}`);
+                }
+                break;
+                
+            case "response.audio.done":
+                this.logMessage("AI音频回复完成");
+                this.updateVoiceStatus('正在聆听...', 'listening');
+                break;
+                
+            case "response.done":
+                this.logMessage("AI回复完成");
+                this.updateVoiceStatus('通话进行中', 'connected');
+                break;
+                
+            case "response.created":
+                this.logMessage("AI开始生成回复");
+                this.updateVoiceStatus('AI正在思考...', 'processing');
+                break;
+                
+            case "rate_limits.updated":
+                if (event.rate_limits) {
+                    this.logMessage(`速率限制更新: ${JSON.stringify(event.rate_limits)}`);
+                }
+                break;
+                
+            case "response.text.delta":
+                if (event.delta) {
+                    this.logMessage(`AI文本回复: ${event.delta}`);
+                    // 这里可以添加实时显示文本的逻辑
+                    this.handleTextResponse(event.delta);
+                }
+                break;
+                
+            case "response.text.done":
+                this.logMessage("AI文本回复完成");
+                break;
+                
+            case "response.audio_transcript.done":
+                this.logMessage("AI音频转录完成");
+                // 当AI音频转录完成时，保存完整的AI回复
+                if (event.transcript) {
+                    this.currentTurnAIText = event.transcript;
+                    this.logMessage(`AI完整回复: "${this.currentTurnAIText}"`);
+                    if (this.currentTurnAIText) {
+                        this.currentInterviewMessages.push({ role: "assistant", content: this.currentTurnAIText });
+                    }
+                }
+                break;
+                
+            case "response.content_part.done":
+                this.logMessage("AI内容部分完成");
+                break;
+                
+            case "response.output_item.done":
+                this.logMessage("AI输出项完成");
+                break;
+                
+            case "output_audio_buffer.stopped":
+                this.logMessage("输出音频缓冲区已停止");
+                break;
+                
+            case "conversation.item.created":
+                this.logMessage("对话项已创建");
+                break;
+                
+            case "conversation.item.truncated":
+                this.logMessage("对话项被截断");
+                break;
+                
+            case "error":
+                this.logMessage(`错误: ${event.error?.message || '未知错误'}`, 'error');
+                this.updateVoiceStatus('发生错误', 'error');
                 break;
                 
             default:
+                // 对于未知事件类型，记录但不处理
                 this.logMessage(`未处理的事件类型: ${event.type}`);
+        }
+        
+        // 如果有音频级别数据，更新语音级别显示
+        if (event.audio_level !== undefined) {
+            this.updateVoiceLevelDisplay(event.audio_level);
+        }
+        
+        // 模拟音频级别（用于演示，实际应该从音频流获取）
+        if (event.type === "input_audio_buffer.speech_started" || 
+            event.type === "response.audio.delta") {
+            this.simulateAudioLevel();
+        } else if (event.type === "input_audio_buffer.speech_stopped" || 
+                   event.type === "response.audio.done") {
+            this.updateVoiceLevelDisplay(0);
         }
     }
     
@@ -920,12 +1069,17 @@ class VoiceCallManager {
             // 检查WebSocket连接状态
             if (!this.azureVoiceChat.ws || this.azureVoiceChat.ws.readyState !== WebSocket.OPEN) {
                 this.showError('请等待连接建立后再开始语音通话');
-            return;
-        }
-        
+                return;
+            }
+            
             // 显示语音通话界面
             this.showVoiceCallInterface();
             this.updateVoiceStatus('正在初始化...', 'connecting');
+            this.updateInterviewPhase('初始化中');
+            
+            // 测试音频播放权限（通过播放一个静音音频）
+            await this.testAudioPlayback();
+            
             // 重置当前通话历史
             this.currentInterviewMessages = [];
 
@@ -942,6 +1096,7 @@ class VoiceCallManager {
             } else {
                 this.logMessage("开始新面试，对话历史已清空。");
             }            
+            
             // 获取临时密钥
             await this.getEphemeralKey();
             
@@ -956,12 +1111,19 @@ class VoiceCallManager {
             this.callStartTime = Date.now();
             this.startCallTimer();
             
+            // 更新状态面板
+            this.updateConnectionStatus('connected', '已连接');
+            this.updateInterviewPhase('进行中');
             this.updateVoiceStatus('通话进行中，可以开始说话', 'connected');
+            this.addSystemTip('语音通话已启动，请开始对话', 'success');
+            
             this.logMessage('语音通话启动成功，录制已开始');
             
         } catch (error) {
             this.logMessage(`语音通话启动失败: ${error.message}`);
             this.showError('无法开始语音通话: ' + error.message);
+            this.updateConnectionStatus('disconnected', '连接失败');
+            this.addSystemTip('语音通话启动失败: ' + error.message, 'error');
             this.endVoiceCall();
         }
     }
@@ -973,12 +1135,6 @@ class VoiceCallManager {
         this.logMessage('结束语音通话...');
         
         try {
-            // 触发面试评分（在关闭连接之前）
-            // if (this.azureVoiceChat && this.azureVoiceChat.isInterviewActive) {
-            //     this.logMessage('触发面试评分...');
-            //     await this.azureVoiceChat.endInterviewRecording();
-            // }
-            
             // 关闭数据通道
             if (this.dataChannel) {
                 this.dataChannel.close();
@@ -999,6 +1155,7 @@ class VoiceCallManager {
             
             // 停止计时器
             this.stopCallTimer();
+            // 状态更新定时器已删除
             
             // 重置状态
             this.isCallActive = false;
@@ -1006,18 +1163,32 @@ class VoiceCallManager {
             this.ephemeralKey = null;
             this.sessionId = null;
             
+            // 更新状态面板
+            this.updateConnectionStatus('disconnected', '已断开');
+            this.updateAudioStatus('pending', '音频待机');
+            this.updateInterviewPhase('已结束');
+            this.updateVoiceLevel(0);
+            this.addSystemTip('语音通话已结束', 'info');
+            
             // 隐藏语音通话界面
             this.hideVoiceCallInterface();
             
             this.logMessage('语音通话已结束');
 
-            this.logMessage('Interview has been saved successfully.');
-            // **在通话结束后统一保存面试记录**
-            await this.saveCurrentInterview();
-            // 清空当前面试历史，为下一次通话做准备
-            this.currentInterviewMessages = [];
+            // 检查是否有面试内容需要保存
+            if (this.currentInterviewMessages.length > 0) {
+                // 显示保存确认对话框
+                this.showSaveInterviewModal();
+            } else {
+                this.logMessage('当前面试无对话内容，无需保存。');
+                // 清空当前面试历史，为下一次通话做准备
+                this.currentInterviewMessages = [];
+                // 重新启动状态更新定时器
+                this.startStatusUpdateTimer();
+            }
         } catch (error) {
             this.logMessage(`结束语音通话时出错: ${error.message}`);
+            this.addSystemTip('结束通话时出现错误: ' + error.message, 'error');
         }
     }
     
@@ -1134,10 +1305,38 @@ class VoiceCallManager {
      * 更新语音状态
      */
     updateVoiceStatus(text, className = '') {
+        // 更新原有的语音状态显示
         if (this.voiceStatus) {
             this.voiceStatus.textContent = text;
-            this.voiceStatus.className = `voice-status ${className}`;
+            this.voiceStatus.className = `voice-status-text ${className}`;
         }
+        
+        // 同时更新状态面板
+        switch (className) {
+            case 'listening':
+                this.updateAudioStatus('active', '正在聆听');
+                break;
+            case 'processing':
+                this.updateAudioStatus('active', '正在处理');
+                break;
+            case 'speaking':
+                this.updateAudioStatus('active', 'AI回复中');
+                break;
+            case 'connected':
+                this.updateAudioStatus('connected', '通话进行中');
+                break;
+            case 'muted':
+                this.updateAudioStatus('pending', '麦克风静音');
+                break;
+            case 'error':
+                this.updateAudioStatus('disconnected', '音频错误');
+                break;
+            default:
+                this.updateAudioStatus('pending', text);
+        }
+        
+        // 更新语音通话界面状态
+        this.updateVoiceCallStatus(text, className);
     }
     
     /**
@@ -1180,6 +1379,841 @@ class VoiceCallManager {
         if (typeof this.azureVoiceChat.showError === 'function') {
             this.azureVoiceChat.showError(message);
         }
+    }
+    
+    /**
+     * 显示保存面试确认对话框
+     */
+    showSaveInterviewModal() {
+        if (!this.saveInterviewModal) {
+            this.logMessage('保存确认对话框元素未找到');
+            // 如果对话框不存在，直接保存
+            this.saveCurrentInterview();
+            return;
+        }
+        
+        // 计算面试统计信息
+        const duration = this.azureVoiceChat.interviewStartTime ? 
+            Math.floor((Date.now() - this.azureVoiceChat.interviewStartTime) / 1000) : 0;
+        const messageCount = this.currentInterviewMessages.length;
+        const resumeData = this.storageManager.getCurrentResume();
+        
+        // 更新统计显示
+        if (this.interviewDurationDisplay) {
+            if (duration >= 60) {
+                const minutes = Math.floor(duration / 60);
+                const seconds = duration % 60;
+                this.interviewDurationDisplay.textContent = `${minutes}分${seconds}秒`;
+            } else {
+                this.interviewDurationDisplay.textContent = `${duration}秒`;
+            }
+        }
+        
+        if (this.interviewMessageCountDisplay) {
+            this.interviewMessageCountDisplay.textContent = `${messageCount}轮`;
+        }
+        
+        if (this.resumeStatusDisplay) {
+            this.resumeStatusDisplay.textContent = resumeData ? resumeData.fileName : '未上传';
+        }
+        
+        // 显示对话框
+        this.saveInterviewModal.style.display = 'flex';
+        this.logMessage('显示保存面试确认对话框');
+    }
+    
+    /**
+     * 隐藏保存面试确认对话框
+     */
+    hideSaveInterviewModal() {
+        if (this.saveInterviewModal) {
+            this.saveInterviewModal.style.display = 'none';
+        }
+    }
+    
+    /**
+     * 确认保存面试记录
+     */
+    async confirmSaveInterview() {
+        this.hideSaveInterviewModal();
+        this.logMessage('用户选择保存面试记录');
+        
+        try {
+            await this.saveCurrentInterview();
+            this.logMessage('面试记录保存成功');
+        } catch (error) {
+            this.logMessage(`保存面试记录失败: ${error.message}`);
+            this.showError('保存面试记录失败: ' + error.message);
+        } finally {
+            // 清空当前面试历史，为下一次通话做准备
+            this.currentInterviewMessages = [];
+        }
+    }
+    
+    /**
+     * 确认丢弃面试记录
+     */
+    confirmDiscardInterview() {
+        this.hideSaveInterviewModal();
+        this.logMessage('用户选择不保存面试记录');
+        
+        // 清空当前面试历史
+        this.currentInterviewMessages = [];
+        this.logMessage('面试记录已丢弃');
+    }
+    
+    // ===== 状态面板管理方法 =====
+    
+    /**
+     * 初始化状态面板
+     */
+    initStatusPanel() {
+        // 绑定面板切换事件
+        if (this.statusPanelToggle) {
+            this.statusPanelToggle.addEventListener('click', () => this.toggleStatusPanel());
+        }
+        
+        // 初始化状态
+        this.updateConnectionStatus('connecting', '连接中...');
+        this.updateAudioStatus('pending', '音频待机');
+        this.updateInterviewPhase('准备中');
+        this.updateConversationRounds(0);
+        this.updateInterviewDuration(0);
+        
+        // 初始化语音级别
+        this.initVoiceLevelMeter();
+        
+        // 添加初始提示
+        this.addSystemTip('确保网络连接稳定，选择安静的环境进行面试', 'info');
+        
+        // 启动状态更新定时器
+        this.startStatusUpdateTimer();
+        
+        this.logMessage('状态面板初始化完成');
+    }
+    
+    /**
+     * 切换状态面板显示/隐藏
+     */
+    toggleStatusPanel() {
+        if (!this.statusPanelContent || !this.statusPanelToggle) return;
+        
+        const isCollapsed = this.statusPanelContent.classList.contains('collapsed');
+        
+        if (isCollapsed) {
+            this.statusPanelContent.classList.remove('collapsed');
+            this.statusPanelToggle.classList.remove('collapsed');
+        } else {
+            this.statusPanelContent.classList.add('collapsed');
+            this.statusPanelToggle.classList.add('collapsed');
+        }
+        
+        this.logMessage(`状态面板${isCollapsed ? '展开' : '收起'}`);
+    }
+    
+    /**
+     * 更新连接状态
+     */
+    updateConnectionStatus(status, text) {
+        if (!this.connectionStatus) return;
+        
+        const statusDot = this.connectionStatus.querySelector('.status-dot');
+        const statusText = this.connectionStatus.querySelector('.status-text');
+        
+        if (statusDot) {
+            statusDot.className = `status-dot ${status}`;
+        }
+        
+        if (statusText) {
+            statusText.textContent = text;
+        }
+        
+        // 根据连接状态更新系统提示
+        switch (status) {
+            case 'connected':
+                this.addSystemTip('连接已建立，可以开始面试', 'success');
+                break;
+            case 'connecting':
+                this.addSystemTip('正在建立连接，请稍候...', 'info');
+                break;
+            case 'disconnected':
+                this.addSystemTip('连接已断开，请检查网络', 'error');
+                break;
+        }
+    }
+    
+    /**
+     * 更新音频状态
+     */
+    updateAudioStatus(status, text) {
+        if (!this.audioStatus) return;
+        
+        const statusDot = this.audioStatus.querySelector('.status-dot');
+        const statusText = this.audioStatus.querySelector('.status-text');
+        
+        if (statusDot) {
+            statusDot.className = `status-dot ${status}`;
+        }
+        
+        if (statusText) {
+            statusText.textContent = text;
+        }
+    }
+    
+    /**
+     * 更新面试阶段
+     */
+    updateInterviewPhase(phase) {
+        if (this.interviewPhase) {
+            this.interviewPhase.textContent = phase;
+        }
+        
+        // 根据阶段更新提示
+        switch (phase) {
+            case '准备中':
+                this.addSystemTip('面试准备阶段，请确认设备正常', 'info');
+                break;
+            case '进行中':
+                this.addSystemTip('面试进行中，请保持自然对话', 'success');
+                break;
+            case '已结束':
+                this.addSystemTip('面试已结束，感谢您的参与', 'success');
+                break;
+        }
+    }
+    
+    /**
+     * 更新对话轮次
+     */
+    updateConversationRounds(rounds) {
+        if (this.conversationRounds) {
+            this.conversationRounds.textContent = rounds.toString();
+        }
+    }
+    
+    /**
+     * 更新面试时长
+     */
+    updateInterviewDuration(seconds) {
+        if (this.interviewDurationPanel) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            this.interviewDurationPanel.textContent = 
+                `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
+    }
+    
+    /**
+     * 初始化语音级别计
+     */
+    initVoiceLevelMeter() {
+        this.voiceLevelBars = document.querySelectorAll('.level-bar');
+        this.currentVoiceLevel = 0;
+        this.updateVoiceLevel(0);
+    }
+    
+    /**
+     * 更新语音级别显示
+     */
+    updateVoiceLevel(level) {
+        if (!this.voiceLevelBars) return;
+        
+        // level 范围 0-1
+        const normalizedLevel = Math.max(0, Math.min(1, level));
+        const activeBarCount = Math.floor(normalizedLevel * this.voiceLevelBars.length);
+        
+        this.voiceLevelBars.forEach((bar, index) => {
+            bar.classList.remove('active', 'high', 'peak');
+            
+            if (index < activeBarCount) {
+                bar.classList.add('active');
+                
+                if (normalizedLevel > 0.7 && index >= 3) {
+                    bar.classList.add('high');
+                }
+                
+                if (normalizedLevel > 0.9 && index === 4) {
+                    bar.classList.add('peak');
+                }
+            }
+        });
+        
+        // 更新级别文本
+        if (this.voiceLevelText) {
+            if (normalizedLevel < 0.1) {
+                this.voiceLevelText.textContent = '静音';
+            } else if (normalizedLevel < 0.3) {
+                this.voiceLevelText.textContent = '低';
+            } else if (normalizedLevel < 0.7) {
+                this.voiceLevelText.textContent = '中';
+            } else if (normalizedLevel < 0.9) {
+                this.voiceLevelText.textContent = '高';
+            } else {
+                this.voiceLevelText.textContent = '很高';
+            }
+        }
+        
+        this.currentVoiceLevel = normalizedLevel;
+    }
+    
+    /**
+     * 更新音频质量信息
+     */
+    updateAudioQuality(quality, latency) {
+        if (this.audioQuality) {
+            this.audioQuality.textContent = quality;
+            this.audioQuality.className = 'quality-value';
+            
+            if (quality === '差') {
+                this.audioQuality.classList.add('error');
+            } else if (quality === '一般') {
+                this.audioQuality.classList.add('warning');
+            }
+        }
+        
+        if (this.audioLatency) {
+            this.audioLatency.textContent = latency;
+            this.audioLatency.className = 'quality-value';
+            
+            const latencyMs = parseInt(latency);
+            if (latencyMs > 300) {
+                this.audioLatency.classList.add('error');
+            } else if (latencyMs > 150) {
+                this.audioLatency.classList.add('warning');
+            }
+        }
+    }
+    
+    /**
+     * 添加系统提示
+     */
+    addSystemTip(message, type = 'info', duration = 5000) {
+        if (!this.systemTips) return;
+        
+        // 创建提示元素
+        const tipElement = document.createElement('div');
+        tipElement.className = `tip-item ${type}`;
+        
+        const iconMap = {
+            info: 'fas fa-info-circle',
+            success: 'fas fa-check-circle',
+            warning: 'fas fa-exclamation-triangle',
+            error: 'fas fa-times-circle'
+        };
+        
+        tipElement.innerHTML = `
+            <i class="${iconMap[type] || iconMap.info}"></i>
+            <span>${message}</span>
+        `;
+        
+        // 添加到容器顶部
+        this.systemTips.insertBefore(tipElement, this.systemTips.firstChild);
+        
+        // 限制提示数量
+        const tips = this.systemTips.querySelectorAll('.tip-item');
+        if (tips.length > 3) {
+            tips[tips.length - 1].remove();
+        }
+        
+        // 自动移除（除了错误提示）
+        if (type !== 'error' && duration > 0) {
+            setTimeout(() => {
+                if (tipElement.parentNode) {
+                    tipElement.remove();
+                }
+            }, duration);
+        }
+    }
+    
+    /**
+     * 启动状态更新定时器
+     */
+    startStatusUpdateTimer() {
+        // 每秒更新一次时长和语音级别
+        this.statusUpdateTimer = setInterval(() => {
+            // 更新面试时长
+            if (this.azureVoiceChat.interviewStartTime) {
+                const duration = Math.floor((Date.now() - this.azureVoiceChat.interviewStartTime) / 1000);
+                this.updateInterviewDuration(duration);
+            }
+            
+            // 更新对话轮次
+            if (this.currentInterviewMessages) {
+                this.updateConversationRounds(this.currentInterviewMessages.length);
+            }
+            
+            // 模拟语音级别（实际应该从音频分析器获取）
+            if (this.isCallActive) {
+                const randomLevel = Math.random() * 0.3 + (this.currentVoiceLevel * 0.7);
+                this.updateVoiceLevel(randomLevel);
+            } else {
+                this.updateVoiceLevel(0);
+            }
+        }, 1000);
+    }
+    
+    /**
+     * 停止状态更新定时器
+     */
+    stopStatusUpdateTimer() {
+        if (this.statusUpdateTimer) {
+            clearInterval(this.statusUpdateTimer);
+            this.statusUpdateTimer = null;
+        }
+    }
+    
+    // ===== 语音通话界面状态管理方法 =====
+    
+    /**
+     * 初始化语音通话界面状态
+     */
+    initVoiceCallStatus() {
+        // 初始化连接质量
+        this.updateConnectionQuality('good');
+        
+        // 初始化通话状态
+        this.updateCallStatus('准备中', 'pending');
+        
+        // 初始化进度计数
+        this.updateProgressCount(0);
+        
+        // 初始化当前状态
+        this.updateCurrentStatus('准备开始面试', 'microphone', 'pending');
+        
+        // 初始化语音级别
+        this.updateVoiceLevelDisplay(0);
+        
+        // 添加初始提示
+        this.addVoiceTip('确保麦克风权限已开启，环境安静', 'info');
+        
+        this.logMessage('语音通话界面状态初始化完成');
+    }
+    
+    /**
+     * 更新连接质量显示
+     */
+    updateConnectionQuality(quality) {
+        if (!this.connectionQuality) return;
+        
+        const signalBars = this.connectionQuality.querySelector('.signal-bars');
+        const qualityText = this.connectionQuality.querySelector('.quality-text');
+        
+        if (signalBars) {
+            signalBars.className = `signal-bars ${quality}`;
+        }
+        
+        if (qualityText) {
+            const qualityMap = {
+                excellent: '连接优秀',
+                good: '连接良好',
+                fair: '连接一般',
+                poor: '连接较差'
+            };
+            qualityText.textContent = qualityMap[quality] || '连接状态';
+        }
+    }
+    
+    /**
+     * 更新通话状态
+     */
+    updateCallStatus(text, status = 'active') {
+        if (!this.callStatus) return;
+        
+        const statusDot = this.callStatus.querySelector('.status-indicator-dot');
+        const statusText = this.callStatus.querySelector('.status-text');
+        
+        if (statusDot) {
+            statusDot.className = `status-indicator-dot ${status}`;
+        }
+        
+        if (statusText) {
+            statusText.textContent = text;
+        }
+    }
+    
+    /**
+     * 更新进度计数
+     */
+    updateProgressCount(count) {
+        if (this.progressCount) {
+            this.progressCount.textContent = count.toString();
+        }
+    }
+    
+    /**
+     * 更新当前状态显示
+     */
+    updateCurrentStatus(message, iconClass = 'microphone', statusClass = 'pending') {
+        // 图标已被隐藏，不再更新图标样式
+        // if (this.statusIcon) {
+        //     this.statusIcon.className = `fas fa-${iconClass}`;
+        //     this.statusIcon.parentElement.className = `status-icon ${statusClass}`;
+        // }
+        
+        if (this.statusMessage) {
+            this.statusMessage.textContent = message;
+        }
+    }
+    
+    /**
+     * 更新语音级别显示
+     */
+    updateVoiceLevelDisplay(level) {
+        if (!this.voiceLevelBars || this.voiceLevelBars.length === 0) return;
+        
+        // level 范围 0-1
+        const normalizedLevel = Math.max(0, Math.min(1, level));
+        const activeBarCount = Math.floor(normalizedLevel * this.voiceLevelBars.length);
+        
+        this.voiceLevelBars.forEach((bar, index) => {
+            bar.classList.remove('active', 'medium', 'high');
+            
+            if (index < activeBarCount) {
+                bar.classList.add('active');
+                
+                // 根据级别添加不同颜色
+                if (normalizedLevel > 0.8 && index >= 6) {
+                    bar.classList.add('high');
+                } else if (normalizedLevel > 0.5 && index >= 4) {
+                    bar.classList.add('medium');
+                }
+            }
+        });
+        
+        // 更新级别文本
+        if (this.levelText) {
+            if (normalizedLevel < 0.1) {
+                this.levelText.textContent = '静音';
+            } else if (normalizedLevel < 0.3) {
+                this.levelText.textContent = '低';
+            } else if (normalizedLevel < 0.6) {
+                this.levelText.textContent = '中';
+            } else if (normalizedLevel < 0.8) {
+                this.levelText.textContent = '高';
+            } else {
+                this.levelText.textContent = '很高';
+            }
+        }
+    }
+    
+    /**
+     * 添加语音提示
+     */
+    addVoiceTip(message, type = 'info', duration = 5000) {
+        if (!this.voiceTips) return;
+        
+        // 移除旧的提示
+        const existingTips = this.voiceTips.querySelectorAll('.tip-item');
+        existingTips.forEach(tip => tip.classList.remove('active'));
+        
+        // 创建新提示
+        const tipElement = document.createElement('div');
+        tipElement.className = 'tip-item';
+        
+        const iconMap = {
+            info: 'fas fa-info-circle',
+            success: 'fas fa-check-circle',
+            warning: 'fas fa-exclamation-triangle',
+            error: 'fas fa-times-circle'
+        };
+        
+        tipElement.innerHTML = `
+            <i class="${iconMap[type] || iconMap.info}"></i>
+            <span>${message}</span>
+        `;
+        
+        // 清空容器并添加新提示
+        this.voiceTips.innerHTML = '';
+        this.voiceTips.appendChild(tipElement);
+        
+        // 显示动画
+        setTimeout(() => {
+            tipElement.classList.add('active');
+        }, 100);
+        
+        // 自动隐藏
+        if (duration > 0) {
+            setTimeout(() => {
+                tipElement.classList.remove('active');
+            }, duration);
+        }
+    }
+    
+    /**
+     * 更新语音通话状态（集成方法）
+     */
+    updateVoiceCallStatus(text, className = '') {
+        // 根据状态类更新各个组件
+        switch (className) {
+            case 'listening':
+                this.updateCallStatus('正在聆听', 'listening');
+                this.updateCurrentStatus('请说话，我在聆听...', 'microphone', 'listening');
+                this.addVoiceTip('检测到您的声音，请继续说话', 'info', 3000);
+                break;
+                
+            case 'processing':
+                this.updateCallStatus('正在处理', 'processing');
+                this.updateCurrentStatus('正在分析您的回答...', 'cog', 'processing');
+                this.addVoiceTip('正在处理您的回答，请稍候', 'info', 3000);
+                break;
+                
+            case 'speaking':
+                this.updateCallStatus('AI回复中', 'speaking');
+                this.updateCurrentStatus('AI正在回复...', 'volume-up', 'speaking');
+                this.addVoiceTip('AI正在回复，请仔细聆听', 'success', 3000);
+                break;
+                
+            case 'connected':
+                this.updateCallStatus('通话进行中', 'active');
+                this.updateCurrentStatus('通话进行中，可以开始对话', 'microphone', 'active');
+                break;
+                
+            case 'muted':
+                this.updateCallStatus('麦克风静音', 'muted');
+                this.updateCurrentStatus('麦克风已静音', 'microphone-slash', 'muted');
+                this.addVoiceTip('麦克风已静音，点击取消静音继续对话', 'warning', 0);
+                break;
+                
+            case 'error':
+                this.updateCallStatus('连接错误', 'error');
+                this.updateCurrentStatus('连接出现问题', 'exclamation-triangle', 'error');
+                this.addVoiceTip('连接出现问题：' + text, 'error', 0);
+                break;
+                
+            case 'connecting':
+                this.updateCallStatus('正在连接', 'connecting');
+                this.updateCurrentStatus('正在建立连接...', 'spinner', 'connecting');
+                this.addVoiceTip('正在建立连接，请稍候', 'info', 3000);
+                break;
+                
+            default:
+                this.updateCallStatus(text, 'active');
+                this.updateCurrentStatus(text, 'microphone', 'active');
+        }
+        
+        // 更新对话轮次
+        if (this.currentInterviewMessages) {
+            this.updateProgressCount(Math.floor(this.currentInterviewMessages.length / 2));
+        }
+    }
+    
+    /**
+     * 模拟音频级别（用于演示）
+     */
+    simulateAudioLevel() {
+        if (this.audioLevelInterval) {
+            clearInterval(this.audioLevelInterval);
+        }
+        
+        this.audioLevelInterval = setInterval(() => {
+            // 生成随机音频级别
+            const baseLevel = 0.3 + Math.random() * 0.5;
+            const variation = Math.sin(Date.now() / 200) * 0.2;
+            const level = Math.max(0, Math.min(1, baseLevel + variation));
+            
+            this.updateVoiceLevelDisplay(level);
+        }, 100);
+        
+        // 3秒后停止模拟
+        setTimeout(() => {
+            if (this.audioLevelInterval) {
+                clearInterval(this.audioLevelInterval);
+                this.audioLevelInterval = null;
+            }
+        }, 3000);
+    }
+    
+    /**
+     * 播放音频数据
+     */
+    playAudioDelta(audioData) {
+        try {
+            if (!this.audioPlayer) {
+                this.logMessage('音频播放器未初始化', 'error');
+                return;
+            }
+            
+            if (!audioData) {
+                this.logMessage('音频数据为空', 'warning');
+                return;
+            }
+            
+            this.logMessage(`收到音频数据，长度: ${audioData.length} 字符`);
+            
+            // 将base64音频数据转换为ArrayBuffer
+            try {
+                const binaryString = atob(audioData);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                
+                this.logMessage(`音频数据转换完成，字节长度: ${bytes.length}`);
+                
+                // 创建音频blob，尝试PCM16格式（Azure OpenAI的默认格式）
+                const blob = new Blob([bytes], { type: 'audio/wav' });
+                const audioUrl = URL.createObjectURL(blob);
+                
+                // 停止当前播放的音频
+                if (!this.audioPlayer.paused) {
+                    this.audioPlayer.pause();
+                }
+                
+                this.audioPlayer.src = audioUrl;
+                this.audioPlayer.currentTime = 0;
+                
+                // 尝试播放音频
+                const playPromise = this.audioPlayer.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        this.logMessage('✅ 音频播放成功');
+                    }).catch(error => {
+                        this.logMessage(`❌ 音频播放失败: ${error.name} - ${error.message}`, 'error');
+                        
+                        // 如果是自动播放策略问题，提供解决方案
+                        if (error.name === 'NotAllowedError') {
+                            this.logMessage('浏览器阻止了自动播放，需要用户交互', 'warning');
+                            this.addVoiceTip('音频被浏览器阻止，请点击页面任意位置启用声音', 'warning', 8000);
+                        }
+                        
+                        // 清理资源
+                        URL.revokeObjectURL(audioUrl);
+                    });
+                }
+                
+                // 音频播放结束时清理资源
+                this.audioPlayer.onended = () => {
+                    this.logMessage('音频播放完毕');
+                    URL.revokeObjectURL(audioUrl);
+                };
+                
+                // 音频加载错误处理
+                this.audioPlayer.onerror = (event) => {
+                    this.logMessage(`音频加载错误: ${event.target.error?.message || '未知错误'}`, 'error');
+                    URL.revokeObjectURL(audioUrl);
+                };
+                
+            } catch (decodeError) {
+                this.logMessage(`Base64解码错误: ${decodeError.message}`, 'error');
+            }
+            
+        } catch (error) {
+            this.logMessage(`音频数据处理错误: ${error.message}`, 'error');
+            this.logMessage(`错误堆栈: ${error.stack}`, 'error');
+        }
+    }
+    
+    /**
+     * 处理文本回复
+     */
+    handleTextResponse(textDelta) {
+        if (!this.currentTurnAIText) {
+            this.currentTurnAIText = '';
+        }
+        
+        this.currentTurnAIText += textDelta;
+        
+        // 可以在这里添加实时显示文本的逻辑
+        // 例如更新某个显示区域显示正在生成的文本
+    }
+    
+    /**
+     * 测试音频播放权限
+     */
+    async testAudioPlayback() {
+        try {
+            if (!this.audioPlayer) {
+                this.logMessage('音频播放器未初始化', 'error');
+                return false;
+            }
+            
+            this.logMessage('正在测试音频播放权限...');
+            
+            // 创建一个很短的静音音频文件 (WAV格式)
+            // 这是一个44字节的WAV文件头 + 很短的静音数据
+            const silentAudioData = new Uint8Array([
+                0x52, 0x49, 0x46, 0x46, 0x28, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45, 0x66, 0x6D, 0x74, 0x20,
+                0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x44, 0xAC, 0x00, 0x00, 0x88, 0x58, 0x01, 0x00,
+                0x02, 0x00, 0x10, 0x00, 0x64, 0x61, 0x74, 0x61, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            ]);
+            
+            const blob = new Blob([silentAudioData], { type: 'audio/wav' });
+            const audioUrl = URL.createObjectURL(blob);
+            
+            this.audioPlayer.src = audioUrl;
+            this.audioPlayer.volume = 0.01; // 设置很低的音量避免打扰
+            
+            try {
+                await this.audioPlayer.play();
+                this.logMessage('音频播放权限测试成功');
+                this.audioPlayer.pause();
+                this.audioPlayer.currentTime = 0;
+                this.audioPlayer.volume = 1.0; // 恢复正常音量
+                URL.revokeObjectURL(audioUrl);
+                return true;
+            } catch (error) {
+                this.logMessage(`音频播放权限测试失败: ${error.name} - ${error.message}`, 'warning');
+                
+                if (error.name === 'NotAllowedError') {
+                    this.addVoiceTip('请允许浏览器播放音频，或点击页面任意位置后重试', 'warning', 10000);
+                    
+                    // 等待用户交互
+                    await this.waitForUserInteraction();
+                    
+                    // 重试
+                    try {
+                        await this.audioPlayer.play();
+                        this.logMessage('音频播放权限测试重试成功');
+                        this.audioPlayer.pause();
+                        this.audioPlayer.currentTime = 0;
+                        this.audioPlayer.volume = 1.0;
+                        URL.revokeObjectURL(audioUrl);
+                        return true;
+                    } catch (retryError) {
+                        this.logMessage(`音频播放权限重试失败: ${retryError.message}`, 'error');
+                        URL.revokeObjectURL(audioUrl);
+                        return false;
+                    }
+                }
+                
+                URL.revokeObjectURL(audioUrl);
+                return false;
+            }
+            
+        } catch (error) {
+            this.logMessage(`测试音频播放权限时出错: ${error.message}`, 'error');
+            return false;
+        }
+    }
+    
+    /**
+     * 等待用户交互
+     */
+    async waitForUserInteraction() {
+        return new Promise((resolve) => {
+            this.logMessage('等待用户交互以启用音频播放...');
+            
+            const handleUserInteraction = () => {
+                this.logMessage('检测到用户交互');
+                document.removeEventListener('click', handleUserInteraction);
+                document.removeEventListener('touchstart', handleUserInteraction);
+                document.removeEventListener('keydown', handleUserInteraction);
+                resolve();
+            };
+            
+            document.addEventListener('click', handleUserInteraction);
+            document.addEventListener('touchstart', handleUserInteraction);
+            document.addEventListener('keydown', handleUserInteraction);
+            
+            // 5秒后自动继续
+            setTimeout(() => {
+                document.removeEventListener('click', handleUserInteraction);
+                document.removeEventListener('touchstart', handleUserInteraction);
+                document.removeEventListener('keydown', handleUserInteraction);
+                resolve();
+            }, 5000);
+        });
     }
 }
 

@@ -265,18 +265,23 @@ class AzureVoiceChat {
     }
     
     bindEvents() {
+        // 保存绑定的函数引用，以便后续移除
+        this.startInterviewHandler = () => {
+            this.startInterview();
+        };
+        
+        this.startActualInterviewHandler = () => {
+            this.startActualInterview();
+        };
+        
         // 语音通话按钮事件
         if (this.voiceCallButton) {
-            this.voiceCallButton.addEventListener('click', () => {
-                this.startInterview();
-            });
+            this.voiceCallButton.addEventListener('click', this.startInterviewHandler);
         }
         
         // 欢迎界面开始面试按钮事件
         if (this.heroStartButton) {
-            this.heroStartButton.addEventListener('click', () => {
-                this.startInterview();
-            });
+            this.heroStartButton.addEventListener('click', this.startInterviewHandler);
         }
     }
     
@@ -290,18 +295,65 @@ class AzureVoiceChat {
             return;
         }
         
-        // 开始记录面试
-        this.startInterviewRecording();
+        // 显示准备页面阶段
+        this.showPreparationStage();
+    }
+    
+    showPreparationStage() {
+        console.log('显示面试准备页面');
         
-        // 切换到聊天界面
+        // 切换到聊天界面但保持在准备状态
         const welcomeSection = document.querySelector('.interview-welcome');
         const chatSection = document.querySelector('.interview-chat');
         
         if (welcomeSection && chatSection) {
-            console.log('切换到聊天界面');
+            console.log('切换到准备界面');
             welcomeSection.style.display = 'none';
             chatSection.style.display = 'flex';
+            chatSection.classList.add('preparation-mode');
+        }
+        
+        // 更新语音控制按钮为真正的开始面试
+        if (this.voiceCallButton) {
+            const btnText = this.voiceCallButton.querySelector('.btn-text');
+            if (btnText) {
+                btnText.textContent = '确认开始面试';
+            }
+            
+            // 移除旧的事件监听器并添加新的
+            this.voiceCallButton.removeEventListener('click', this.startInterviewHandler);
+            this.voiceCallButton.addEventListener('click', this.startActualInterviewHandler);
+        }
+        
+        // 更新状态提示
+        if (this.voiceHint) {
+            this.voiceHint.textContent = '确认开始您的AI语音面试';
+        }
+    }
+    
+    startActualInterview() {
+        console.log('确认开始实际面试');
+        
+        // 移除准备模式样式
+        const chatSection = document.querySelector('.interview-chat');
+        if (chatSection) {
+            chatSection.classList.remove('preparation-mode');
             chatSection.classList.add('active');
+        }
+        
+        // 开始记录面试
+        this.startInterviewRecording();
+        
+        // 恢复按钮原始状态和文本
+        if (this.voiceCallButton) {
+            const btnText = this.voiceCallButton.querySelector('.btn-text');
+            if (btnText) {
+                btnText.textContent = '开始面试';
+            }
+            
+            // 恢复原始的事件监听器
+            this.voiceCallButton.removeEventListener('click', this.startActualInterviewHandler);
+            this.voiceCallButton.addEventListener('click', this.startInterviewHandler);
         }
         
         // 启动语音通话
@@ -378,34 +430,56 @@ class AzureVoiceChat {
     
 
     setStatus(text, className = '') {
-        console.log('更新状态:', text, className);
+        const statusElement = document.querySelector('.status-text');
+        const connectionIndicator = document.querySelector('.connection-indicator');
         
-        // 更新导航栏状态
-        const navStatus = document.getElementById('connectionStatus');
-        if (navStatus) {
-            const statusText = navStatus.querySelector('.status-text');
-            const statusDot = navStatus.querySelector('.status-dot');
-            if (statusText) {
-                statusText.textContent = text;
-            }
-            navStatus.className = `connection-indicator ${className}`;
+        if (statusElement) {
+            statusElement.textContent = text;
+        }
+        
+        if (connectionIndicator) {
+            const statusDot = connectionIndicator.querySelector('.status-dot');
             if (statusDot) {
-                statusDot.className = `status-dot ${className}`;
-                // 根据状态更新点的样式
-                if (className === 'connected') {
-                    statusDot.classList.add('connected');
-                } else if (className === 'error') {
-                    statusDot.classList.add('error');
-                } else {
-                    statusDot.classList.remove('connected', 'error');
+                // 移除所有状态类
+                statusDot.classList.remove('connected', 'connecting', 'disconnected', 'error');
+                
+                // 根据className设置状态
+                switch (className) {
+                    case 'connected':
+                        statusDot.classList.add('connected');
+                        break;
+                    case 'connecting':
+                        statusDot.classList.add('connecting');
+                        break;
+                    case 'error':
+                    case 'disconnected':
+                        statusDot.classList.add('disconnected');
+                        break;
+                    default:
+                        statusDot.classList.add('connecting');
                 }
             }
         }
         
-        // 更新语音提示
-        if (this.voiceHint) {
-            this.voiceHint.textContent = text;
+        // 同时更新状态面板（如果存在）
+        if (this.app && this.app.voiceCallManager) {
+            switch (className) {
+                case 'connected':
+                    this.app.voiceCallManager.updateConnectionStatus('connected', text);
+                    break;
+                case 'connecting':
+                    this.app.voiceCallManager.updateConnectionStatus('connecting', text);
+                    break;
+                case 'error':
+                case 'disconnected':
+                    this.app.voiceCallManager.updateConnectionStatus('disconnected', text);
+                    break;
+                default:
+                    this.app.voiceCallManager.updateConnectionStatus('connecting', text);
+            }
         }
+        
+        console.log('状态更新:', text, className);
     }
     
     showLoadingOverlay(text = '正在连接天汇AI面试官') {
