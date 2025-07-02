@@ -33,9 +33,33 @@ class LocalStorageManager {
     saveInterview(interview) {
         try {
             const interviews = this.getInterviews();
-            interview.id = Date.now().toString();
-            interview.createdAt = new Date().toISOString();
-            interviews.unshift(interview);
+            
+            // 检查是否为更新现有记录
+            if (interview.id) {
+                // 查找现有记录的索引
+                const existingIndex = interviews.findIndex(item => item.id === interview.id);
+                
+                if (existingIndex !== -1) {
+                    // 更新现有记录，保持原有的创建时间
+                    const existingInterview = interviews[existingIndex];
+                    interview.createdAt = existingInterview.createdAt || interview.createdAt;
+                    interviews[existingIndex] = interview;
+                    console.log(`更新面试记录: ${interview.id}`);
+                } else {
+                    // ID存在但找不到记录，作为新记录添加
+                    if (!interview.createdAt) {
+                        interview.createdAt = new Date().toISOString();
+                    }
+                    interviews.unshift(interview);
+                    console.log(`添加面试记录: ${interview.id}`);
+                }
+            } else {
+                // 新记录，分配新ID
+                interview.id = Date.now().toString();
+                interview.createdAt = new Date().toISOString();
+                interviews.unshift(interview);
+                console.log(`创建新面试记录: ${interview.id}`);
+            }
             
             // 限制最大数量，防止占用过多空间
             if (interviews.length > 50) {
@@ -1627,12 +1651,13 @@ class HistoryManager {
                         <button class="history-action-btn" onclick="historyManager.viewEvaluation('${interview.id}')" title="查看评分">
                             <i class="fas fa-chart-bar"></i>
                         </button>
-                    ` : ''}
+                    ` : `
+                        <button class="history-action-btn evaluate-btn" data-id="${interview.id}" onclick="historyManager.startEvaluation('${interview.id}')" title="开始评估">
+                            <i class="fas fa-star"></i>
+                        </button>
+                    `}
                     <button class="history-action-btn" onclick="historyManager.continueInterview('${interview.id}')" title="继续面试">
                         <i class="fas fa-play"></i>
-                    </button>
-                    <button class="history-action-btn evaluate-btn" data-id="${interview.id}" onclick="historyManager.startEvaluation('${interview.id}')" title="开始评估">
-                        <i class="fas fa-star"></i>
                     </button>
                     <button class="history-action-btn" onclick="historyManager.deleteInterview('${interview.id}')" title="删除记录">
                         <i class="fas fa-trash"></i>
@@ -1684,6 +1709,30 @@ class HistoryManager {
 
         if (!interviewToEvaluate || !interviewToEvaluate.messages) {
             alert("错误：未找到面试记录或对话消息。");
+            return;
+        }
+
+        // 检查是否已经评估过
+        const hasEvaluation = interviewToEvaluate.evaluation || interviewToEvaluate.score || 
+                             interviewToEvaluate.evaluationMarkdown || interviewToEvaluate.evaluationScore;
+        
+        if (hasEvaluation) {
+            console.log(`面试记录 ${interviewId} 已经评估过，直接显示评估结果`);
+            // 如果已评估，直接显示评估结果而不是重新评估
+            if (interviewToEvaluate.evaluation && window.app && window.app.voiceChat) {
+                window.app.voiceChat.showEvaluationResult(interviewToEvaluate.evaluation);
+            } else if (interviewToEvaluate.evaluationMarkdown) {
+                // 显示模态窗口
+                if (this.evaluationModal) {
+                    this.evaluationModal.style.display = 'flex';
+                }
+                if (this.modalLoadingSpinner) {
+                    this.modalLoadingSpinner.style.display = 'none';
+                }
+                this.displayCompleteEvaluation(interviewToEvaluate);
+            } else {
+                alert(`该面试记录已评估，评分：${interviewToEvaluate.score || '未知'}分`);
+            }
             return;
         }
 
