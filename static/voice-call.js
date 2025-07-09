@@ -45,13 +45,13 @@ class VoiceCallManager {
         this.callStartTime = null;
         this.callTimer = null;
         
-        // 语音活动检测（VAD）配置
-        this.vadConfig = {
-            threshold: 0.5,              // 语音检测阈值 (0.0-1.0，越高越不敏感)
-            prefix_padding_ms: 300,      // 语音开始前的缓冲时间
-            silence_duration_ms: 1500,   // 静音持续时间（毫秒，用户停顿多久后AI开始回复）
-            create_response: true,       // 检测到静音后自动创建响应
-            interrupt_response: true     // 允许用户打断AI回复
+        // 从设置管理器加载配置
+        this.loadSettingsFromManager();
+
+        // 音频设置
+        this.audioSettings = {
+            volume: 1.0,
+            playbackRate: 1.0
         };
         
         // 调试日志
@@ -61,6 +61,48 @@ class VoiceCallManager {
         this.initElements();
         this.bindEvents();
         this.setupDebugMode();
+    }
+
+    /**
+     * 从设置管理器加载配置
+     */
+    loadSettingsFromManager() {
+        if (this.azureVoiceChat && this.azureVoiceChat.settingsManager) {
+            const settings = this.azureVoiceChat.settingsManager.getSettings();
+
+            // 加载语音检测配置
+            this.vadConfig = {
+                threshold: settings.voice.threshold,
+                prefix_padding_ms: settings.voice.prefix_padding_ms,
+                silence_duration_ms: settings.voice.silence_duration_ms,
+                create_response: true,       // 检测到静音后自动创建响应
+                interrupt_response: true     // 允许用户打断AI回复
+            };
+
+            // 加载音频设置
+            this.audioSettings = {
+                volume: settings.audio.volume,
+                playbackRate: settings.audio.playbackRate
+            };
+
+            this.logMessage(`从设置管理器加载配置: VAD阈值=${this.vadConfig.threshold}, 静音时长=${this.vadConfig.silence_duration_ms}ms, 音量=${this.audioSettings.volume}, 播放速度=${this.audioSettings.playbackRate}x`);
+        } else {
+            // 回退到默认配置
+            this.vadConfig = {
+                threshold: 0.5,
+                prefix_padding_ms: 300,
+                silence_duration_ms: 1500,
+                create_response: true,
+                interrupt_response: true
+            };
+
+            this.audioSettings = {
+                volume: 1.0,
+                playbackRate: 1.0
+            };
+
+            this.logMessage('设置管理器不可用，使用默认配置');
+        }
     }
     
     /**
@@ -112,15 +154,17 @@ class VoiceCallManager {
         // 创建音频播放元素（用于播放AI音频delta）
         this.audioPlayer = document.createElement('audio');
         this.audioPlayer.style.display = 'none';
-        this.audioPlayer.volume = 1.0; // 确保音量最大
+        this.audioPlayer.volume = this.audioSettings.volume;
+        this.audioPlayer.playbackRate = this.audioSettings.playbackRate;
         this.audioPlayer.preload = 'auto';
         this.audioPlayer.controls = false;
         document.body.appendChild(this.audioPlayer);
-        
+
         // 创建远程音频流播放元素（用于WebRTC远程流）
         this.audioElement = document.createElement('audio');
         this.audioElement.style.display = 'none';
-        this.audioElement.volume = 1.0;
+        this.audioElement.volume = this.audioSettings.volume;
+        this.audioElement.playbackRate = this.audioSettings.playbackRate;
         this.audioElement.autoplay = true; // 自动播放远程流
         this.audioElement.controls = false;
         document.body.appendChild(this.audioElement);
@@ -262,7 +306,7 @@ class VoiceCallManager {
      */
     updateVADConfig(newConfig) {
         const oldConfig = { ...this.vadConfig };
-        
+
         // 更新配置
         if (newConfig.threshold !== undefined) {
             this.vadConfig.threshold = Math.max(0.0, Math.min(1.0, newConfig.threshold));
@@ -273,16 +317,49 @@ class VoiceCallManager {
         if (newConfig.prefix_padding_ms !== undefined) {
             this.vadConfig.prefix_padding_ms = Math.max(0, Math.min(1000, newConfig.prefix_padding_ms));
         }
-        
+
         this.logMessage(`VAD配置已更新:`);
         this.logMessage(`  阈值: ${oldConfig.threshold} → ${this.vadConfig.threshold}`);
         this.logMessage(`  静音时长: ${oldConfig.silence_duration_ms}ms → ${this.vadConfig.silence_duration_ms}ms`);
         this.logMessage(`  前缀缓冲: ${oldConfig.prefix_padding_ms}ms → ${this.vadConfig.prefix_padding_ms}ms`);
-        
+
         // 如果当前有活跃连接，立即应用新配置
         if (this.isConnected && this.dataChannel && this.dataChannel.readyState === 'open') {
             this.updateSessionInstructions();
         }
+    }
+
+    /**
+     * 更新音频设置
+     * @param {Object} newAudioSettings - 新的音频设置
+     * @param {number} newAudioSettings.volume - 音量 (0.0-1.0)
+     * @param {number} newAudioSettings.playbackRate - 播放速度 (0.5-2.0)
+     */
+    updateAudioSettings(newAudioSettings) {
+        const oldSettings = { ...this.audioSettings };
+
+        // 更新配置
+        if (newAudioSettings.volume !== undefined) {
+            this.audioSettings.volume = Math.max(0.0, Math.min(1.0, newAudioSettings.volume));
+        }
+        if (newAudioSettings.playbackRate !== undefined) {
+            this.audioSettings.playbackRate = Math.max(0.5, Math.min(2.0, newAudioSettings.playbackRate));
+        }
+
+        // 立即应用到音频元素
+        if (this.audioPlayer) {
+            this.audioPlayer.volume = this.audioSettings.volume;
+            this.audioPlayer.playbackRate = this.audioSettings.playbackRate;
+        }
+
+        if (this.audioElement) {
+            this.audioElement.volume = this.audioSettings.volume;
+            this.audioElement.playbackRate = this.audioSettings.playbackRate;
+        }
+
+        this.logMessage(`音频设置已更新:`);
+        this.logMessage(`  音量: ${oldSettings.volume} → ${this.audioSettings.volume}`);
+        this.logMessage(`  播放速度: ${oldSettings.playbackRate}x → ${this.audioSettings.playbackRate}x`);
     }
     
     /**
@@ -1437,10 +1514,24 @@ class VoiceCallManager {
     async confirmSaveInterview() {
         this.hideSaveInterviewModal();
         this.logMessage('用户选择保存面试记录');
-        
+
         try {
+            // 保存面试记录
             await this.saveCurrentInterview();
             this.logMessage('面试记录保存成功');
+
+            // 立即刷新历史记录显示
+            if (window.app && window.app.historyManager) {
+                window.app.historyManager.refreshHistoryList();
+                console.log('历史记录已刷新');
+            }
+
+            // 显示后台评分处理提示
+            this.showBackgroundEvaluationNotice();
+
+            // 自动触发后台评分
+            this.triggerBackgroundEvaluation();
+
         } catch (error) {
             this.logMessage(`保存面试记录失败: ${error.message}`);
             this.showError('保存面试记录失败: ' + error.message);
@@ -1456,10 +1547,273 @@ class VoiceCallManager {
     confirmDiscardInterview() {
         this.hideSaveInterviewModal();
         this.logMessage('用户选择不保存面试记录');
-        
+
         // 清空当前面试历史
         this.currentInterviewMessages = [];
         this.logMessage('面试记录已丢弃');
+    }
+
+    /**
+     * 显示后台评分处理提示
+     */
+    showBackgroundEvaluationNotice() {
+        // 创建提示通知
+        const notice = document.createElement('div');
+        notice.className = 'background-evaluation-notice';
+        notice.innerHTML = `
+            <div class="notice-content">
+                <div class="notice-icon">
+                    <i class="fas fa-cogs"></i>
+                </div>
+                <div class="notice-text">
+                    <h4>正在后台处理您的面试结果</h4>
+                    <p>我们正在分析您的面试表现并生成详细评分，请稍后在历史记录中查看结果</p>
+                </div>
+                <button class="notice-close" onclick="this.parentElement.parentElement.remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+
+        // 添加样式
+        notice.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            z-index: 10000;
+            max-width: 400px;
+            animation: slideInRight 0.5s ease-out;
+        `;
+
+        // 添加到页面
+        document.body.appendChild(notice);
+
+        // 自动移除（10秒后）
+        setTimeout(() => {
+            if (notice.parentElement) {
+                notice.style.animation = 'slideOutRight 0.5s ease-out';
+                setTimeout(() => {
+                    if (notice.parentElement) {
+                        notice.remove();
+                    }
+                }, 500);
+            }
+        }, 10000);
+
+        this.logMessage('显示后台评分处理提示');
+    }
+
+    /**
+     * 触发后台评分
+     */
+    async triggerBackgroundEvaluation() {
+        try {
+            // 获取最新保存的面试记录
+            const interviews = this.storageManager.getInterviews();
+            const latestInterview = interviews[0]; // 最新的记录应该在第一个
+
+            if (!latestInterview) {
+                this.logMessage('未找到最新的面试记录，无法触发评分');
+                return;
+            }
+
+            // 标记评分状态为处理中
+            this.markInterviewAsEvaluating(latestInterview.id);
+
+            // 获取简历上下文
+            const resumeContext = await this.getResumeContext();
+
+            // 构建评分请求
+            const evaluationRequest = {
+                interview_id: latestInterview.id,
+                messages: latestInterview.messages,
+                resume_context: resumeContext || '',
+                duration: latestInterview.duration || 0
+            };
+
+            this.logMessage('开始后台评分处理...');
+
+            // 异步调用评分API（不等待结果）
+            this.performBackgroundEvaluation(evaluationRequest);
+
+        } catch (error) {
+            this.logMessage(`触发后台评分失败: ${error.message}`);
+            console.error('后台评分触发失败:', error);
+        }
+    }
+
+    /**
+     * 执行后台评分（异步）
+     */
+    async performBackgroundEvaluation(evaluationRequest) {
+        try {
+            this.logMessage('发送评分请求到后台...');
+
+            const response = await fetch('/api/interview/evaluate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(evaluationRequest)
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                this.logMessage('后台评分完成');
+
+                if (result.success) {
+                    // 更新面试记录的评分信息
+                    this.updateInterviewEvaluation(evaluationRequest.interview_id, result.evaluation);
+
+                    // 显示评分完成通知
+                    this.showEvaluationCompleteNotice(evaluationRequest.interview_id);
+                } else {
+                    this.logMessage(`评分失败: ${result.message}`);
+                    this.markInterviewEvaluationFailed(evaluationRequest.interview_id);
+                }
+            } else {
+                this.logMessage(`评分API调用失败: ${response.status}`);
+                this.markInterviewEvaluationFailed(evaluationRequest.interview_id);
+            }
+
+        } catch (error) {
+            this.logMessage(`后台评分处理失败: ${error.message}`);
+            this.markInterviewEvaluationFailed(evaluationRequest.interview_id);
+            console.error('后台评分处理失败:', error);
+        }
+    }
+
+    /**
+     * 标记面试记录为评分中
+     */
+    markInterviewAsEvaluating(interviewId) {
+        try {
+            const interviews = this.storageManager.getInterviews();
+            const interview = interviews.find(item => item.id === interviewId);
+
+            if (interview) {
+                interview.evaluationStatus = 'evaluating';
+                interview.evaluationStartTime = new Date().toISOString();
+                this.storageManager.saveInterview(interview);
+                this.logMessage(`面试记录 ${interviewId} 标记为评分中`);
+            }
+        } catch (error) {
+            this.logMessage(`标记评分状态失败: ${error.message}`);
+        }
+    }
+
+    /**
+     * 标记面试记录评分失败
+     */
+    markInterviewEvaluationFailed(interviewId) {
+        try {
+            const interviews = this.storageManager.getInterviews();
+            const interview = interviews.find(item => item.id === interviewId);
+
+            if (interview) {
+                interview.evaluationStatus = 'failed';
+                interview.evaluationEndTime = new Date().toISOString();
+                this.storageManager.saveInterview(interview);
+                this.logMessage(`面试记录 ${interviewId} 标记为评分失败`);
+            }
+        } catch (error) {
+            this.logMessage(`标记评分失败状态失败: ${error.message}`);
+        }
+    }
+
+    /**
+     * 更新面试记录的评分信息
+     */
+    updateInterviewEvaluation(interviewId, evaluation) {
+        try {
+            const interviews = this.storageManager.getInterviews();
+            const interview = interviews.find(item => item.id === interviewId);
+
+            if (interview) {
+                interview.evaluation = evaluation;
+                interview.score = evaluation.total_score;
+                interview.evaluationStatus = 'completed';
+                interview.evaluationEndTime = new Date().toISOString();
+
+                // 只有在原来没有summary的情况下才设置评估总结
+                if (!interview.summary && evaluation.summary) {
+                    interview.summary = evaluation.summary;
+                }
+
+                this.storageManager.saveInterview(interview);
+                this.logMessage(`面试记录 ${interviewId} 评分信息已更新`);
+
+                // 立即刷新历史记录显示
+                if (window.app && window.app.historyManager) {
+                    window.app.historyManager.refreshHistoryList();
+                    console.log('评分完成后历史记录已刷新');
+                }
+            }
+        } catch (error) {
+            this.logMessage(`更新评分信息失败: ${error.message}`);
+        }
+    }
+
+    /**
+     * 显示评分完成通知
+     */
+    showEvaluationCompleteNotice(interviewId) {
+        const notice = document.createElement('div');
+        notice.className = 'evaluation-complete-notice';
+        notice.innerHTML = `
+            <div class="notice-content">
+                <div class="notice-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="notice-text">
+                    <h4>面试评分已完成！</h4>
+                    <p>您的面试结果已生成，点击查看详细评分报告</p>
+                </div>
+                <div class="notice-actions">
+                    <button class="btn-primary btn-sm" onclick="window.app.router.navigateTo('history')">
+                        查看结果
+                    </button>
+                    <button class="notice-close" onclick="this.parentElement.parentElement.parentElement.remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // 添加样式
+        notice.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            z-index: 10000;
+            max-width: 400px;
+            animation: slideInRight 0.5s ease-out;
+        `;
+
+        // 添加到页面
+        document.body.appendChild(notice);
+
+        // 自动移除（15秒后）
+        setTimeout(() => {
+            if (notice.parentElement) {
+                notice.style.animation = 'slideOutRight 0.5s ease-out';
+                setTimeout(() => {
+                    if (notice.parentElement) {
+                        notice.remove();
+                    }
+                }, 500);
+            }
+        }, 15000);
+
+        this.logMessage('显示评分完成通知');
     }
     
     // ===== 状态面板管理方法 =====

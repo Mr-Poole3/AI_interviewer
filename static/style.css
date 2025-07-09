@@ -1222,7 +1222,7 @@ body {
 /* 历史记录项 */
 .history-item {
     display: flex;
-    align-items: center;
+    align-items: flex-start; /* 改为顶部对齐，适应多行内容 */
     gap: var(--spacing-lg);
     padding: var(--spacing-lg);
     border: 1px solid var(--border-light);
@@ -1283,10 +1283,13 @@ body {
 .history-summary {
     font-size: 0.875rem;
     color: var(--text-secondary);
-    line-height: 1.4;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.5;
+    word-wrap: break-word;
+    word-break: break-word;
+    white-space: normal;
+    max-height: none; /* 允许完全展开 */
+    margin-top: var(--spacing-xs); /* 添加一些上边距 */
+    padding-right: var(--spacing-sm); /* 避免与操作按钮重叠 */
 }
 
 .history-actions {
@@ -2544,7 +2547,7 @@ body {
     scrollbar-color: var(--border-light) var(--bg-secondary);
 }
 
-/* ===== VAD设置面板样式 ===== */
+/* ===== 设置面板通用样式 ===== */
 .voice-control-btn.settings-btn {
     background: var(--gray-600);
     color: white;
@@ -2552,6 +2555,17 @@ body {
 
 .voice-control-btn.settings-btn:hover {
     background: var(--gray-500);
+    transform: scale(1.05);
+}
+
+/* 准备页面设置按钮 */
+.quick-btn {
+    transition: all var(--transition-normal);
+}
+
+.quick-btn:hover {
+    background: var(--primary-light);
+    color: var(--primary-color);
     transform: scale(1.05);
 }
 
@@ -2733,6 +2747,325 @@ body {
     .slider-value {
         min-width: 50px;
         font-size: 0.8rem;
+    }
+}
+
+/* ===== 准备页面设置面板样式 ===== */
+.preparation-settings-panel {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--bg-primary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    width: 480px;
+    max-width: 90vw;
+    max-height: 80vh;
+    overflow-y: auto;
+    z-index: 1000;
+    animation: slideInScale 0.3s ease-out;
+}
+
+@keyframes slideInScale {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+.preparation-settings-panel .settings-header {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.preparation-settings-panel .settings-header h3 {
+    color: white;
+    font-size: 1.1rem;
+}
+
+.preparation-settings-panel .close-settings {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.preparation-settings-panel .close-settings:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.settings-section {
+    margin-bottom: var(--spacing-xl);
+    padding-bottom: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.settings-section:last-of-type {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.settings-section h4 {
+    margin: 0 0 var(--spacing-md) 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.settings-section h4 i {
+    color: var(--primary-color);
+    font-size: 0.9rem;
+}
+
+/* 准备页面设置面板移动端适配 */
+@media (max-width: 480px) {
+    .preparation-settings-panel {
+        width: 95vw;
+        max-height: 85vh;
+    }
+
+    .settings-section {
+        margin-bottom: var(--spacing-lg);
+        padding-bottom: var(--spacing-md);
+    }
+}
+
+/* ===== 后台评分通知样式 ===== */
+.background-evaluation-notice,
+.evaluation-complete-notice {
+    font-family: var(--font-sans);
+}
+
+.background-evaluation-notice .notice-content,
+.evaluation-complete-notice .notice-content {
+    padding: var(--spacing-lg);
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+}
+
+.background-evaluation-notice .notice-icon,
+.evaluation-complete-notice .notice-icon {
+    font-size: 1.5rem;
+    margin-top: 2px;
+    opacity: 0.9;
+}
+
+.background-evaluation-notice .notice-text h4,
+.evaluation-complete-notice .notice-text h4 {
+    margin: 0 0 var(--spacing-xs) 0;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.background-evaluation-notice .notice-text p,
+.evaluation-complete-notice .notice-text p {
+    margin: 0;
+    font-size: 0.875rem;
+    opacity: 0.9;
+    line-height: 1.4;
+}
+
+.background-evaluation-notice .notice-close,
+.evaluation-complete-notice .notice-close {
+    position: absolute;
+    top: var(--spacing-sm);
+    right: var(--spacing-sm);
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    padding: var(--spacing-xs);
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+}
+
+.background-evaluation-notice .notice-close:hover,
+.evaluation-complete-notice .notice-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.evaluation-complete-notice .notice-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+    align-items: center;
+}
+
+.evaluation-complete-notice .btn-primary.btn-sm {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: 0.8rem;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.evaluation-complete-notice .btn-primary.btn-sm:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* 通知动画 */
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+/* ===== 优化的历史记录样式 ===== */
+.history-badge.evaluating {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+    animation: pulse 2s infinite;
+}
+
+.history-badge.evaluation-failed {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+}
+
+.evaluation-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8rem;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+}
+
+.evaluation-status.evaluating {
+    background: rgba(245, 158, 11, 0.1);
+    color: #d97706;
+}
+
+.evaluation-status.completed {
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
+}
+
+.evaluation-status.failed {
+    background: rgba(239, 68, 68, 0.1);
+    color: #dc2626;
+}
+
+.evaluation-status.pending {
+    background: rgba(107, 114, 128, 0.1);
+    color: #6b7280;
+}
+
+/* 历史记录操作按钮优化 */
+.history-action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: var(--spacing-xs);
+    min-width: 60px;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.history-action-btn .btn-label {
+    font-size: 0.7rem;
+    font-weight: 500;
+    opacity: 0.8;
+}
+
+.history-action-btn:hover .btn-label {
+    opacity: 1;
+}
+
+/* 特定按钮样式 */
+.conversation-btn {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+}
+
+.conversation-btn:hover {
+    background: rgba(59, 130, 246, 0.2);
+}
+
+.evaluation-btn {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+}
+
+.evaluation-btn:hover {
+    background: rgba(16, 185, 129, 0.2);
+}
+
+.start-evaluation-btn {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+}
+
+.start-evaluation-btn:hover {
+    background: rgba(245, 158, 11, 0.2);
+}
+
+.evaluating-btn {
+    background: rgba(245, 158, 11, 0.1);
+    color: #d97706;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.retry-evaluation-btn {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.retry-evaluation-btn:hover {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+
+
+.delete-btn {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.delete-btn:hover {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+/* 脉冲动画 */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
     }
 }
 
@@ -3566,10 +3899,10 @@ body {
 
 .modal-body {
     flex: 1;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
     background: var(--bg-secondary);
+    min-height: 0; /* 确保flex子元素可以收缩 */
 }
 
 .conversation-info {
@@ -3603,16 +3936,95 @@ body {
     flex: 1;
     overflow: hidden;
     padding: var(--spacing-lg);
+    position: relative;
+    min-height: 0; /* 确保flex子元素可以收缩 */
+    display: flex;
+    flex-direction: column;
+}
+
+/* 滚动提示渐变效果 */
+.conversation-container::after {
+    content: '';
+    position: absolute;
+    bottom: var(--spacing-lg);
+    left: var(--spacing-lg);
+    right: var(--spacing-lg);
+    height: 30px;
+    background: linear-gradient(to bottom,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.8) 70%,
+        rgba(255, 255, 255, 1) 100%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 1;
+}
+
+.conversation-container.has-scroll::after {
+    opacity: 1;
+}
+
+/* 滚动提示箭头 */
+.conversation-container::before {
+    content: '⌄';
+    position: absolute;
+    bottom: calc(var(--spacing-lg) + 5px);
+    right: calc(var(--spacing-lg) + 10px);
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 2;
+    animation: scrollHint 2s ease-in-out infinite;
+}
+
+.conversation-container.has-scroll::before {
+    opacity: 0.6;
+}
+
+@keyframes scrollHint {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(3px); }
+}
+
+/* 暗色主题下的渐变效果 */
+@media (prefers-color-scheme: dark) {
+    .conversation-container::after {
+        background: linear-gradient(to bottom,
+            rgba(31, 41, 55, 0) 0%,
+            rgba(31, 41, 55, 0.8) 70%,
+            rgba(31, 41, 55, 1) 100%);
+    }
 }
 
 .conversation-messages {
-    height: 100%;
+    flex: 1;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: var(--spacing-sm);
     scroll-behavior: smooth;
     padding: var(--spacing-sm) 0;
+    min-height: 0; /* 确保flex子元素可以收缩 */
+
+    /* 隐藏滚动条但保持滚动功能 */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* 隐藏 WebKit 浏览器（Chrome, Safari, Edge）的滚动条 */
+.conversation-messages::-webkit-scrollbar {
+    width: 0px;
+    background: transparent;
+}
+
+.conversation-messages::-webkit-scrollbar-thumb {
+    background: transparent;
+}
+
+.conversation-messages::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 /* 确保对话消息容器使用正确的布局 */

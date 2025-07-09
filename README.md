@@ -543,6 +543,9 @@ docker run -p 8000:8000 -e OPENAI_API_KEY=your_key ai-interview-system
 | `OPENAI_API_KEY` | Azure OpenAI API密钥 | 是 | - |
 | `OPENAI_BASE_URL` | Azure OpenAI端点URL | 是 | - |
 | `ARK_API_KEY` | 备用API密钥 | 否 | - |
+| `MODEL_TEMPERATURE` | LLM模型温度设置 | 否 | 0.1 |
+| `MAX_TOKENS` | 最大token数量 | 否 | 2000 |
+| `TOP_P` | top_p参数 | 否 | 0.9 |
 
 ### 推荐配置
 ```env
@@ -550,10 +553,41 @@ docker run -p 8000:8000 -e OPENAI_API_KEY=your_key ai-interview-system
 OPENAI_API_KEY=your_azure_api_key_here
 OPENAI_BASE_URL=https://your-resource-name.openai.azure.com
 
+# LLM模型参数配置（优化稳定性）
+MODEL_TEMPERATURE=0.1    # 极低温度确保高稳定性和一致性
+MAX_TOKENS=2000         # 最大token数量
+TOP_P=0.9              # top_p参数
+
 # 服务配置
 HOST=localhost
 PORT=8000
 LOG_LEVEL=INFO
+```
+
+### 🎯 模型参数优化
+
+#### 温度设置说明
+系统默认使用 `MODEL_TEMPERATURE=0.1` 的极低温度设置，这样配置的优势：
+
+- **高稳定性**: 模型输出更加一致和可预测
+- **减少随机性**: 降低面试评分的波动性
+- **提升准确性**: 确保评估结果的客观性和可靠性
+- **一致体验**: 相同条件下的面试会得到相似的评分
+
+#### 温度值建议
+- `0.1` - **推荐值**: 极高稳定性，适合面试评分
+- `0.3` - 平衡稳定性和创造性
+- `0.7` - 更多创造性，但稳定性降低
+- `1.0` - 最大创造性，但结果不可预测
+
+#### 自定义配置
+如需调整模型行为，可在 `.env` 文件中修改：
+```env
+# 更保守的设置（更高稳定性）
+MODEL_TEMPERATURE=0.05
+
+# 稍微增加创造性
+MODEL_TEMPERATURE=0.2
 ```
 
 ## 📈 性能优化

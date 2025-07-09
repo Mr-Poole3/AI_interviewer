@@ -30,6 +30,9 @@ from docx import Document
 # Azure OpenAI实时语音客户端
 from openai import AsyncAzureOpenAI
 
+# 导入配置管理
+from config import get_model_temperature, get_max_tokens, get_top_p
+
 # 导入提示词配置
 from prompts import get_interviewer_prompt, get_voice_call_prompt, get_interview_evaluation_prompt, get_interview_extraction_prompt
 
@@ -261,9 +264,9 @@ class InterviewEvaluationService:
                 payload = {
                     'model': self.DEEPSEEK_MODEL,
                     'messages': messages,
-                    'temperature': 0.3,  # 较低的温度确保评估的一致性
-                    'max_tokens': 2000,
-                    'top_p': 0.9
+                    'temperature': get_model_temperature(),  # 从配置文件获取温度设置，确保评估的高度一致性和稳定性
+                    'max_tokens': get_max_tokens(),
+                    'top_p': get_top_p()
                 }
 
                 response = await self.http_client.post(
@@ -320,9 +323,9 @@ class InterviewEvaluationService:
                     'messages': [
                         {"role": "user", "content": prompt}
                     ],
-                    'temperature': 0.3,  # 较低的温度确保评估的一致性
-                    'max_tokens': 2000,
-                    'top_p': 0.9
+                    'temperature': get_model_temperature(),  # 从配置文件获取温度设置，确保评估的高度一致性和稳定性
+                    'max_tokens': get_max_tokens(),
+                    'top_p': get_top_p()
                 }
 
                 response = await self.http_client.post(
@@ -1555,8 +1558,8 @@ async def evaluate_interview(request_body: InterviewEvaluationRequest):
         # chat_completion = client.chat.completions.create(
         #     model=os.getenv("AZURE_DEPLOYMENT_FOR_EVALUATION"),
         #     messages=messages_for_llm,
-        #     temperature=0.7,
-        #     max_tokens=1500, # 确保有足够空间生成详细评估
+        #     temperature=get_model_temperature(),  # 从配置文件获取温度设置，确保评估的高度一致性和稳定性
+        #     max_tokens=get_max_tokens(), # 确保有足够空间生成详细评估
         # )
 
         # evaluation_markdown = chat_completion.choices[0].message.content
