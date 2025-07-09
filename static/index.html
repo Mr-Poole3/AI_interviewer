@@ -578,6 +578,50 @@
         </div>
     </div>
 
+    <!-- 对话详情模态框 -->
+    <div id="conversationModal" class="modal" style="display: none;">
+        <div class="modal-content conversation-modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fas fa-comments"></i>
+                    面试对话记录
+                </h3>
+                <div class="modal-actions">
+                    <button class="btn-secondary btn-sm" id="exportConversationBtn" title="导出对话记录">
+                        <i class="fas fa-download"></i>
+                        导出
+                    </button>
+                    <button class="close-button" id="closeConversationModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="modal-body">
+                <div class="conversation-info">
+                    <div class="info-item">
+                        <span class="info-label">面试时间：</span>
+                        <span class="info-value" id="conversationDate">--</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">面试时长：</span>
+                        <span class="info-value" id="conversationDuration">--</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">对话轮次：</span>
+                        <span class="info-value" id="conversationCount">--</span>
+                    </div>
+                </div>
+                
+                <div class="conversation-container">
+                    <div class="conversation-messages" id="conversationMessages">
+                        <!-- 对话消息将在这里动态生成 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 面试保存确认对话框 -->
     <div id="saveInterviewModal" class="modal" style="display: none;">
         <div class="modal-content save-interview-modal">

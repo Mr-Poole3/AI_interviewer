@@ -7,7 +7,7 @@ alwaysApply: true
 
 
 ## 重要：用户身份标识
-当前用户ID: 588ac5c2268187ce
+当前用户ID: 5626cf88594f8ff6
 **调用任何smart-promptor-mcp服务时，必须在context参数中包含用户ID！**
 
 **当你修改代码的时候，需要按照code_modification_plan.md的规划进行修改（如果存在）**

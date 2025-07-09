@@ -429,6 +429,13 @@ class AzureVoiceChat {
             this.setStatus('已连接 - Azure语音服务', 'connected');
             this.enableInput();
             this.hideLoadingOverlay();
+            
+            // 处理待发送的继续面试上下文
+            if (this.pendingContinueContext) {
+                console.log('WebSocket连接建立，发送待处理的继续面试上下文');
+                this.sendContinueInterviewContext(this.pendingContinueContext);
+                this.pendingContinueContext = null;
+            }
         };
         
         this.ws.onmessage = (event) => {
@@ -1384,6 +1391,110 @@ class AzureVoiceChat {
             }
         }
     }
+
+    /**
+     * 从历史记录恢复面试
+     * @param {Object} interview - 历史面试记录
+     */
+    resumeInterviewFromHistory(interview) {
+        try {
+            console.log('开始恢复历史面试记录:', interview.id);
+            
+            // 清空当前消息
+            this.currentInterviewMessages = [];
+            
+            // 清空UI中的消息显示
+            const messagesContainer = document.getElementById('messages');
+            if (messagesContainer) {
+                messagesContainer.innerHTML = '';
+            }
+            
+            // 恢复历史消息到当前会话
+            if (interview.messages && Array.isArray(interview.messages)) {
+                interview.messages.forEach((message, index) => {
+                    // 统一消息格式（支持type和role两种格式）
+                    const messageType = message.type || message.role;
+                    const normalizedMessage = {
+                        content: message.content,
+                        type: messageType,
+                        role: messageType,
+                        timestamp: message.timestamp || new Date().toISOString()
+                    };
+                    
+                    // 添加到当前会话消息列表
+                    this.currentInterviewMessages.push(normalizedMessage);
+                    
+                    // 在UI中显示消息
+                    this.addMessage(message.content, messageType);
+                });
+            }
+            
+            // 设置面试状态为继续模式
+            this.isInterviewContinued = true;
+            this.continuedInterviewId = interview.id;
+            this.continuedInterviewTitle = interview.title || '继续面试';
+            
+            // 更新UI状态
+            this.updateUIForContinuedInterview();
+            
+            // 发送继续面试的上下文给AI
+            this.sendContinueInterviewContext(interview);
+            
+            console.log(`历史面试记录恢复完成，共恢复 ${interview.messages.length} 条消息`);
+            
+        } catch (error) {
+            console.error('恢复历史面试记录失败:', error);
+            this.showError('恢复面试记录失败，请重新尝试');
+        }
+    }
+
+    /**
+     * 更新UI以显示继续面试状态
+     */
+    updateUIForContinuedInterview() {
+        // 更新面试标题
+        const titleElement = document.querySelector('.interview-title');
+        if (titleElement) {
+            titleElement.textContent = `${this.continuedInterviewTitle} (继续)`;
+        }
+        
+        // 显示继续面试提示
+        this.showNotification('面试继续', '已加载历史对话记录，AI面试官将基于之前的内容继续提问', 'info');
+        
+        // 更新状态显示
+        this.setStatus('面试继续中 - 已加载历史记录', 'connected');
+    }
+
+    /**
+     * 发送继续面试的上下文给AI
+     * @param {Object} interview - 面试记录
+     */
+    async sendContinueInterviewContext(interview) {
+        try {
+            if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+                console.log('WebSocket未连接，等待连接后发送继续面试上下文');
+                // 存储上下文，等待连接后发送
+                this.pendingContinueContext = interview;
+                return;
+            }
+
+            // 构建继续面试的上下文消息
+            const contextMessage = {
+                type: 'continue_interview',
+                interview_id: interview.id,
+                messages: this.currentInterviewMessages,
+                resume_context: await this.getResumeContext(),
+                instruction: '这是一个继续进行的面试。请基于之前的对话历史，自然地继续面试流程。不要重复之前已经问过的问题，而是根据之前的回答深入提问或转向新的话题。'
+            };
+
+            // 发送上下文给后端
+            this.ws.send(JSON.stringify(contextMessage));
+            console.log('已发送继续面试上下文给AI');
+            
+        } catch (error) {
+            console.error('发送继续面试上下文失败:', error);
+        }
+    }
 }
 
 /**
@@ -1404,6 +1515,15 @@ class HistoryManager {
         this.modalEvaluationContent = null;
         this.modalLoadingSpinner = null;
         this.modalActualContent = null;
+        
+        // 对话详情模态框元素
+        this.conversationModal = null;
+        this.conversationMessages = null;
+        this.conversationDate = null;
+        this.conversationDuration = null;
+        this.conversationCount = null;
+        this.closeConversationModal = null;
+        this.exportConversationBtn = null;
 
         this.init();
     }
@@ -1420,9 +1540,19 @@ class HistoryManager {
         this.modalActualContent = this.modalEvaluationContent?.querySelector('.evaluation-actual-content');
         this.modalCloseButton = this.evaluationModal?.querySelector('.close-button');
         
+        // 初始化对话详情模态框元素
+        this.conversationModal = document.getElementById('conversationModal');
+        this.conversationMessages = document.getElementById('conversationMessages');
+        this.conversationDate = document.getElementById('conversationDate');
+        this.conversationDuration = document.getElementById('conversationDuration');
+        this.conversationCount = document.getElementById('conversationCount');
+        this.closeConversationModal = document.getElementById('closeConversationModal');
+        this.exportConversationBtn = document.getElementById('exportConversationBtn');
+        
         this.bindHistoryEvents();
         this.bindSearchEvents(); 
         this.bindModalEvents();
+        this.bindConversationModalEvents();
         this.refreshHistoryList();
     }
 
@@ -1647,6 +1777,9 @@ class HistoryManager {
                     </div>
                 </div>
                 <div class="history-actions">
+                    <button class="history-action-btn" onclick="historyManager.viewConversation('${interview.id}')" title="查看详情">
+                        <i class="fas fa-eye"></i>
+                    </button>
                     ${hasEvaluation ? `
                         <button class="history-action-btn" onclick="historyManager.viewEvaluation('${interview.id}')" title="查看评分">
                             <i class="fas fa-chart-bar"></i>
@@ -2064,6 +2197,309 @@ class HistoryManager {
             alert('该面试记录暂无评分信息');
         }
     }
+    
+    /**
+     * 绑定对话详情模态框事件
+     */
+    bindConversationModalEvents() {
+        // 关闭按钮事件
+        if (this.closeConversationModal) {
+            this.closeConversationModal.addEventListener('click', () => {
+                this.hideConversationModal();
+            });
+        }
+        
+        // 导出按钮事件
+        if (this.exportConversationBtn) {
+            this.exportConversationBtn.addEventListener('click', () => {
+                this.exportConversation();
+            });
+        }
+        
+        // 点击模态框外部关闭
+        if (this.conversationModal) {
+            this.conversationModal.addEventListener('click', (event) => {
+                if (event.target === this.conversationModal) {
+                    this.hideConversationModal();
+                }
+            });
+        }
+        
+        // ESC键关闭
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && this.conversationModal && this.conversationModal.style.display === 'flex') {
+                this.hideConversationModal();
+            }
+        });
+    }
+    
+    /**
+     * 查看面试对话详情
+     */
+    viewConversation(id) {
+        const interviews = this.storageManager.getInterviews();
+        const interview = interviews.find(item => item.id === id);
+        
+        if (!interview) {
+            alert('未找到面试记录');
+            return;
+        }
+        
+        if (!interview.messages || interview.messages.length === 0) {
+            alert('该面试记录没有对话内容');
+            return;
+        }
+        
+        this.showConversationModal(interview);
+    }
+    
+    /**
+     * 显示对话详情模态框
+     */
+    showConversationModal(interview) {
+        if (!this.conversationModal) {
+            console.error('对话详情模态框未找到');
+            return;
+        }
+        
+        // 设置面试信息
+        this.setConversationInfo(interview);
+        
+        // 渲染对话消息
+        this.renderConversationMessages(interview.messages);
+        
+        // 显示模态框
+        this.conversationModal.style.display = 'flex';
+        
+        // 记录当前查看的面试ID，用于导出功能
+        this.currentViewingInterviewId = interview.id;
+        
+        console.log('显示面试对话详情:', interview.id);
+    }
+    
+    /**
+     * 隐藏对话详情模态框
+     */
+    hideConversationModal() {
+        if (this.conversationModal) {
+            this.conversationModal.style.display = 'none';
+            this.currentViewingInterviewId = null;
+        }
+    }
+    
+    /**
+     * 设置对话信息
+     */
+    setConversationInfo(interview) {
+        // 面试时间
+        if (this.conversationDate) {
+            const date = new Date(interview.createdAt).toLocaleString('zh-CN');
+            this.conversationDate.textContent = date;
+        }
+        
+        // 面试时长
+        if (this.conversationDuration) {
+            const duration = interview.duration || 0;
+            if (duration >= 60) {
+                const minutes = Math.floor(duration / 60);
+                const seconds = duration % 60;
+                this.conversationDuration.textContent = `${minutes}分${seconds}秒`;
+            } else {
+                this.conversationDuration.textContent = `${duration}秒`;
+            }
+        }
+        
+        // 对话轮次
+        if (this.conversationCount) {
+            this.conversationCount.textContent = `${interview.messages.length}条`;
+        }
+    }
+    
+    /**
+     * 渲染对话消息
+     */
+    renderConversationMessages(messages) {
+        if (!this.conversationMessages) {
+            console.error('对话消息容器未找到');
+            return;
+        }
+        
+        // 清空现有内容
+        this.conversationMessages.innerHTML = '';
+        
+        if (!messages || messages.length === 0) {
+            this.conversationMessages.innerHTML = `
+                <div class="conversation-empty">
+                    <i class="fas fa-comments"></i>
+                    <h3>暂无对话记录</h3>
+                    <p>该面试记录中没有保存对话内容</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // 渲染每条消息
+        messages.forEach((message, index) => {
+            const messageElement = this.createConversationMessageElement(message, index);
+            this.conversationMessages.appendChild(messageElement);
+        });
+        
+        // 滚动到底部
+        setTimeout(() => {
+            this.conversationMessages.scrollTop = this.conversationMessages.scrollHeight;
+        }, 100);
+    }
+    
+    /**
+     * 创建对话消息元素
+     */
+    createConversationMessageElement(message, index) {
+        // 兼容不同的消息格式：type 或 role 字段
+        const messageType = message.type || message.role;
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `conversation-message ${messageType}`;
+        
+        // 头像
+        const avatar = document.createElement('div');
+        avatar.className = 'conversation-avatar';
+        avatar.innerHTML = messageType === 'assistant' ? '<i class="fas fa-robot"></i>' : '<i class="fas fa-user"></i>';
+        
+        // 对话气泡
+        const bubble = document.createElement('div');
+        bubble.className = 'conversation-bubble';
+        
+        const text = document.createElement('p');
+        text.className = 'conversation-text';
+        text.textContent = message.content;
+        
+        const time = document.createElement('div');
+        time.className = 'conversation-time';
+        if (message.timestamp) {
+            const messageTime = new Date(message.timestamp);
+            time.textContent = messageTime.toLocaleTimeString('zh-CN', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        } else {
+            time.textContent = `第${index + 1}轮`;
+        }
+        
+        bubble.appendChild(text);
+        bubble.appendChild(time);
+        
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(bubble);
+        
+        return messageDiv;
+    }
+    
+    /**
+     * 导出对话记录
+     */
+    exportConversation() {
+        if (!this.currentViewingInterviewId) {
+            alert('无法导出：未找到当前查看的面试记录');
+            return;
+        }
+        
+        const interviews = this.storageManager.getInterviews();
+        const interview = interviews.find(item => item.id === this.currentViewingInterviewId);
+        
+        if (!interview || !interview.messages) {
+            alert('无法导出：面试记录数据不完整');
+            return;
+        }
+        
+        try {
+            // 生成导出内容
+            const exportContent = this.generateExportContent(interview);
+            
+            // 创建并下载文件
+            const blob = new Blob([exportContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `面试记录_${interview.id}_${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            console.log('对话记录导出成功');
+            alert('对话记录导出成功！');
+        } catch (error) {
+            console.error('导出对话记录失败:', error);
+            alert('导出失败：' + error.message);
+        }
+    }
+    
+    /**
+     * 生成导出内容
+     */
+    generateExportContent(interview) {
+        const lines = [];
+        
+        // 头部信息
+        lines.push('='.repeat(50));
+        lines.push('AI面试官 - 面试对话记录');
+        lines.push('='.repeat(50));
+        lines.push('');
+        lines.push(`面试ID: ${interview.id}`);
+        lines.push(`面试时间: ${new Date(interview.createdAt).toLocaleString('zh-CN')}`);
+        
+        if (interview.duration) {
+            const duration = interview.duration;
+            if (duration >= 60) {
+                const minutes = Math.floor(duration / 60);
+                const seconds = duration % 60;
+                lines.push(`面试时长: ${minutes}分${seconds}秒`);
+            } else {
+                lines.push(`面试时长: ${duration}秒`);
+            }
+        }
+        
+        lines.push(`对话轮次: ${interview.messages.length}条`);
+        
+        if (interview.title) {
+            lines.push(`面试标题: ${interview.title}`);
+        }
+        
+        if (interview.summary) {
+            lines.push(`面试摘要: ${interview.summary}`);
+        }
+        
+        if (interview.score || (interview.evaluation && interview.evaluation.total_score)) {
+            lines.push(`面试评分: ${interview.score || interview.evaluation.total_score}分`);
+        }
+        
+        lines.push('');
+        lines.push('-'.repeat(50));
+        lines.push('对话内容');
+        lines.push('-'.repeat(50));
+        lines.push('');
+        
+        // 对话内容
+        interview.messages.forEach((message, index) => {
+            const messageType = message.type || message.role;
+            const speaker = messageType === 'assistant' ? 'AI面试官' : '求职者';
+            const timestamp = message.timestamp ? 
+                new Date(message.timestamp).toLocaleTimeString('zh-CN') : 
+                `第${index + 1}轮`;
+            
+            lines.push(`[${timestamp}] ${speaker}:`);
+            lines.push(message.content);
+            lines.push('');
+        });
+        
+        lines.push('-'.repeat(50));
+        lines.push(`导出时间: ${new Date().toLocaleString('zh-CN')}`);
+        lines.push('由 AI面试官系统 生成');
+        lines.push('='.repeat(50));
+        
+        return lines.join('\n');
+    }
 }
 
 /**
@@ -2399,6 +2835,15 @@ class AzureVoiceInterviewApp {
             
             // 浏览器兼容性检查现在在startVoiceCall方法中进行
             console.log('语音通话管理器初始化完成');
+            
+            // 检查是否有待恢复的面试记录
+            if (window.pendingInterviewResume) {
+                console.log('检测到待恢复的面试记录，正在恢复...');
+                if (this.voiceChat && this.voiceChat.resumeInterviewFromHistory) {
+                    this.voiceChat.resumeInterviewFromHistory(window.pendingInterviewResume);
+                    window.pendingInterviewResume = null;
+                }
+            }
         } catch (error) {
             console.error('语音通话管理器初始化失败:', error);
         }
@@ -2432,9 +2877,34 @@ class AzureVoiceInterviewApp {
     }
 
     continueInterviewFromHistory(interview) {
-        // 这里可以实现从历史记录继续面试的逻辑
+        // 需求：支持任意面试记录的继续，不仅限于特定格式
         console.log('继续面试:', interview);
-        // 暂时只是切换到面试页面
+        
+        try {
+            // 验证面试记录的完整性
+            if (!interview || !interview.messages || !Array.isArray(interview.messages)) {
+                console.error('面试记录格式无效:', interview);
+                this.showNotification('错误', '面试记录格式无效，无法继续面试', 'error');
+                return;
+            }
+
+            // 将历史面试记录传递给语音聊天组件
+            if (this.voiceChat && this.voiceChat.resumeInterviewFromHistory) {
+                this.voiceChat.resumeInterviewFromHistory(interview);
+                console.log(`成功加载历史面试记录，共 ${interview.messages.length} 条消息`);
+            } else {
+                // 降级处理：如果voiceChat组件还未初始化，存储到全局状态
+                window.pendingInterviewResume = interview;
+                console.log('voiceChat组件未准备就绪，已存储面试记录待恢复');
+            }
+            
+            // 切换到面试页面
+            this.router.navigateTo('interview');
+            
+        } catch (error) {
+            console.error('继续面试失败:', error);
+            this.showNotification('错误', '继续面试失败，请稍后重试', 'error');
+        }
     }
 }
 

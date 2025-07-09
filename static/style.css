@@ -3517,3 +3517,328 @@ body {
         padding: var(--spacing-xs);
     }
 }
+
+.voice-tips .tip-item {
+    font-size: 0.8rem;
+    padding: var(--spacing-sm);
+}
+
+/* ===== 对话详情模态框样式 ===== */
+.conversation-modal-content {
+    max-width: 900px;
+    width: 90vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-lg);
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border-light);
+    flex-shrink: 0;
+}
+
+.modal-title {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.modal-title i {
+    color: var(--primary-color);
+}
+
+.modal-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.modal-body {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-secondary);
+}
+
+.conversation-info {
+    display: flex;
+    gap: var(--spacing-lg);
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border-light);
+    flex-shrink: 0;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.info-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.info-value {
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.conversation-container {
+    flex: 1;
+    overflow: hidden;
+    padding: var(--spacing-lg);
+}
+
+.conversation-messages {
+    height: 100%;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    scroll-behavior: smooth;
+    padding: var(--spacing-sm) 0;
+}
+
+/* 确保对话消息容器使用正确的布局 */
+.conversation-messages .conversation-message {
+    display: flex;
+    gap: var(--spacing-sm);
+    max-width: 80%;
+    animation: messageSlideIn 0.3s ease-out;
+    margin-bottom: var(--spacing-md);
+}
+
+.conversation-messages .conversation-message.assistant {
+    align-self: flex-start;
+    flex-direction: row;
+}
+
+.conversation-messages .conversation-message.user {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+}
+
+/* 对话消息样式 */
+.conversation-message {
+    display: flex;
+    gap: var(--spacing-sm);
+    max-width: 80%;
+    animation: messageSlideIn 0.3s ease-out;
+    margin-bottom: var(--spacing-md);
+}
+
+.conversation-message.assistant {
+    align-self: flex-start;
+    flex-direction: row;
+}
+
+.conversation-message.user {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+}
+
+.conversation-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.conversation-message.assistant .conversation-avatar {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+    box-shadow: var(--shadow-sm);
+}
+
+.conversation-message.user .conversation-avatar {
+    background: linear-gradient(135deg, var(--success-color), var(--success-dark));
+    color: white;
+    box-shadow: var(--shadow-sm);
+}
+
+.conversation-bubble {
+    background: var(--bg-primary);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    word-wrap: break-word;
+    line-height: 1.5;
+}
+
+.conversation-message.assistant .conversation-bubble {
+    background: var(--bg-primary);
+    border-bottom-left-radius: var(--radius-sm);
+    border: 1px solid var(--border-light);
+}
+
+.conversation-message.user .conversation-bubble {
+    background: var(--primary-color) !important;
+    color: white !important;
+    border-bottom-right-radius: var(--radius-sm);
+    border: 1px solid var(--primary-color);
+}
+
+.conversation-message.user .conversation-text {
+    color: white !important;
+}
+
+.conversation-message.user .conversation-time {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.conversation-text {
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    margin: 0;
+}
+
+.conversation-time {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: var(--spacing-xs);
+    text-align: right;
+}
+
+.conversation-message.user .conversation-time {
+    text-align: left;
+}
+
+/* 导出按钮样式 */
+#exportConversationBtn {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: 0.875rem;
+}
+
+/* 空状态样式 */
+.conversation-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.conversation-empty i {
+    font-size: 3rem;
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-md);
+}
+
+.conversation-empty h3 {
+    font-size: 1.25rem;
+    margin-bottom: var(--spacing-sm);
+    color: var(--text-primary);
+}
+
+.conversation-empty p {
+    font-size: 0.95rem;
+    max-width: 300px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .conversation-modal-content {
+        width: 95vw;
+        max-height: 95vh;
+    }
+    
+    .modal-header {
+        padding: var(--spacing-md);
+    }
+    
+    .conversation-info {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+        padding: var(--spacing-md);
+    }
+    
+    .conversation-container {
+        padding: var(--spacing-md);
+    }
+    
+    .conversation-message {
+        max-width: 90%;
+    }
+    
+    .conversation-avatar {
+        width: 36px;
+        height: 36px;
+        font-size: 1.1rem;
+    }
+    
+    .modal-actions {
+        gap: var(--spacing-xs);
+    }
+    
+    #exportConversationBtn {
+        padding: var(--spacing-xs) var(--spacing-sm);
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .conversation-modal-content {
+        width: 100vw;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+    
+    .modal-title {
+        font-size: 1.1rem;
+    }
+    
+    .conversation-info {
+        padding: var(--spacing-sm);
+    }
+    
+    .info-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+    }
+    
+    .conversation-container {
+        padding: var(--spacing-sm);
+    }
+    
+    .conversation-message {
+        max-width: 95%;
+    }
+    
+    .conversation-bubble {
+        padding: var(--spacing-sm);
+        font-size: 0.9rem;
+    }
+    
+    .conversation-avatar {
+        width: 32px;
+        height: 32px;
+        font-size: 1rem;
+    }
+}

@@ -1456,6 +1456,31 @@ async def websocket_voice_endpoint(websocket: WebSocket):
                     "message": "语音输入处理完成"
                 })
                 
+            elif message_type == "continue_interview":
+                # 处理继续面试请求
+                interview_id = data.get("interview_id", "")
+                messages = data.get("messages", [])
+                resume_context = data.get("resume_context", "")
+                instruction = data.get("instruction", "")
+                
+                logger.info(f"收到继续面试请求: 面试ID={interview_id}, 消息数量={len(messages)}")
+                
+                # 构建继续面试的上下文消息
+                continue_message = f"""基于以下历史面试对话，请继续进行面试：
+
+{instruction}
+
+历史对话记录：
+"""
+                for msg in messages:
+                    role = "面试官" if msg.get("type") == "assistant" or msg.get("role") == "assistant" else "求职者"
+                    continue_message += f"{role}: {msg.get('content', '')}\n"
+                
+                continue_message += "\n请基于以上对话历史，自然地继续面试流程。"
+                
+                # 发送继续面试的消息给AI
+                await azure_voice_service.chat_with_voice(continue_message, websocket, resume_context)
+                
             elif message_type == "ping":
                 await websocket.send_json({"type": "pong"})
                 
