@@ -1531,52 +1531,25 @@ async def evaluate_interview(request_body: InterviewEvaluationRequest):
     logger.info(f"简历文本长度: {len(resume_text)}")
 
     try:
-        from prompts import InterviewPrompts
-        
-        messages_for_llm = []
-
-        # 添加系统提示，指导AI进行评估
-        system_prompt = InterviewPrompts.BASE_EVALUATION
-        messages_for_llm.append({"role": "system", "content": system_prompt})
-
-        if resume_text:
-            messages_for_llm.append({"role": "user", "content": f"候选人提供的简历信息，请在评估时参考：\n```\n{resume_text}\n```"})
-
-        # 将面试对话消息添加到 messages 数组
-        # 过滤掉前端可能传递过来的原始系统指令，因为我们在这里构造了自己的评估系统指令
-        filtered_messages = json.dumps(interview_messages)
-        messages_for_llm.append({"role": "user", "content": f"以下是候选人（user）和面试官（assistant）的对话记录，请评估： \n```\n{filtered_messages}\n```"})
-
-        # 调用 OpenAI API
-        # from openai import AzureOpenAI
-        # client = AzureOpenAI(
-        #     api_key=os.getenv("AZURE_OPENAI_API_KEY_FOR_EVALUATION"),
-        #     api_version=os.getenv("AZURE_API_VERSION_FOR_EVALUATION"),
-        #     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT_FOR_EVALUATION")
-        # )
-
-        # chat_completion = client.chat.completions.create(
-        #     model=os.getenv("AZURE_DEPLOYMENT_FOR_EVALUATION"),
-        #     messages=messages_for_llm,
-        #     temperature=get_model_temperature(),  # 从配置文件获取温度设置，确保评估的高度一致性和稳定性
-        #     max_tokens=get_max_tokens(), # 确保有足够空间生成详细评估
-        # )
-
-        # evaluation_markdown = chat_completion.choices[0].message.content
-        logger.info(messages_for_llm)
-        evaluation_result = await evaluation_service._call_deepseek_with_messages(messages_for_llm)
-        logger.info(f"evaluation result: {evaluation_result}")
-
-        # 解析评估结果，获取结构化数据
-        parsed_result = evaluation_service._parse_evaluation_result(evaluation_result)
-
-        # 分离markdown和JSON，只返回纯markdown部分
-        clean_markdown = evaluation_service._extract_clean_markdown(evaluation_result)
-
-        # 返回包含纯markdown和结构化数据的完整结果
+        from backend.three_agent_interview import generate_three_agent_report
+        result = await generate_three_agent_report(
+            interview_messages,
+            resume_text,
+            job_description="请从简历中提取或了解猜测岗位信息"
+        )
+        # {
+        #     'analysis': self.analysis_result,
+        #     'scoring': self.scoring_result,
+        #     'html_report': self.report_result,
+        #     'evaluation': self._extract_json_from_scoring()
+        # }
+        # result = await three_agent_interview.run_interview(interview_messages, resume_text, interview_id)
+        # 返回包含HTML报告和结构化数据的完整结果
         return JSONResponse(content={
-            'evaluationMarkdown': clean_markdown,
-            'evaluation': parsed_result
+            'evaluationHtml': result['html_report'],  # 保持与原API兼容的字段名
+            'evaluation': result['evaluation'],
+            'analysis': result['analysis'],
+            'scoring': result['scoring']
         })
 
     except Exception as e:
@@ -1585,6 +1558,118 @@ async def evaluate_interview(request_body: InterviewEvaluationRequest):
         print(traceback.format_exc())
         # 返回更详细的错误信息，方便调试
         raise HTTPException(status_code=500, detail=f"面试评估服务内部错误: {str(e)}")
+
+@app.post("/api/evaluate-interview-two-agent", response_model=dict)
+async def evaluate_interview_two_agent(request_body: InterviewEvaluationRequest):
+    """
+    使用两个Agent系统进行面试评估（更快的版本）
+    """
+    interview_messages = request_body.interviewMessages
+    resume_text = request_body.resumeText
+    interview_id = request_body.interviewId
+
+    if not interview_messages:
+        raise HTTPException(status_code=400, detail="请提供有效的面试对话消息。")
+
+    logger.info(f"收到两Agent面试评估请求，面试ID: {interview_id}")
+    logger.info(f"对话消息数量: {len(interview_messages)}")
+    logger.info(f"简历文本长度: {len(resume_text)}")
+
+    try:
+        from backend.two_agent_interview import generate_two_agent_report
+        result = await generate_two_agent_report(
+            interview_messages,
+            resume_text,
+            job_description="请从简历中提取或了解猜测岗位信息"
+        )
+
+        # 返回包含HTML报告和结构化数据的完整结果
+        return JSONResponse(content={
+            'evaluationHtml': result['html_report'],  # 保持与原API兼容的字段名
+            'evaluation': result['evaluation'],
+            'analysis_scoring': result['analysis_scoring'],
+            'agent_type': 'two_agent',  # 标识使用的Agent类型
+            'performance_note': '使用两Agent系统，评估速度更快'
+        })
+
+    except Exception as e:
+        print(f"调用两Agent评估系统失败: {e}")
+        import traceback
+        print(traceback.format_exc())
+        # 返回更详细的错误信息，方便调试
+        raise HTTPException(status_code=500, detail=f"两Agent面试评估服务内部错误: {str(e)}")
+
+# @app.post("/api/evaluate-interview", response_model=dict)
+# async def evaluate_interview(request_body: InterviewEvaluationRequest):
+#     """
+#     接收面试对话消息和简历文本，调用OpenAI API进行面试评估。
+#     """
+#     interview_messages = request_body.interviewMessages
+#     resume_text = request_body.resumeText
+#     interview_id = request_body.interviewId
+
+#     if not interview_messages:
+#         raise HTTPException(status_code=400, detail="请提供有效的面试对话消息。")
+
+#     logger.info(f"收到面试评估请求，面试ID: {interview_id}")
+#     logger.info(f"对话消息数量: {len(interview_messages)}")
+#     logger.info(f"简历文本长度: {len(resume_text)}")
+
+#     try:
+#         from prompts import InterviewPrompts
+        
+#         messages_for_llm = []
+
+#         # 添加系统提示，指导AI进行评估
+#         system_prompt = InterviewPrompts.BASE_EVALUATION
+#         messages_for_llm.append({"role": "system", "content": system_prompt})
+
+#         if resume_text:
+#             messages_for_llm.append({"role": "user", "content": f"候选人提供的简历信息，请在评估时参考：\n```\n{resume_text}\n```"})
+
+#         # 将面试对话消息添加到 messages 数组
+#         # 过滤掉前端可能传递过来的原始系统指令，因为我们在这里构造了自己的评估系统指令
+#         filtered_messages = json.dumps(interview_messages)
+#         messages_for_llm.append({"role": "user", "content": f"以下是候选人（user）和面试官（assistant）的对话记录，请评估： \n```\n{filtered_messages}\n```"})
+
+#         # 调用 OpenAI API
+#         # from openai import AzureOpenAI
+#         # client = AzureOpenAI(
+#         #     api_key=os.getenv("AZURE_OPENAI_API_KEY_FOR_EVALUATION"),
+#         #     api_version=os.getenv("AZURE_API_VERSION_FOR_EVALUATION"),
+#         #     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT_FOR_EVALUATION")
+#         # )
+
+#         # chat_completion = client.chat.completions.create(
+#         #     model=os.getenv("AZURE_DEPLOYMENT_FOR_EVALUATION"),
+#         #     messages=messages_for_llm,
+#         #     temperature=0.7,
+#         #     max_tokens=1500, # 确保有足够空间生成详细评估
+#         # )
+
+#         # evaluation_markdown = chat_completion.choices[0].message.content
+#         logger.info(messages_for_llm)
+#         evaluation_result = await evaluation_service._call_deepseek_with_messages(messages_for_llm)
+#         logger.info(f"evaluation result: {evaluation_result}")
+
+#         # 解析评估结果，获取结构化数据
+#         parsed_result = evaluation_service._parse_evaluation_result(evaluation_result)
+
+#         # 分离markdown和JSON，只返回纯markdown部分
+#         clean_markdown = evaluation_service._extract_clean_markdown(evaluation_result)
+
+#         # 返回包含纯markdown和结构化数据的完整结果
+#         return JSONResponse(content={
+#             'evaluationMarkdown': clean_markdown,
+#             'evaluation': parsed_result
+#         })
+
+#     except Exception as e:
+#         print(f"调用OpenAI API失败: {e}")
+#         import traceback
+#         print(traceback.format_exc())
+#         # 返回更详细的错误信息，方便调试
+#         raise HTTPException(status_code=500, detail=f"面试评估服务内部错误: {str(e)}")
 
 
 if __name__ == "__main__":

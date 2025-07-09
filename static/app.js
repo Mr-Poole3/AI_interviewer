@@ -320,39 +320,37 @@ class LocalStorageManager {
     saveInterview(interview) {
         try {
             const interviews = this.getInterviews();
-            
-            // 检查是否为更新现有记录
+
+            // 如果面试记录已有ID，尝试更新现有记录
             if (interview.id) {
-                // 查找现有记录的索引
                 const existingIndex = interviews.findIndex(item => item.id === interview.id);
-                
                 if (existingIndex !== -1) {
-                    // 更新现有记录，保持原有的创建时间
+                    // 更新现有记录，保留原始创建时间
                     const existingInterview = interviews[existingIndex];
                     interview.createdAt = existingInterview.createdAt || interview.createdAt;
                     interviews[existingIndex] = interview;
-                    console.log(`更新面试记录: ${interview.id}`);
+                    console.log('更新现有面试记录:', interview.id);
                 } else {
-                    // ID存在但找不到记录，作为新记录添加
+                    // ID存在但找不到记录，作为新记录处理
                     if (!interview.createdAt) {
                         interview.createdAt = new Date().toISOString();
                     }
                     interviews.unshift(interview);
-                    console.log(`添加面试记录: ${interview.id}`);
+                    console.log('保存新面试记录:', interview.id);
                 }
             } else {
-                // 新记录，分配新ID
+                // 没有ID，创建新记录
                 interview.id = Date.now().toString();
                 interview.createdAt = new Date().toISOString();
                 interviews.unshift(interview);
-                console.log(`创建新面试记录: ${interview.id}`);
+                console.log('创建新面试记录:', interview.id);
             }
-            
+
             // 限制最大数量，防止占用过多空间
             if (interviews.length > 50) {
                 interviews.splice(50);
             }
-            
+
             localStorage.setItem(this.KEYS.INTERVIEWS, JSON.stringify(interviews));
             return true;
         } catch (e) {
@@ -369,6 +367,33 @@ class LocalStorageManager {
         } catch (e) {
             console.error('读取面试记录失败:', e);
             return [];
+        }
+    }
+
+    // 更新现有面试记录
+    updateInterview(interview) {
+        try {
+            const interviews = this.getInterviews();
+            const existingIndex = interviews.findIndex(item => item.id === interview.id);
+
+            if (existingIndex !== -1) {
+                // 保留原始创建时间和ID
+                const existingInterview = interviews[existingIndex];
+                interview.createdAt = existingInterview.createdAt;
+                interview.id = existingInterview.id;
+
+                // 更新记录
+                interviews[existingIndex] = interview;
+                localStorage.setItem(this.KEYS.INTERVIEWS, JSON.stringify(interviews));
+                console.log('面试记录已更新:', interview.id);
+                return true;
+            } else {
+                console.warn('未找到要更新的面试记录:', interview.id);
+                return false;
+            }
+        } catch (e) {
+            console.error('更新面试记录失败:', e);
+            return false;
         }
     }
 
@@ -1655,59 +1680,59 @@ class AzureVoiceChat {
         console.log('记录消息:', type, content.substring(0, 50) + '...');
     }
     
-    /**
-     * 触发面试评分
-     */
-    async triggerInterviewEvaluation(interview) {
-        try {
-            console.log('开始面试评分...');
+    // /**
+    //  * 触发面试评分
+    //  */
+    // async triggerInterviewEvaluation(interview) {
+    //     try {
+    //         console.log('开始面试评分...');
             
-            // 获取简历上下文
-            const resumeContext = await this.getResumeContext();
+    //         // 获取简历上下文
+    //         const resumeContext = await this.getResumeContext();
             
-            // 构建评分请求
-            const evaluationRequest = {
-                interview_id: interview.id,
-                messages: interview.messages,
-                resume_context: resumeContext || '',
-                duration: interview.duration,
-                session_id: interview.sessionId || ''
-            };
+    //         // 构建评分请求
+    //         const evaluationRequest = {
+    //             interview_id: interview.id,
+    //             messages: interview.messages,
+    //             resume_context: resumeContext || '',
+    //             duration: interview.duration,
+    //             session_id: interview.sessionId || ''
+    //         };
             
-            // 显示评分进度
-            this.showEvaluationProgress();
+    //         // 显示评分进度
+    //         this.showEvaluationProgress();
             
-            // 调用评分API
-            const response = await fetch('/api/interview/evaluate', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(evaluationRequest)
-            });
+    //         // 调用评分API
+    //         const response = await fetch('/api/interview/evaluate', {
+    //             method: 'POST',
+    //             headers: {
+    //                 'Content-Type': 'application/json'
+    //             },
+    //             body: JSON.stringify(evaluationRequest)
+    //         });
             
-            if (response.ok) {
-                const result = await response.json();
-                console.log('面试评分完成:', result);
+    //         if (response.ok) {
+    //             const result = await response.json();
+    //             console.log('面试评分完成:', result);
                 
-                // 显示评分结果
-                this.showEvaluationResult(result.evaluation);
+    //             // 显示评分结果
+    //             this.showEvaluationResult(result.evaluation);
                 
-                // 更新本地存储的面试记录
-                this.updateInterviewWithEvaluation(interview.id, result.evaluation);
+    //             // 更新本地存储的面试记录
+    //             this.updateInterviewWithEvaluation(interview.id, result.evaluation);
                 
-            } else {
-                console.error('面试评分失败:', response.status);
-                this.showEvaluationError('评分服务暂时不可用，请稍后查看面试记录');
-            }
+    //         } else {
+    //             console.error('面试评分失败:', response.status);
+    //             this.showEvaluationError('评分服务暂时不可用，请稍后查看面试记录');
+    //         }
             
-        } catch (error) {
-            console.error('面试评分错误:', error);
-            this.showEvaluationError('评分过程中出现错误: ' + error.message);
-        } finally {
-            this.hideEvaluationProgress();
-        }
-    }
+    //     } catch (error) {
+    //         console.error('面试评分错误:', error);
+    //         this.showEvaluationError('评分过程中出现错误: ' + error.message);
+    //     } finally {
+    //         this.hideEvaluationProgress();
+    //     }
+    // }
     
     /**
      * 获取简历上下文
@@ -1779,9 +1804,16 @@ class AzureVoiceChat {
     }
     
     /**
-     * 显示评分结果
+     * 显示评分结果 - 直接显示完整HTML报告
      */
     showEvaluationResult(evaluation) {
+        // 如果有完整的HTML报告，直接显示
+        if (evaluation.full_evaluation_html) {
+            this.showFullHtmlReportInModal(evaluation.full_evaluation_html);
+            return;
+        }
+
+        // 否则显示简化版本
         const resultDiv = document.createElement('div');
         resultDiv.className = 'evaluation-result-modal';
         resultDiv.innerHTML = `
@@ -1797,36 +1829,37 @@ class AzureVoiceChat {
                         <div class="score-overview">
                             <div class="total-score">
                                 <div class="score-circle">
-                                    <span class="score-number">${evaluation.total_score || 75}</span>
+                                    <span class="score-number">${evaluation.total_score || 0}</span>
                                 </div>
                             </div>
                             <div class="score-summary">
                                 <h3>评估总结</h3>
-                                <p>${evaluation.summary || '面试表现良好，具备基本的专业素养和沟通能力。'}</p>
+                                <p>${evaluation.summary || '面试评估已完成'}</p>
+                                ${evaluation.recommendation ? `<p class="recommendation"><strong>推荐结果:</strong> ${evaluation.recommendation}</p>` : ''}
                             </div>
                         </div>
-                        
-                        ${evaluation.dimension_scores ? this.createDimensionScoresHTML(evaluation.dimension_scores) : ''}
-                        
+
+                        ${this.createNewScoreBreakdownHTML(evaluation)}
+
                         <div class="evaluation-details">
                             <div class="detail-section">
                                 <h4><i class="fas fa-thumbs-up"></i> 优势表现</h4>
                                 <ul>
-                                    ${(evaluation.strengths || ['表现积极', '回答完整']).map(strength => `<li>${strength}</li>`).join('')}
+                                    ${(evaluation.strengths || ['表现积极']).map(strength => `<li>${strength}</li>`).join('')}
                                 </ul>
                             </div>
                             <div class="detail-section">
                                 <h4><i class="fas fa-lightbulb"></i> 改进建议</h4>
                                 <ul>
-                                    ${(evaluation.improvements || ['继续保持', '深入学习']).map(improvement => `<li>${improvement}</li>`).join('')}
+                                    ${(evaluation.improvements || ['继续保持']).map(improvement => `<li>${improvement}</li>`).join('')}
                                 </ul>
                             </div>
                         </div>
-                        
+
                         <div class="evaluation-meta">
                             <small>
-                                评估时间: ${new Date().toLocaleString('zh-CN')} | 
-                                评估模型: ${evaluation.model_used || 'DeepSeek-V3'}
+                                评估时间: ${new Date().toLocaleString('zh-CN')} |
+                                评估模型: DeepSeek-V3 (三Agent协作)
                             </small>
                         </div>
                     </div>
@@ -1841,8 +1874,255 @@ class AzureVoiceChat {
                 </div>
             </div>
         `;
-        
+
         document.body.appendChild(resultDiv);
+    }
+
+    /**
+     * 创建新的评分细则HTML（适配三Agent系统）
+     */
+    createNewScoreBreakdownHTML(evaluation) {
+        let html = '<div class="score-breakdown">';
+
+        // 简历匹配度评分
+        if (evaluation.resume_scores) {
+            html += '<div class="score-section">';
+            html += '<h4><i class="fas fa-file-alt"></i> 简历匹配度评分</h4>';
+            html += '<div class="score-items">';
+
+            const resumeScores = evaluation.resume_scores;
+            if (resumeScores.experience_relevance) {
+                html += `<div class="score-item">
+                    <span class="score-name">经验相关性</span>
+                    <span class="score-value">${resumeScores.experience_relevance.score}/5</span>
+                </div>`;
+            }
+            if (resumeScores.skill_match) {
+                html += `<div class="score-item">
+                    <span class="score-name">技能契合度</span>
+                    <span class="score-value">${resumeScores.skill_match.score}/5</span>
+                </div>`;
+            }
+            if (resumeScores.project_results) {
+                html += `<div class="score-item">
+                    <span class="score-name">项目成果</span>
+                    <span class="score-value">${resumeScores.project_results.score}/5</span>
+                </div>`;
+            }
+            if (resumeScores.education) {
+                html += `<div class="score-item">
+                    <span class="score-name">教育资质</span>
+                    <span class="score-value">${resumeScores.education.score}/5</span>
+                </div>`;
+            }
+            if (resumeScores.total) {
+                html += `<div class="score-item total">
+                    <span class="score-name">简历匹配度总分</span>
+                    <span class="score-value">${resumeScores.total.toFixed(1)}/5</span>
+                </div>`;
+            }
+
+            html += '</div></div>';
+        }
+
+        // 面试表现评分
+        if (evaluation.interview_scores) {
+            html += '<div class="score-section">';
+            html += '<h4><i class="fas fa-comments"></i> 面试表现评分</h4>';
+            html += '<div class="score-items">';
+
+            const interviewScores = evaluation.interview_scores;
+            if (interviewScores.communication) {
+                html += `<div class="score-item">
+                    <span class="score-name">沟通表达</span>
+                    <span class="score-value">${interviewScores.communication.score}/5</span>
+                </div>`;
+            }
+            if (interviewScores.problem_solving) {
+                html += `<div class="score-item">
+                    <span class="score-name">问题解决</span>
+                    <span class="score-value">${interviewScores.problem_solving.score}/5</span>
+                </div>`;
+            }
+            if (interviewScores.technical_depth) {
+                html += `<div class="score-item">
+                    <span class="score-name">专业深度</span>
+                    <span class="score-value">${interviewScores.technical_depth.score}/5</span>
+                </div>`;
+            }
+            if (interviewScores.cultural_fit) {
+                html += `<div class="score-item">
+                    <span class="score-name">文化适配性</span>
+                    <span class="score-value">${interviewScores.cultural_fit.score}/5</span>
+                </div>`;
+            }
+            if (interviewScores.growth_potential) {
+                html += `<div class="score-item">
+                    <span class="score-name">成长潜力</span>
+                    <span class="score-value">${interviewScores.growth_potential.score}/5</span>
+                </div>`;
+            }
+
+            html += '</div></div>';
+        }
+
+        html += '</div>';
+        return html;
+    }
+
+    /**
+     * 在模态框中显示完整HTML报告
+     */
+    showFullHtmlReportInModal(htmlContent) {
+        const resultDiv = document.createElement('div');
+        resultDiv.className = 'evaluation-result-modal full-html-modal';
+
+        // 创建模态框结构
+        const modalOverlay = document.createElement('div');
+        modalOverlay.className = 'modal-overlay';
+
+        const modalContent = document.createElement('div');
+        modalContent.className = 'modal-content full-html-content';
+
+        // 创建头部
+        const modalHeader = document.createElement('div');
+        modalHeader.className = 'modal-header';
+        modalHeader.innerHTML = `
+            <h2><i class="fas fa-file-alt"></i> 完整面试评估报告</h2>
+            <div class="modal-header-actions">
+                <button class="btn btn-sm btn-outline download-btn">
+                    <i class="fas fa-download"></i> 下载
+                </button>
+                <button class="btn btn-sm btn-outline new-window-btn">
+                    <i class="fas fa-external-link-alt"></i> 新窗口打开
+                </button>
+                <button class="modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+
+        // 创建主体
+        const modalBody = document.createElement('div');
+        modalBody.className = 'modal-body full-html-body';
+
+        const htmlContainer = document.createElement('div');
+        htmlContainer.className = 'html-report-container';
+        htmlContainer.innerHTML = htmlContent;
+
+        modalBody.appendChild(htmlContainer);
+
+        // 创建底部
+        const modalFooter = document.createElement('div');
+        modalFooter.className = 'modal-footer';
+        modalFooter.innerHTML = `
+            <button class="btn btn-secondary close-btn">关闭</button>
+            <button class="btn btn-outline pdf-btn">
+                <i class="fas fa-file-pdf"></i> 导出PDF
+            </button>
+            <button class="btn btn-primary history-btn">查看历史记录</button>
+        `;
+
+        // 组装模态框
+        modalContent.appendChild(modalHeader);
+        modalContent.appendChild(modalBody);
+        modalContent.appendChild(modalFooter);
+        modalOverlay.appendChild(modalContent);
+        resultDiv.appendChild(modalOverlay);
+
+        // 绑定事件
+        modalHeader.querySelector('.download-btn').onclick = () => this.downloadHtmlReportDirect(htmlContent);
+        modalHeader.querySelector('.new-window-btn').onclick = () => this.openHtmlInNewWindow(htmlContent);
+        modalHeader.querySelector('.modal-close').onclick = () => resultDiv.remove();
+        modalFooter.querySelector('.close-btn').onclick = () => resultDiv.remove();
+        modalFooter.querySelector('.pdf-btn').onclick = () => this.exportHtmlToPDF(htmlContent);
+        modalFooter.querySelector('.history-btn').onclick = () => {
+            resultDiv.remove();
+            window.app.router.navigateTo('history');
+        };
+
+        document.body.appendChild(resultDiv);
+    }
+
+    /**
+     * 显示完整HTML报告（在新窗口）
+     */
+    showFullHtmlReport(evaluation) {
+        if (!evaluation.full_evaluation_html) {
+            alert('完整HTML报告不可用');
+            return;
+        }
+
+        this.openHtmlInNewWindow(evaluation.full_evaluation_html);
+    }
+
+    /**
+     * 在新窗口打开HTML内容
+     */
+    openHtmlInNewWindow(htmlContent) {
+        const reportWindow = window.open('', '_blank');
+        reportWindow.document.write(htmlContent);
+        reportWindow.document.close();
+    }
+
+    /**
+     * 下载HTML报告
+     */
+    downloadHtmlReport(evaluation) {
+        if (!evaluation.full_evaluation_html) {
+            alert('HTML报告不可用');
+            return;
+        }
+
+        this.downloadHtmlReportDirect(evaluation.full_evaluation_html);
+    }
+
+    /**
+     * 直接下载HTML内容
+     */
+    downloadHtmlReportDirect(htmlContent) {
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `面试评估报告_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    /**
+     * 导出HTML内容为PDF
+     */
+    async exportHtmlToPDF(htmlContent) {
+        try {
+            // 创建临时容器来渲染HTML
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = htmlContent;
+            tempDiv.style.position = 'absolute';
+            tempDiv.style.left = '-9999px';
+            tempDiv.style.top = '-9999px';
+            tempDiv.style.width = '800px';
+            document.body.appendChild(tempDiv);
+
+            // 生成文件名
+            const now = new Date();
+            const fileName = `面试评估报告_${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}.pdf`;
+
+            // 使用PDF导出器导出
+            await window.pdfExporter.exportToPDF(tempDiv, fileName);
+
+            // 清理临时元素
+            document.body.removeChild(tempDiv);
+
+            // 显示成功提示
+            this.showNotification('PDF导出成功', `文件已保存为: ${fileName}`, 'success');
+
+        } catch (error) {
+            console.error('PDF导出失败:', error);
+            this.showNotification('导出失败', 'PDF导出失败: ' + error.message, 'error');
+        }
     }
 
     /**
@@ -1938,39 +2218,38 @@ class AzureVoiceChat {
         }, 3000);
     }
 
-    /**
-     * 创建维度评分HTML
-     */
-    createDimensionScoresHTML(dimensionScores) {
-        const dimensions = {
-            'technical_skills': '技术能力',
-            'communication': '沟通表达',
-            'problem_solving': '问题解决',
-            'learning_adaptability': '学习适应',
-            'professional_attitude': '职业素养'
-        };
+    // /**
+    //  * 创建维度评分HTML
+    //  */
+    // createDimensionScoresHTML(dimensionScores) {
+    //     const dimensions = {
+    //         'technical_depth': '技术能力',
+    //         'communication': '沟通表达',
+    //         'problem_solving': '问题解决',
+    //         'growth_potential': '成长潜力'
+    //     };
         
-        return `
-            <div class="dimension-scores">
-                <h4>各维度评分</h4>
-                <div class="score-bars">
-                    ${Object.entries(dimensions).map(([key, name]) => {
-                        const score = dimensionScores[key] || 7;
-                        const percentage = (score / 10) * 100;
-                        return `
-                            <div class="score-bar">
-                                <div class="score-label">${name}</div>
-                                <div class="score-progress">
-                                    <div class="score-fill" style="width: ${percentage}%"></div>
-                                </div>
-                                <div class="score-value">${score}/10</div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            </div>
-        `;
-    }
+    //     return `
+    //         <div class="dimension-scores">
+    //             <h4>各维度评分</h4>
+    //             <div class="score-bars">
+    //                 ${Object.entries(dimensions).map(([key, name]) => {
+    //                     const score = dimensionScores[key] || 7;
+    //                     const percentage = (score / 10) * 100;
+    //                     return `
+    //                         <div class="score-bar">
+    //                             <div class="score-label">${name}</div>
+    //                             <div class="score-progress">
+    //                                 <div class="score-fill" style="width: ${percentage}%"></div>
+    //                             </div>
+    //                             <div class="score-value">${score}/10</div>
+    //                         </div>
+    //                     `;
+    //                 }).join('')}
+    //             </div>
+    //         </div>
+    //     `;
+    // }
     
     /**
      * 显示评分错误
@@ -2479,8 +2758,8 @@ class HistoryManager {
             this.modalActualContent.innerHTML = ''; // 清空之前的内容
         }
 
-        // 检查是否已缓存完整评估结果（包含markdown和评分）
-        if (interviewToEvaluate.evaluationMarkdown && interviewToEvaluate.evaluationScore) {
+        // 检查是否已缓存完整评估结果（包含HTML和评分）
+        if (interviewToEvaluate.evaluationHtml && interviewToEvaluate.evaluationScore) {
             console.log(`从缓存加载完整评估结果，面试ID: ${interviewId}`);
             this.displayCompleteEvaluation(interviewToEvaluate);
             if (this.modalLoadingSpinner) {
@@ -2514,15 +2793,17 @@ class HistoryManager {
             }
 
             const evaluationData = await evaluationResponse.json();
-            const markdownResult = evaluationData.evaluationMarkdown;
+            const htmlResult = evaluationData.evaluationHtml;
             const structuredEvaluation = evaluationData.evaluation;
+            const analysisResult = evaluationData.analysis;
+            const scoringResult = evaluationData.scoring;
 
-            if (markdownResult && structuredEvaluation) {
+            if (htmlResult && structuredEvaluation) {
                 // 缓存评估结果到 interview 对象，但保持原有的标题和基本信息
-                interviewToEvaluate.evaluationMarkdown = markdownResult;
+                interviewToEvaluate.evaluationHtml = htmlResult;
 
-                // 使用结构化数据中的分数，如果没有则从markdown提取
-                interviewToEvaluate.evaluationScore = structuredEvaluation.total_score || this.extractScoreFromMarkdown(markdownResult);
+                // 使用结构化数据中的分数
+                interviewToEvaluate.evaluationScore = structuredEvaluation.overall_score || structuredEvaluation.total_score || 0;
                 interviewToEvaluate.score = interviewToEvaluate.evaluationScore; // 确保score字段也被设置
 
                 // 不修改原有的title，保持原面试记录的标题
@@ -2531,23 +2812,22 @@ class HistoryManager {
                     interviewToEvaluate.title = 'AI语音面试记录';
                 }
 
-                // 使用结构化数据中的总结，如果没有则从markdown提取
-                const evaluationSummary = structuredEvaluation.summary || this.extractSummaryFromMarkdown(markdownResult);
-                if (evaluationSummary && !interviewToEvaluate.summary) {
-                    interviewToEvaluate.summary = evaluationSummary;
-                }
+                // // 使用结构化数据中的总结
+                // const evaluationSummary = structuredEvaluation.summary || '面试评估已完成';
+                // if (evaluationSummary && !interviewToEvaluate.summary) {
+                //     interviewToEvaluate.summary = evaluationSummary;
+                // }
 
                 // 创建完整的evaluation对象，包含所有结构化数据
                 interviewToEvaluate.evaluation = {
                     total_score: interviewToEvaluate.evaluationScore,
-                    summary: evaluationSummary || '面试评估已完成',
-                    full_evaluation: markdownResult,
-                    strengths: structuredEvaluation.strengths || [],
-                    improvements: structuredEvaluation.improvements || [],
-                    dimension_scores: structuredEvaluation.dimension_scores || {}
+                    // summary: evaluationSummary,
+                    full_evaluation_html: htmlResult,
+                    strengths: analysisResult.highlights || [],
+                    improvements: analysisResult.risks || [],
                 };
 
-                this.storageManager.saveInterview(interviewToEvaluate); // 更新 localStorage 中的记录
+                this.storageManager.updateInterview(interviewToEvaluate); // 更新 localStorage 中的记录
 
                 // 使用AzureVoiceChat的showEvaluationResult方法显示结构化评分结果
                 if (window.app && window.app.voiceChat) {
@@ -2710,13 +2990,13 @@ class HistoryManager {
     }
 
     /**
-     * 显示完整的评估结果（包含评分卡片和详细markdown）
+     * 显示完整的评估结果（包含评分卡片和详细HTML报告）
      * @param {Object} interview - 面试对象
      */
     displayCompleteEvaluation(interview) {
         if (!this.modalActualContent) return;
 
-        const score = interview.evaluationScore || 75;
+        const score = interview.evaluationScore || 0;
         const title = interview.title || `面试评估 - ${new Date().toLocaleDateString()}`;
         const summary = interview.summary || '面试评估已完成';
 
@@ -2736,6 +3016,12 @@ class HistoryManager {
                         <button class="btn btn-sm btn-outline" onclick="this.closest('.evaluation-complete-view').querySelector('.evaluation-details').scrollIntoView({behavior: 'smooth'})">
                             <i class="fas fa-arrow-down"></i> 查看详细评估
                         </button>
+                        <button class="btn btn-sm btn-outline" onclick="window.app.voiceChat.showFullHtmlReport(${JSON.stringify(interview.evaluation || {}).replace(/"/g, '&quot;')})">
+                            <i class="fas fa-file-alt"></i> 查看完整报告
+                        </button>
+                        <button class="btn btn-sm btn-outline" onclick="window.app.voiceChat.downloadHtmlReport(${JSON.stringify(interview.evaluation || {}).replace(/"/g, '&quot;')})">
+                            <i class="fas fa-download"></i> 下载HTML
+                        </button>
                         <button class="btn btn-sm btn-primary" onclick="window.app.voiceChat.exportEvaluationToPDF(this.closest('.modal'))">
                             <i class="fas fa-file-pdf"></i> 导出PDF
                         </button>
@@ -2744,9 +3030,18 @@ class HistoryManager {
 
                 <!-- 详细评估内容 -->
                 <div class="evaluation-details">
-                    <div class="markdown-content">
-                        ${this.renderMarkdownToHtml(interview.evaluationMarkdown)}
-                    </div>
+                    ${interview.evaluation ? this.createNewScoreBreakdownHTML(interview.evaluation) : ''}
+                    ${interview.evaluation && interview.evaluation.full_evaluation_html ?
+                        `<div class="html-content-preview">
+                            <h4><i class="fas fa-file-code"></i> 完整评估报告预览</h4>
+                            <div class="html-preview-container">
+                                <iframe srcdoc="${interview.evaluation.full_evaluation_html.replace(/"/g, '&quot;')}"
+                                        style="width: 100%; height: 400px; border: 1px solid #ddd; border-radius: 6px;">
+                                </iframe>
+                            </div>
+                        </div>` :
+                        '<p>详细评估报告不可用</p>'
+                    }
                 </div>
             </div>
         `;
