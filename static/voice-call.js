@@ -1308,12 +1308,12 @@ class VoiceCallManager {
         if (this.currentInterviewMessages.length > 0) {
             const resumeData = this.storageManager.getCurrentResume();
             if(!this.sessionId){
-                this.sessionId = this.azureVoiceChat.currentSessionId || resumeData.sessionId;
+                this.sessionId = this.azureVoiceChat.currentSessionId || (resumeData && resumeData.sessionId) || Date.now().toString();
             }
             var interviewRecord = {
                 id: this.sessionId, // 使用 Azure 会话ID 作为面试记录的ID
                 createdAt: new Date().toISOString(),
-                duration: Math.floor((Date.now() - this.azureVoiceChat.interviewStartTime) / 1000), // 从计时器获取时长
+                duration: this.azureVoiceChat.interviewStartTime ? Math.floor((Date.now() - this.azureVoiceChat.interviewStartTime) / 1000) : 0, // 从计时器获取时长
                 messages: this.currentInterviewMessages,
                 resumeFileName: resumeData ? resumeData.fileName : '无简历',
                 // 可以添加其他元数据，例如面试状态、AI模型等

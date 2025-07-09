@@ -21,6 +21,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Uplo
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import uvicorn
 
 # 文件解析库
@@ -60,7 +61,18 @@ app.add_middleware(
 # 挂载静态文件
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-        
+# Pydantic 模型定义
+class PromptRequest(BaseModel):
+    resume_context: str = ""
+
+class InterviewEvaluationRequest(BaseModel):
+    interview_id: str
+    messages: list
+    resume_context: str = ""
+    duration: int = 0
+    session_id: str = ""
+
+
 class InterviewEvaluationService:
     """面试评分服务"""
     
@@ -1013,18 +1025,6 @@ async def read_root():
     """返回主页面"""
     return FileResponse("static/index.html")
 
-from pydantic import BaseModel
-
-class PromptRequest(BaseModel):
-    resume_context: str = ""
-
-class InterviewEvaluationRequest(BaseModel):
-    interview_id: str
-    messages: list
-    resume_context: str = ""
-    duration: int = 0
-    session_id: str = ""
-
 @app.post("/api/prompts/voice-call")
 async def get_voice_call_prompt_api(request: PromptRequest) -> JSONResponse:
     """
@@ -1508,14 +1508,14 @@ async def health_check():
         "azure_client_ready": azure_voice_service.client is not None if azure_voice_service else False
     }
 
-class InterviewEvaluationRequest(BaseModel):
+class LegacyInterviewEvaluationRequest(BaseModel):
     interviewMessages: List[Dict]
     resumeText: Optional[str]
     interviewId: Optional[str]
 
 
 @app.post("/api/evaluate-interview", response_model=dict)
-async def evaluate_interview(request_body: InterviewEvaluationRequest):
+async def evaluate_interview(request_body: LegacyInterviewEvaluationRequest):
     """
     接收面试对话消息和简历文本，调用OpenAI API进行面试评估。
     """
@@ -1576,8 +1576,8 @@ async def evaluate_interview_two_agent(request_body: InterviewEvaluationRequest)
     logger.info(f"简历文本长度: {len(resume_text)}")
 
     try:
-        from backend.two_agent_interview import generate_two_agent_report
-        result = await generate_two_agent_report(
+        from backend.three_agent_interview import generate_three_agent_report
+        result = await generate_three_agent_report(
             interview_messages,
             resume_text,
             job_description="请从简历中提取或了解猜测岗位信息"
