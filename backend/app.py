@@ -111,8 +111,30 @@ class InterviewEvaluationService:
             resume_context = interview_data.get('resume_context', '')
             duration = interview_data.get('duration', 0)
             
+            # ===== 详细日志输出：打印原始面试数据 =====
+            logger.info("=" * 100)
+            logger.info("原始面试数据:")
+            logger.info("=" * 100)
+            logger.info(f"面试ID: {interview_data.get('id', 'unknown')}")
+            logger.info(f"消息数量: {len(messages)}")
+            logger.info(f"面试时长: {duration} 秒")
+            logger.info(f"简历上下文长度: {len(resume_context)} 字符")
+            logger.info("原始消息列表:")
+            for i, msg in enumerate(messages):
+                logger.info(f"  消息 {i+1}: type={msg.get('type', 'unknown')}, content_length={len(msg.get('content', ''))}")
+                logger.info(f"    内容: {msg.get('content', '')[:100]}...")
+            logger.info("=" * 100)
+            
             # 分析对话内容
             conversation_analysis = self._analyze_conversation(messages)
+            
+            # ===== 详细日志输出：打印分析后的对话内容 =====
+            logger.info("分析后的对话内容:")
+            logger.info("=" * 100)
+            logger.info(f"格式化对话长度: {len(conversation_analysis['formatted_conversation'])} 字符")
+            logger.info("格式化对话内容:")
+            logger.info(conversation_analysis['formatted_conversation'])
+            logger.info("=" * 100)
             
             # 构建评估prompt
             evaluation_prompt = get_interview_evaluation_prompt(
@@ -222,9 +244,12 @@ class InterviewEvaluationService:
         total_ai_words = 0
         
         for msg in messages:
-            role = msg.get('type', 'unknown')
+            # 兼容多种字段格式：优先使用'role'，回退到'type'
+            role = msg.get('role', msg.get('type', 'unknown'))
             content = msg.get('content', '')
             timestamp = msg.get('timestamp', '')
+            
+            logger.info(f"处理消息: role={role}, content_preview={content[:50]}...")
             
             if role == 'user':
                 formatted_conversation.append(f"候选人: {content}")
@@ -325,6 +350,15 @@ class InterviewEvaluationService:
             try:
                 logger.info(f"DeepSeek 评估API调用尝试 {attempt + 1}/{max_retries + 1}")
 
+                # ===== 详细日志输出：打印发送给DeepSeek V3的完整信息 =====
+                logger.info("=" * 100)
+                logger.info("发送给DeepSeek V3的完整Prompt内容:")
+                logger.info("=" * 100)
+                logger.info(f"Prompt长度: {len(prompt)} 字符")
+                logger.info("Prompt内容:")
+                logger.info(prompt)
+                logger.info("=" * 100)
+
                 headers = {
                     'Authorization': f'Bearer {self.DEEPSEEK_API_KEY}',
                     'Content-Type': 'application/json'
@@ -340,6 +374,14 @@ class InterviewEvaluationService:
                     'top_p': get_top_p()
                 }
 
+                # 打印API调用参数（不包含API密钥）
+                logger.info("API调用参数:")
+                logger.info(f"- Model: {payload['model']}")
+                logger.info(f"- Temperature: {payload['temperature']}")
+                logger.info(f"- Max Tokens: {payload['max_tokens']}")
+                logger.info(f"- Top P: {payload['top_p']}")
+                logger.info("=" * 100)
+
                 response = await self.http_client.post(
                     f"{self.DEEPSEEK_API_URL}/chat/completions",
                     headers=headers,
@@ -350,7 +392,15 @@ class InterviewEvaluationService:
                 if response.status_code == 200:
                     result = response.json()
                     content = result['choices'][0]['message']['content']
-                    logger.info(f"DeepSeek 评估API调用成功，返回内容长度: {len(content)}")
+                    
+                    # ===== 详细日志输出：打印DeepSeek V3的返回结果 =====
+                    logger.info("DeepSeek V3返回结果:")
+                    logger.info("=" * 100)
+                    logger.info(f"返回内容长度: {len(content)} 字符")
+                    logger.info("返回内容:")
+                    logger.info(content)
+                    logger.info("=" * 100)
+                    
                     return content
                 else:
                     logger.error(f"DeepSeek API调用失败: {response.status_code}, {response.text}")
