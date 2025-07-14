@@ -3551,6 +3551,8 @@ class ResumeManager {
     constructor(storageManager, router) {
         this.storageManager = storageManager;
         this.router = router;
+        // 缓存完整简历内容，避免重复API调用
+        this.cachedFullContent = null;
         this.fileInput = null;
         this.uploadArea = null;
         this.resumeInfo = null;
@@ -3559,41 +3561,50 @@ class ResumeManager {
     }
 
     init() {
-        this.fileInput = document.getElementById('resumeFileInput');
-        this.uploadArea = document.getElementById('resumeFileUploadArea');
-        this.resumeInfo = document.getElementById('resumeInfo');
+        this.resumeContent = document.getElementById('resumeContent');
+        this.resumeSectionTitle = document.getElementById('resumeSectionTitle');
+        this.sectionActions = document.getElementById('sectionActions');
+        this.uploadTips = document.getElementById('uploadTips');
         
-        this.bindResumeEvents();
+        this.bindDrawerEvents();
         this.refreshResumeInfo();
     }
 
     bindResumeEvents() {
+        // 先清理旧的事件监听器
+        this.unbindResumeEvents();
+        
+        // 重新获取元素引用（因为可能是动态创建的）
+        this.fileInput = document.getElementById('resumeFileInput');
+        this.uploadArea = document.getElementById('resumeFileUploadArea');
+        
         // 文件选择
         if (this.fileInput) {
-            this.fileInput.addEventListener('change', (e) => {
+            this.fileChangeHandler = (e) => {
                 const file = e.target.files[0];
                 if (file) {
                     this.handleFileSelect(file);
                 }
-            });
+            };
+            this.fileInput.addEventListener('change', this.fileChangeHandler);
         }
 
         // 拖拽上传
         if (this.uploadArea) {
-            this.uploadArea.addEventListener('click', () => {
+            this.uploadClickHandler = () => {
                 this.fileInput?.click();
-            });
-
-            this.uploadArea.addEventListener('dragover', (e) => {
+            };
+            
+            this.dragOverHandler = (e) => {
                 e.preventDefault();
                 this.uploadArea.classList.add('drag-over');
-            });
-
-            this.uploadArea.addEventListener('dragleave', () => {
+            };
+            
+            this.dragLeaveHandler = () => {
                 this.uploadArea.classList.remove('drag-over');
-            });
-
-            this.uploadArea.addEventListener('drop', (e) => {
+            };
+            
+            this.dropHandler = (e) => {
                 e.preventDefault();
                 this.uploadArea.classList.remove('drag-over');
                 
@@ -3601,7 +3612,41 @@ class ResumeManager {
                 if (files.length > 0) {
                     this.handleFileSelect(files[0]);
                 }
-            });
+            };
+
+            this.uploadArea.addEventListener('click', this.uploadClickHandler);
+            this.uploadArea.addEventListener('dragover', this.dragOverHandler);
+            this.uploadArea.addEventListener('dragleave', this.dragLeaveHandler);
+            this.uploadArea.addEventListener('drop', this.dropHandler);
+        }
+    }
+
+    /**
+     * 解绑简历事件
+     */
+    unbindResumeEvents() {
+        if (this.fileInput && this.fileChangeHandler) {
+            this.fileInput.removeEventListener('change', this.fileChangeHandler);
+            this.fileChangeHandler = null;
+        }
+
+        if (this.uploadArea) {
+            if (this.uploadClickHandler) {
+                this.uploadArea.removeEventListener('click', this.uploadClickHandler);
+                this.uploadClickHandler = null;
+            }
+            if (this.dragOverHandler) {
+                this.uploadArea.removeEventListener('dragover', this.dragOverHandler);
+                this.dragOverHandler = null;
+            }
+            if (this.dragLeaveHandler) {
+                this.uploadArea.removeEventListener('dragleave', this.dragLeaveHandler);
+                this.dragLeaveHandler = null;
+            }
+            if (this.dropHandler) {
+                this.uploadArea.removeEventListener('drop', this.dropHandler);
+                this.dropHandler = null;
+            }
         }
     }
 
@@ -3616,20 +3661,35 @@ class ResumeManager {
     }
 
     showResumeInfo(resumeData) {
-        if (this.resumeInfo) {
-            this.resumeInfo.innerHTML = this.createResumeInfoHTML(resumeData);
+        if (this.resumeContent) {
+            this.resumeContent.innerHTML = this.createResumeInfoHTML(resumeData);
             this.bindResumeInfoEvents();
+        }
+        
+        // 清空标题右侧的操作按钮
+        if (this.sectionActions) {
+            this.sectionActions.innerHTML = '';
+        }
+        
+        // 更新标题和提示
+        if (this.resumeSectionTitle) {
+            this.resumeSectionTitle.textContent = '当前简历';
+        }
+        
+        // 隐藏上传提示
+        if (this.uploadTips) {
+            this.uploadTips.style.display = 'none';
         }
     }
 
     showNoResume() {
-        if (this.resumeInfo) {
-            this.resumeInfo.innerHTML = `
+        if (this.resumeContent) {
+            this.resumeContent.innerHTML = `
                 <div class="no-resume" id="noResume">
                     <div class="no-resume-illustration">
                         <i class="fas fa-file-upload"></i>
                     </div>
-                    <h3>暂未上传简历</h3>
+                    <h3>暂无简历？右上角使用天汇AI工具快速制作简历</h3>
                     <p>上传简历后，天汇AI面试官将基于您的背景生成个性化面试问题</p>
                     <div class="resume-benefits">
                         <div class="benefit-item">
@@ -3645,8 +3705,50 @@ class ResumeManager {
                             <span>深度分析</span>
                         </div>
                     </div>
+                    
+                    <!-- 上传区域 -->
+                    <div class="upload-zone" id="resumeFileUploadArea">
+                        <div class="upload-content">
+                            <div class="upload-icon">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                            </div>
+                            <div class="upload-text">
+                                <h3>拖拽简历文件到此处</h3>
+                                <p>或点击选择文件上传</p>
+                                <div class="upload-formats">
+                                    <span class="format-tag">PDF</span>
+                                    <span class="format-tag">DOC</span>
+                                    <span class="format-tag">DOCX</span>
+                                </div>
+                            </div>
+                            <input type="file" id="resumeFileInput" class="file-input" accept=".pdf,.doc,.docx" />
+                        </div>
+                    </div>
                 </div>
             `;
+            
+            // 重新绑定上传事件
+            this.bindResumeEvents();
+        }
+        
+        // 在标题右侧显示制作简历按钮
+        if (this.sectionActions) {
+            this.sectionActions.innerHTML = `
+                <button class="header-action-btn" onclick="window.open('https://tianhuiai.com.cn/', '_blank')" title="天汇AI简历">
+                    <i class="fas fa-magic"></i>
+                    <span>天汇AI简历</span>
+                </button>
+            `;
+        }
+        
+        // 更新标题和提示
+        if (this.resumeSectionTitle) {
+            this.resumeSectionTitle.textContent = '上传简历';
+        }
+        
+        // 显示上传提示
+        if (this.uploadTips) {
+            this.uploadTips.style.display = 'block';
         }
     }
 
@@ -3676,7 +3778,13 @@ class ResumeManager {
                 <div class="resume-preview">
                     <h5><i class="fas fa-eye"></i> 简历预览</h5>
                     <div class="preview-content">
-                    <p class="preview-text">${resumeData.preview}</p>
+                        <p class="preview-text">${resumeData.preview}</p>
+                        <div class="preview-expand">
+                            <button class="expand-btn" onclick="resumeManager.showFullResume()">
+                                <i class="fas fa-expand-alt"></i>
+                                查看完整简历
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="resume-actions">
@@ -3691,6 +3799,29 @@ class ResumeManager {
 
     bindResumeInfoEvents() {
         // 事件已在HTML中绑定
+    }
+
+    /**
+     * 绑定抽屉事件
+     */
+    bindDrawerEvents() {
+        // ESC键关闭抽屉
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('resumeDrawerModal');
+                if (modal && modal.classList.contains('show')) {
+                    this.hideFullResume();
+                }
+            }
+        });
+
+        // 防止抽屉内容区域点击时关闭抽屉
+        const drawerContainer = document.querySelector('.drawer-container');
+        if (drawerContainer) {
+            drawerContainer.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        }
     }
 
     handleFileSelect(file) {
@@ -3744,33 +3875,34 @@ class ResumeManager {
     }
 
     showUploadProgress() {
-        if (this.uploadArea) {
-            this.uploadArea.innerHTML = `
+        if (this.resumeContent) {
+            this.resumeContent.innerHTML = `
                 <div class="upload-progress">
                     <div class="loading-spinner"></div>
                     <p>正在上传和解析简历...</p>
                 </div>
             `;
         }
+        
+        // 清空标题右侧的操作按钮
+        if (this.sectionActions) {
+            this.sectionActions.innerHTML = '';
+        }
+        
+        // 更新标题
+        if (this.resumeSectionTitle) {
+            this.resumeSectionTitle.textContent = '上传中...';
+        }
+        
+        // 隐藏上传提示
+        if (this.uploadTips) {
+            this.uploadTips.style.display = 'none';
+        }
     }
 
     hideUploadProgress() {
-        if (this.uploadArea) {
-            this.uploadArea.innerHTML = `
-                <div class="upload-content">
-                    <div class="upload-icon">📁</div>
-                    <div class="upload-text">
-                        <p class="upload-main-text">拖拽简历文件到此处，或点击选择文件</p>
-                        <p class="upload-sub-text">支持 PDF、Word (.doc/.docx) 格式，最大 10MB</p>
-                    </div>
-                    <input type="file" id="resumeFileInput" class="file-input" accept=".pdf,.doc,.docx" />
-                </div>
-            `;
-            
-            // 重新绑定事件
-            this.fileInput = document.getElementById('resumeFileInput');
-            this.bindResumeEvents();
-        }
+        // 恢复无简历状态的完整内容
+        this.showNoResume();
     }
 
     handleUploadSuccess(response, fileName) {
@@ -3783,6 +3915,8 @@ class ResumeManager {
         };
 
         this.storageManager.saveCurrentResume(resumeData);
+        // 清除之前的缓存内容，因为是新的简历
+        this.cachedFullContent = null;
         this.refreshResumeInfo();
 
         // 通知主应用简历已上传
@@ -3800,12 +3934,227 @@ class ResumeManager {
     removeResume() {
         if (confirm('确定要删除当前简历吗？')) {
             this.storageManager.removeCurrentResume();
+            // 清除缓存的完整内容
+            this.cachedFullContent = null;
             this.refreshResumeInfo();
             
             // 通知主应用简历已删除
             window.dispatchEvent(new CustomEvent('resumeRemoved'));
             
             alert('简历已删除');
+        }
+    }
+
+
+
+    /**
+     * 显示完整简历内容抽屉
+     */
+    async showFullResume() {
+        const resumeData = this.storageManager.getCurrentResume();
+        if (!resumeData) {
+            alert('未找到简历数据');
+            return;
+        }
+
+        const modal = document.getElementById('resumeDrawerModal');
+        const contentContainer = document.getElementById('resumeFullContent');
+        
+        if (!modal || !contentContainer) {
+            console.error('未找到抽屉Modal元素');
+            return;
+        }
+
+        // 显示抽屉
+        modal.style.display = 'flex';
+        // 使用setTimeout确保DOM更新后再添加show类
+        setTimeout(() => {
+            modal.classList.add('show');
+        }, 10);
+
+        // 阻止背景滚动
+        document.body.style.overflow = 'hidden';
+
+        // 显示加载状态
+        contentContainer.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #666;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 16px;"></i>
+                <div>正在加载完整简历内容...</div>
+            </div>
+        `;
+
+        try {
+            // 通过API获取完整简历内容
+            const response = await fetch(`/api/resume/${resumeData.sessionId}`);
+            if (response.ok) {
+                const data = await response.json();
+                const fullContent = data.content || '无法获取简历内容';
+                // 缓存完整内容供复制功能使用
+                this.cachedFullContent = fullContent;
+                // 渲染Markdown格式的简历内容
+                this.renderResumeContent(contentContainer, fullContent);
+                console.log('成功获取完整简历内容，长度:', fullContent.length);
+            } else {
+                console.warn('获取完整简历内容失败，使用预览内容');
+                // 清除缓存
+                this.cachedFullContent = null;
+                // 回退到预览内容
+                const fallbackContent = resumeData.preview || '暂无内容';
+                this.renderResumeContent(contentContainer, fallbackContent);
+            }
+        } catch (error) {
+            console.error('获取简历内容时发生错误:', error);
+            // 清除缓存
+            this.cachedFullContent = null;
+            // 回退到预览内容
+            const fallbackContent = resumeData.preview || '暂无内容';
+            this.renderResumeContent(contentContainer, fallbackContent);
+        }
+    }
+
+    /**
+     * 隐藏完整简历内容抽屉
+     */
+    hideFullResume() {
+        const modal = document.getElementById('resumeDrawerModal');
+        
+        if (!modal) {
+            console.error('未找到抽屉Modal元素');
+            return;
+        }
+
+        // 隐藏抽屉
+        modal.classList.remove('show');
+        
+        // 等待动画完成后隐藏元素
+        setTimeout(() => {
+            modal.style.display = 'none';
+            // 恢复背景滚动
+            document.body.style.overflow = '';
+        }, 250);
+    }
+
+    /**
+     * 渲染简历内容（支持Markdown格式）
+     * @param {HTMLElement} container - 内容容器
+     * @param {string} content - 简历内容
+     */
+    renderResumeContent(container, content) {
+        try {
+            // 检查是否包含Markdown语法
+            const hasMarkdown = this.detectMarkdownSyntax(content);
+            
+            if (hasMarkdown && typeof marked !== 'undefined') {
+                // 配置marked选项
+                marked.setOptions({
+                    breaks: true,          // 支持换行
+                    gfm: true,            // 支持GitHub风格Markdown
+                    sanitize: false,      // 允许HTML（简历内容可信）
+                    smartLists: true,     // 智能列表
+                    smartypants: true     // 智能标点
+                });
+                
+                // 转换Markdown为HTML
+                const htmlContent = marked.parse(content);
+                
+                // 更新容器样式以支持Markdown渲染
+                container.className = 'resume-full-content markdown-content';
+                container.innerHTML = htmlContent;
+                
+                console.log('简历内容已渲染为Markdown格式');
+            } else {
+                // 显示为纯文本
+                container.className = 'resume-full-content';
+                container.textContent = content;
+                
+                if (hasMarkdown) {
+                    console.warn('检测到Markdown语法但marked库未加载，显示为纯文本');
+                }
+            }
+        } catch (error) {
+            console.error('渲染简历内容时出错:', error);
+            // 降级显示纯文本
+            container.className = 'resume-full-content';
+            container.textContent = content;
+        }
+    }
+
+    /**
+     * 检测内容是否包含Markdown语法
+     * @param {string} content - 待检测的内容
+     * @returns {boolean} - 是否包含Markdown语法
+     */
+    detectMarkdownSyntax(content) {
+        if (!content || typeof content !== 'string') {
+            return false;
+        }
+
+        // 检测常见的Markdown语法模式
+        const markdownPatterns = [
+            /\*\*.*?\*\*/,           // 粗体 **text**
+            /\*.*?\*/,               // 斜体 *text*
+            /^#{1,6}\s+/m,           // 标题 # ## ###
+            /^[\*\-\+]\s+/m,         // 无序列表 * - +
+            /^\d+\.\s+/m,            // 有序列表 1. 2.
+            /\[.*?\]\(.*?\)/,        // 链接 [text](url)
+            /`.*?`/,                 // 行内代码 `code`
+            /^```/m,                 // 代码块 ```
+            /^>\s+/m,                // 引用 >
+            /\|.*?\|/,               // 表格 |col1|col2|
+            /^-{3,}$/m,              // 分隔线 ---
+            /^=+$/m                  // 标题下划线 ===
+        ];
+
+        // 如果匹配任何一个模式，则认为包含Markdown
+        return markdownPatterns.some(pattern => pattern.test(content));
+    }
+
+    /**
+     * 复制简历内容到剪贴板
+     */
+    async copyResumeContent() {
+        const resumeData = this.storageManager.getCurrentResume();
+        if (!resumeData) {
+            alert('未找到简历数据');
+            return;
+        }
+
+        // 优先使用缓存的完整内容，如果没有则通过API获取，最后回退到预览
+        let content = this.cachedFullContent;
+
+        if (!content) {
+            // 尝试通过API获取完整内容
+            try {
+                showNotification('获取中', '正在获取完整简历内容...', 'info', 1000);
+                const response = await fetch(`/api/resume/${resumeData.sessionId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    content = data.content;
+                    // 同时缓存起来
+                    this.cachedFullContent = content;
+                } else {
+                    console.warn('无法获取完整简历内容，使用预览内容');
+                    content = resumeData.preview || '';
+                }
+            } catch (error) {
+                console.error('获取简历内容失败:', error);
+                content = resumeData.preview || '';
+            }
+        }
+
+        if (!content) {
+            alert('简历内容为空');
+            return;
+        }
+
+        try {
+            await copyToClipboard(content);
+            // 显示成功提示
+            const message = this.cachedFullContent ? '完整简历内容已复制到剪贴板' : '简历预览内容已复制到剪贴板';
+            showNotification('复制成功', message, 'success', 2000);
+        } catch (error) {
+            console.error('复制失败:', error);
+            alert('复制失败，请手动选择文本复制');
         }
     }
 }
@@ -3944,7 +4293,13 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // 拖拽上传功能
+// 用于跟踪是否已经初始化过拖拽功能
+let isDragAndDropInitialized = false;
+
 function initDragAndDrop() {
+    // 避免重复初始化
+    if (isDragAndDropInitialized) return;
+    
     const uploadZone = document.querySelector('.upload-content');
     if (!uploadZone) return;
 
@@ -3962,6 +4317,9 @@ function initDragAndDrop() {
     });
 
     uploadZone.addEventListener('drop', handleDrop, false);
+    
+    // 标记已初始化
+    isDragAndDropInitialized = true;
 
     function preventDefaults(e) {
         e.preventDefault();
@@ -4252,9 +4610,6 @@ function showSettingsPanel() {
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
-    // 初始化拖拽上传
-    initDragAndDrop();
-    
     // 初始化快捷操作
     addQuickActions();
     
@@ -4873,8 +5228,19 @@ function handlePageSpecificTutorial(page) {
         setTimeout(() => {
             switch(page) {
                 case 'resume':
-                    if (document.querySelector('.upload-area')) {
+                    // 检查是否有简历和相关元素
+                    const hasUploadArea = document.querySelector('.upload-area');
+                    const hasNoResumeContent = document.querySelector('#noResume');
+                    const hasHeaderActionBtn = document.querySelector('.header-action-btn');
+                    
+                    // 如果是无简历状态且有天汇AI工具按钮，显示完整引导
+                    if (hasNoResumeContent && hasHeaderActionBtn && hasUploadArea) {
                         window.tutorialGuide.startFeatureTutorial('resume-upload');
+                        localStorage.setItem(tutorialKey, 'true');
+                    }
+                    // 如果只有上传区域（有简历状态），显示简化引导
+                    else if (hasUploadArea && !hasNoResumeContent) {
+                        window.tutorialGuide.startFeatureTutorial('resume-upload-simple');
                         localStorage.setItem(tutorialKey, 'true');
                     }
                     break;

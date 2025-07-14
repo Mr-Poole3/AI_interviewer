@@ -233,6 +233,78 @@ class InterviewEvaluationService:
                 'error': str(e),
                 'summary': '解析过程中出现错误，请稍后重试。'
             }
+
+    async def format_resume_content(self, resume_text: str, filename: str = "") -> dict:
+        """
+        使用DeepSeek V3对简历内容进行AI重新排版
+        
+        Args:
+            resume_text: 原始简历文本内容
+            filename: 简历文件名（用于上下文）
+        
+        Returns:
+            dict: 排版结果，包含格式化后的内容
+        """
+        try:
+            logger.info(f"开始AI简历排版: 文件名={filename}, 原始内容长度={len(resume_text)}")
+            
+            # 构建简历排版提示词
+            format_prompt = f"""请作为一个专业的简历排版专家，对以下简历内容进行重新排版和格式化。
+
+**任务要求：**
+1. 对简历内容进行逻辑重组和排版优化
+2. 保持所有原始信息的完整性，不能删除或修改任何实质内容
+3. 优化文字结构，使其更加清晰、专业
+4. 统一格式风格，提升整体可读性
+5. 只输出重新排版后的完整简历内容，不要添加任何评论、建议或无关信息
+
+**原始简历内容：**
+```
+{resume_text}
+```
+
+请输出重新排版后的完整简历内容："""
+
+            logger.info("调用DeepSeek V3进行简历排版...")
+            
+            # 调用DeepSeek V3进行简历排版
+            formatted_result = await self._call_deepseek_evaluation(format_prompt)
+            
+            # 验证排版结果
+            if not formatted_result or len(formatted_result.strip()) < 50:
+                logger.warning("DeepSeek返回的排版结果过短，使用原始内容")
+                formatted_content = resume_text
+                is_formatted = False
+            else:
+                formatted_content = formatted_result.strip()
+                is_formatted = True
+            
+            result = {
+                'success': True,
+                'original_content': resume_text,
+                'formatted_content': formatted_content,
+                'is_ai_formatted': is_formatted,
+                'original_length': len(resume_text),
+                'formatted_length': len(formatted_content),
+                'format_timestamp': datetime.now().isoformat(),
+                'model_used': self.DEEPSEEK_MODEL
+            }
+            
+            logger.info(f"简历AI排版完成: 原始长度={len(resume_text)}, 排版后长度={len(formatted_content)}, AI处理={'成功' if is_formatted else '失败，使用原始内容'}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"简历AI排版失败: {e}")
+            # 返回原始内容作为降级方案
+            return {
+                'success': False,
+                'original_content': resume_text,
+                'formatted_content': resume_text,  # 降级使用原始内容
+                'is_ai_formatted': False,
+                'error': str(e),
+                'format_timestamp': datetime.now().isoformat(),
+                'model_used': 'Fallback - Original Content'
+            }
             
     
     def _analyze_conversation(self, messages: list) -> dict:
@@ -916,6 +988,9 @@ class AzureVoiceService:
 # 全局Azure语音服务实例
 azure_voice_service: AzureVoiceService = None
 
+# 全局面试评估服务实例
+evaluation_service: InterviewEvaluationService = None
+
 # 存储用户会话的简历内容
 user_sessions: Dict[str, str] = {}
 
@@ -1067,6 +1142,7 @@ async def startup_event():
         azure_voice_service = AzureVoiceService()
         evaluation_service = InterviewEvaluationService()
         logger.info("Azure语音服务和面试评分服务初始化完成")
+        logger.info("简历AI排版功能已激活，将使用DeepSeek V3进行内容优化")
     except Exception as e:
         logger.error(f"服务初始化失败: {e}")
 
@@ -1360,13 +1436,13 @@ async def get_resume_content(session_id: str) -> JSONResponse:
 @app.post("/api/upload-resume")
 async def upload_resume(file: UploadFile = File(...)) -> JSONResponse:
     """
-    上传并解析简历文件
+    上传并解析简历文件，使用AI进行重新排版
     
     Args:
         file: 上传的简历文件
         
     Returns:
-        解析结果和会话ID
+        解析结果和会话ID，包含AI排版后的内容
     """
     try:
         # 验证文件
@@ -1379,33 +1455,82 @@ async def upload_resume(file: UploadFile = File(...)) -> JSONResponse:
         file_extension = Path(file.filename).suffix.lower()
         
         if file_extension == '.pdf':
-            resume_text = extract_pdf_text(file_content)
+            original_resume_text = extract_pdf_text(file_content)
         elif file_extension in ['.doc', '.docx']:
-            resume_text = extract_docx_text(file_content)
+            original_resume_text = extract_docx_text(file_content)
         else:
             raise HTTPException(status_code=400, detail="不支持的文件格式")
         
         # 验证解析结果
-        if not resume_text or len(resume_text.strip()) < 50:
+        if not original_resume_text or len(original_resume_text.strip()) < 50:
             raise HTTPException(status_code=400, detail="简历内容过少或解析失败，请检查文件内容")
         
-        # 生成会话ID
-        session_id = generate_resume_hash(resume_text)
+        logger.info(f"简历文件解析成功: {file.filename}, 原始内容长度: {len(original_resume_text)}")
         
-        # 保存简历内容
-        user_sessions[session_id] = resume_text
-        save_resume_to_file(resume_text, session_id)
+        # 使用AI对简历内容进行重新排版
+        try:
+            format_result = await evaluation_service.format_resume_content(
+                resume_text=original_resume_text,
+                filename=file.filename
+            )
+            
+            # 使用AI排版后的内容作为主要内容
+            final_resume_text = format_result['formatted_content']
+            is_ai_formatted = format_result['is_ai_formatted']
+            
+            logger.info(f"简历AI排版完成: AI处理={'成功' if is_ai_formatted else '失败'}, 最终内容长度: {len(final_resume_text)}")
+            
+        except Exception as format_error:
+            logger.error(f"简历AI排版失败，使用原始内容: {format_error}")
+            # 降级使用原始内容
+            final_resume_text = original_resume_text
+            is_ai_formatted = False
+            format_result = {
+                'success': False,
+                'error': str(format_error),
+                'is_ai_formatted': False
+            }
         
-        logger.info(f"简历上传成功: {file.filename}, 会话ID: {session_id}, 内容长度: {len(resume_text)}")
+        # 生成会话ID（基于原始内容，保持一致性）
+        session_id = generate_resume_hash(original_resume_text)
         
-        return JSONResponse(content={
+        # 保存排版后的内容作为主要内容
+        user_sessions[session_id] = final_resume_text
+        save_resume_to_file(final_resume_text, session_id)
+        
+        # 同时保存原始内容作为备份
+        original_session_id = f"{session_id}_original"
+        user_sessions[original_session_id] = original_resume_text
+        save_resume_to_file(original_resume_text, original_session_id)
+        
+        # 构建返回内容
+        preview_content = final_resume_text[:200] + "..." if len(final_resume_text) > 200 else final_resume_text
+        
+        response_data = {
             "success": True,
-            "message": "简历上传并解析成功",
+            "message": "简历上传、解析和AI排版成功" if is_ai_formatted else "简历上传和解析成功",
             "session_id": session_id,
             "filename": file.filename,
-            "content_length": len(resume_text),
-            "preview": resume_text[:200] + "..." if len(resume_text) > 200 else resume_text
-        })
+            "content_length": len(final_resume_text),
+            "original_content_length": len(original_resume_text),
+            "preview": preview_content,
+            "ai_formatted": is_ai_formatted,
+            "format_info": {
+                "ai_processed": is_ai_formatted,
+                "model_used": format_result.get('model_used', 'None'),
+                "format_timestamp": format_result.get('format_timestamp', ''),
+                "quality_improvement": len(final_resume_text) != len(original_resume_text)
+            }
+        }
+        
+        if not is_ai_formatted and format_result.get('error'):
+            response_data["format_warning"] = f"AI排版失败: {format_result['error']}"
+        
+        logger.info(f"简历上传完成: {file.filename}, 会话ID: {session_id}, "
+                   f"原始长度: {len(original_resume_text)}, 最终长度: {len(final_resume_text)}, "
+                   f"AI排版: {'成功' if is_ai_formatted else '失败'}")
+        
+        return JSONResponse(content=response_data)
         
     except HTTPException:
         raise

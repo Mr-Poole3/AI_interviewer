@@ -55,7 +55,7 @@ class TutorialGuideSystem {
         this.tooltip.innerHTML = `
             <div class="tooltip-header">
                 <div class="tooltip-progress">
-                    <span class="step-counter">1/5</span>
+                    <span class="step-counter">1/6</span>
                     <div class="progress-bar">
                         <div class="progress-fill"></div>
                     </div>
@@ -68,6 +68,7 @@ class TutorialGuideSystem {
                 <div class="tooltip-title">欢迎使用AI面试系统</div>
                 <div class="tooltip-description">让我们开始一个快速的功能介绍</div>
                 <div class="tooltip-tips"></div>
+                <div class="tooltip-custom-action" style="display: none;"></div>
             </div>
             <div class="tooltip-actions">
                 <button class="btn-tutorial btn-secondary" data-action="prev">
@@ -262,11 +263,25 @@ class TutorialGuideSystem {
                     position: 'bottom'
                 },
                 {
-                    target: '.hero-section',
+                    target: '#navResume',
+                    title: '快速创建简历',
+                    description: '还没有简历？点击这个"简历管理"按钮进入页面，页面中有天汇AI工具可以快速制作专业简历',
+                    tips: '🚀 天汇AI工具可以帮您生成专业简历，提升面试成功率',
+                    position: 'bottom',
+                    customAction: {
+                        text: '立即制作简历',
+                        icon: 'fas fa-magic',
+                        action: () => {
+                            window.open('https://tianhuiai.com.cn/', '_blank');
+                        }
+                    }
+                },
+                {
+                    target: '#navInterview',
                     title: '开始您的面试之旅',
-                    description: '现在您已经了解了基本功能，点击"开始面试"按钮体验AI面试吧！',
+                    description: '恭喜！您已经了解了系统的主要功能。现在点击这个"语音面试"按钮开始您的AI面试体验吧！',
                     tips: '🚀 建议先上传简历以获得更好的面试体验',
-                    position: 'top'
+                    position: 'bottom'
                 }
             ]
         };
@@ -370,11 +385,61 @@ class TutorialGuideSystem {
         const titleElement = this.tooltip.querySelector('.tooltip-title');
         const descriptionElement = this.tooltip.querySelector('.tooltip-description');
         const tipsElement = this.tooltip.querySelector('.tooltip-tips');
+        const customActionElement = this.tooltip.querySelector('.tooltip-custom-action');
         
         titleElement.textContent = step.title;
         descriptionElement.textContent = step.description;
         tipsElement.textContent = step.tips || '';
         tipsElement.style.display = step.tips ? 'block' : 'none';
+        
+        // 处理自定义按钮
+        if (step.customAction) {
+            customActionElement.innerHTML = `
+                <button class="btn-tutorial btn-custom" id="customActionBtn" style="
+                    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    margin-top: 12px;
+                    width: 100%;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    box-shadow: 0 4px 6px -1px rgb(139 92 246 / 0.25);
+                ">
+                    <i class="${step.customAction.icon || 'fas fa-external-link-alt'}"></i>
+                    ${step.customAction.text}
+                </button>
+            `;
+            customActionElement.style.display = 'block';
+            
+            // 绑定自定义按钮事件
+            const customBtn = customActionElement.querySelector('#customActionBtn');
+            if (customBtn) {
+                customBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (step.customAction.action) {
+                        step.customAction.action();
+                    }
+                });
+                
+                // 添加悬停效果
+                customBtn.addEventListener('mouseenter', () => {
+                    customBtn.style.transform = 'translateY(-2px)';
+                    customBtn.style.boxShadow = '0 10px 15px -3px rgb(139 92 246 / 0.3)';
+                });
+                
+                customBtn.addEventListener('mouseleave', () => {
+                    customBtn.style.transform = 'translateY(0)';
+                    customBtn.style.boxShadow = '0 4px 6px -1px rgb(139 92 246 / 0.25)';
+                });
+            }
+        } else {
+            customActionElement.style.display = 'none';
+            customActionElement.innerHTML = '';
+        }
     }
     
     /**
@@ -601,6 +666,7 @@ class TutorialGuideSystem {
         const tutorials = {
             'voice-interview': this.getVoiceInterviewTutorial(),
             'resume-upload': this.getResumeUploadTutorial(),
+            'resume-upload-simple': this.getResumeUploadSimpleTutorial(),
             'interview-history': this.getHistoryTutorial()
         };
         
@@ -642,13 +708,39 @@ class TutorialGuideSystem {
     getResumeUploadTutorial() {
         return {
             id: 'resume-upload',
-            title: '简历上传功能',
+            title: '简历管理功能',
             steps: [
+                {
+                    target: '.header-action-btn',
+                    title: '快速制作简历',
+                    description: '还没有简历？点击这里使用天汇AI工具快速制作专业简历',
+                    tips: '🚀 天汇AI工具可以帮您快速生成专业简历，提升面试通过率',
+                    position: 'bottom'
+                },
                 {
                     target: '.upload-area',
                     title: '上传您的简历',
                     description: '拖拽简历文件到这里，或点击选择文件。支持PDF和Word格式',
                     tips: '📄 上传简历后，AI会根据您的背景进行个性化提问',
+                    position: 'top'
+                }
+            ]
+        };
+    }
+
+    /**
+     * 获取简化版简历上传引导（已有简历用户）
+     */
+    getResumeUploadSimpleTutorial() {
+        return {
+            id: 'resume-upload-simple',
+            title: '更新简历',
+            steps: [
+                {
+                    target: '.upload-area',
+                    title: '更新您的简历',
+                    description: '拖拽新的简历文件到这里，或点击选择文件进行更新。支持PDF和Word格式',
+                    tips: '📄 更新简历后，AI会根据您的最新背景进行个性化提问',
                     position: 'top'
                 }
             ]
