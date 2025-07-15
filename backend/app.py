@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -756,7 +756,7 @@ class AzureVoiceService:
         except Exception as e:
             logger.error(f"Azure OpenAI客户端初始化失败: {e}")
     
-    async def chat_with_voice(self, message: str, websocket: WebSocket, resume_context: str = "") -> None:
+    async def chat_with_voice(self, message: str, websocket: WebSocket, resume_context: str = "", job_preference: dict = None) -> None:
         """
         发送消息并接收语音回复
         
@@ -782,7 +782,7 @@ class AzureVoiceService:
                 )
                 
                 # 构建系统提示词
-                system_prompt = self._build_system_prompt(resume_context)
+                system_prompt = self._build_system_prompt(resume_context, job_preference)
                 
                 # 发送系统消息（如果有简历上下文）
                 if resume_context:
@@ -820,9 +820,9 @@ class AzureVoiceService:
                 "message": f"语音聊天错误: {str(e)}"
             })
     
-    def _build_system_prompt(self, resume_context: str) -> str:
+    def _build_system_prompt(self, resume_context: str, job_preference: dict = None) -> str:
         """构建系统提示词"""
-        return get_interviewer_prompt(resume_context=resume_context)
+        return get_interviewer_prompt(resume_context=resume_context, job_preference=job_preference)
     
     async def _handle_response_event(self, event: Any, websocket: WebSocket) -> None:
         """
@@ -881,6 +881,7 @@ class AzureVoiceService:
         audio_data: str, 
         websocket: WebSocket, 
         resume_context: str = "",
+        job_preference: str = "",
         audio_format: str = "pcm_s16le",
         sample_rate: int = 24000,
         channels: int = 1,
@@ -951,8 +952,8 @@ class AzureVoiceService:
                 )
                 
                 # 构建系统提示词
-                if resume_context:
-                    system_prompt = self._build_system_prompt(resume_context)
+                if resume_context or job_preference:
+                    system_prompt = self._build_system_prompt(resume_context, job_preference)
                     await connection.conversation.item.create(
                         item={
                             "type": "message",
@@ -1044,14 +1045,57 @@ def load_resume_from_file(session_id: str) -> Optional[str]:
 def generate_resume_hash(resume_text: str) -> str:
     """
     生成简历内容的哈希值，用于去重和验证
-    
+
     Args:
         resume_text: 简历文本内容
-        
+
     Returns:
         简历内容的MD5哈希值
     """
     return hashlib.md5(resume_text.encode('utf-8')).hexdigest()[:16]
+
+def save_job_preference_to_file(job_preference: dict, session_id: str) -> bool:
+    """
+    将岗位偏好保存到文件
+
+    Args:
+        job_preference: 岗位偏好信息
+        session_id: 会话ID
+
+    Returns:
+        保存是否成功
+    """
+    try:
+        preference_file = RESUME_STORAGE_DIR / f"{session_id}_job_preference.json"
+        with open(preference_file, 'w', encoding='utf-8') as f:
+            json.dump(job_preference, f, ensure_ascii=False, indent=2)
+        logger.info(f"岗位偏好已保存到文件: {preference_file}")
+        return True
+    except Exception as e:
+        logger.error(f"保存岗位偏好文件失败: {e}")
+        return False
+
+def load_job_preference_from_file(session_id: str) -> Optional[dict]:
+    """
+    从文件加载岗位偏好
+ 
+    Args:
+        session_id: 会话ID
+
+    Returns:
+        岗位偏好信息，如果文件不存在则返回None
+    """
+    try:
+        preference_file = RESUME_STORAGE_DIR / f"{session_id}_job_preference.json"
+        if preference_file.exists():
+            with open(preference_file, 'r', encoding='utf-8') as f:
+                preference = json.load(f)
+            logger.info(f"从文件加载岗位偏好: {preference_file}")
+            return preference
+        return None
+    except Exception as e:
+        logger.error(f"加载岗位偏好文件失败: {e}")
+        return None
 
 def extract_pdf_text(file_content: bytes) -> str:
     """
@@ -1151,6 +1195,20 @@ async def read_root():
     """返回主页面"""
     return FileResponse("static/index.html")
 
+from pydantic import BaseModel
+
+class PromptRequest(BaseModel):
+    resume_context: str = ""
+    job_preference: dict = None
+
+class InterviewEvaluationRequest(BaseModel):
+    interview_id: str
+    messages: list
+    resume_context: str = ""
+    duration: int = 0
+    session_id: str = ""
+    job_preference: dict = None
+      
 @app.post("/api/prompts/voice-call")
 async def get_voice_call_prompt_api(request: PromptRequest) -> JSONResponse:
     """
@@ -1164,12 +1222,14 @@ async def get_voice_call_prompt_api(request: PromptRequest) -> JSONResponse:
     """
     try:
         resume_context = request.resume_context
-        instructions = get_voice_call_prompt(resume_context=resume_context)
-        
+        job_preference = request.job_preference
+        instructions = get_voice_call_prompt(resume_context=resume_context, job_preference=job_preference)
+
         return JSONResponse(content={
             "success": True,
             "instructions": instructions,
-            "has_resume": bool(resume_context)
+            "has_resume": bool(resume_context),
+            "has_job_preference": bool(job_preference)
         })
         
     except Exception as e:
@@ -1299,13 +1359,19 @@ async def evaluate_interview_api(request: InterviewEvaluationRequest) -> JSONRes
     try:
         logger.info(f"收到面试评估请求: ID={request.interview_id}")
         
+        # 获取岗位偏好信息（如果请求中没有，尝试从文件加载）
+        job_preference = request.job_preference
+        if not job_preference and request.session_id:
+            job_preference = load_job_preference_from_file(request.session_id)
+
         # 构建面试数据
         interview_data = {
             'id': request.interview_id,
             'messages': request.messages,
             'resume_context': request.resume_context,
             'duration': request.duration,
-            'session_id': request.session_id
+            'session_id': request.session_id,
+            'job_preference': job_preference
         }
         
         # 调用评分服务
@@ -1400,6 +1466,38 @@ async def save_interview_extract_data(request: InterviewExtractionRequest) -> JS
         raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
 
 
+@app.get("/api/preference/{session_id}")
+async def get_preference_content(session_id: str) -> JSONResponse:
+    """
+    获取指定会话的简历内容
+    
+    Args:
+        session_id: 会话ID
+        
+    Returns:
+        简历内容
+    """
+    try:
+        # 从内存或文件获取简历内容
+        resume_content = user_sessions.get(session_id) or load_resume_from_file(session_id)
+        
+        if not resume_content:
+            raise HTTPException(status_code=404, detail="未找到对应的简历内容")
+        
+        return JSONResponse(content={
+            "success": True,
+            "session_id": session_id,
+            "content": resume_content,
+            "content_length": len(resume_content)
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取简历内容失败: {e}")
+        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
+
+
 @app.get("/api/resume/{session_id}")
 async def get_resume_content(session_id: str) -> JSONResponse:
     """
@@ -1434,15 +1532,25 @@ async def get_resume_content(session_id: str) -> JSONResponse:
 
 
 @app.post("/api/upload-resume")
-async def upload_resume(file: UploadFile = File(...)) -> JSONResponse:
+async def upload_resume(
+    file: UploadFile = File(...),
+    job_category: Optional[str] = Form(None),
+    job_position: Optional[str] = Form(None),
+    job_category_label: Optional[str] = Form(None),
+    job_position_label: Optional[str] = Form(None)
+) -> JSONResponse:
     """
-    上传并解析简历文件，使用AI进行重新排版
-    
+    上传并解析简历文件，使用AI进行重新排版，同时支持岗位偏好设置
+
     Args:
         file: 上传的简历文件
-        
+        job_category: 岗位类别代码
+        job_position: 具体岗位代码
+        job_category_label: 岗位类别标签
+        job_position_label: 具体岗位标签
+
     Returns:
-        解析结果和会话ID，包含AI排版后的内容
+        解析结果和会话ID，包含AI排版后的内容和岗位偏好信息
     """
     try:
         # 验证文件
@@ -1468,6 +1576,10 @@ async def upload_resume(file: UploadFile = File(...)) -> JSONResponse:
         logger.info(f"简历文件解析成功: {file.filename}, 原始内容长度: {len(original_resume_text)}")
         
         # 使用AI对简历内容进行重新排版
+        final_resume_text = original_resume_text
+        is_ai_formatted = False
+        format_result = {'success': False, 'is_ai_formatted': False}
+        
         try:
             format_result = await evaluation_service.format_resume_content(
                 resume_text=original_resume_text,
@@ -1503,6 +1615,19 @@ async def upload_resume(file: UploadFile = File(...)) -> JSONResponse:
         user_sessions[original_session_id] = original_resume_text
         save_resume_to_file(original_resume_text, original_session_id)
         
+        # 保存岗位偏好信息
+        job_preference = None
+        if job_category and job_position:
+            job_preference = {
+                "category": job_category,
+                "position": job_position,
+                "category_label": job_category_label or job_category,
+                "position_label": job_position_label or job_position,
+                "full_label": f"{job_category_label or job_category} - {job_position_label or job_position}",
+                "updated_at": datetime.now().isoformat()
+            }
+            save_job_preference_to_file(job_preference, session_id)
+        
         # 构建返回内容
         preview_content = final_resume_text[:200] + "..." if len(final_resume_text) > 200 else final_resume_text
         
@@ -1523,13 +1648,21 @@ async def upload_resume(file: UploadFile = File(...)) -> JSONResponse:
             }
         }
         
+        # 添加岗位偏好信息到响应
+        if job_preference:
+            response_data["job_preference"] = job_preference
+        
+        # 添加AI排版警告信息
         if not is_ai_formatted and format_result.get('error'):
             response_data["format_warning"] = f"AI排版失败: {format_result['error']}"
         
+        logger.info(f"简历上传成功: {file.filename}, 会话ID: {session_id}, 内容长度: {len(final_resume_text)}")
+        if job_preference:
+            logger.info(f"岗位偏好: {job_preference['full_label']}")
         logger.info(f"简历上传完成: {file.filename}, 会话ID: {session_id}, "
                    f"原始长度: {len(original_resume_text)}, 最终长度: {len(final_resume_text)}, "
                    f"AI排版: {'成功' if is_ai_formatted else '失败'}")
-        
+
         return JSONResponse(content=response_data)
         
     except HTTPException:
@@ -1559,13 +1692,15 @@ async def websocket_voice_endpoint(websocket: WebSocket):
                 
                 if message.strip():
                     logger.info(f"收到语音聊天消息: {message}")
-                    
-                    # 获取简历上下文
+
+                    # 获取简历上下文和岗位偏好
                     resume_context = ""
+                    job_preference = None
                     if session_id:
                         resume_context = user_sessions.get(session_id) or load_resume_from_file(session_id)
-                    
-                    await azure_voice_service.chat_with_voice(message, websocket, resume_context)
+                        job_preference = load_job_preference_from_file(session_id)
+
+                    await azure_voice_service.chat_with_voice(message, websocket, resume_context, job_preference)
                     
             elif message_type == "voice_input":
                 # FastRTC增强的语音输入处理
@@ -1583,12 +1718,14 @@ async def websocket_voice_endpoint(websocket: WebSocket):
                     resume_context = ""
                     if session_id:
                         resume_context = user_sessions.get(session_id) or load_resume_from_file(session_id)
+                        job_preference = load_job_preference_from_file(session_id)
                     
                     # 处理FastRTC音频输入
                     await azure_voice_service.process_fastrtc_audio(
                         audio_data, 
                         websocket, 
                         resume_context,
+                        job_preference,
                         audio_format=audio_format,
                         sample_rate=sample_rate,
                         channels=channels,

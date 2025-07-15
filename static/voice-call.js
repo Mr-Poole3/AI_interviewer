@@ -891,11 +891,12 @@ class VoiceCallManager {
             return;
         }
         
-        // 获取简历信息
+        // 获取简历信息和岗位偏好
         const resumeContext = await this.getResumeContext();
-        
+        const jobPreference = await this.getJobPreference();
+
         // 构建系统指令
-        const instructions = await this.buildInstructions(resumeContext);
+        const instructions = await this.buildInstructions(resumeContext, jobPreference);
 
         const event = {
             type: "session.update",
@@ -929,7 +930,7 @@ class VoiceCallManager {
     /**
      * 构建系统指令
      */
-    async buildInstructions(resumeContext) {
+    async buildInstructions(resumeContext, jobPreference) {
         try {
             // 从后端获取prompt配置
             const response = await fetch('/api/prompts/voice-call', {
@@ -938,7 +939,8 @@ class VoiceCallManager {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    resume_context: resumeContext
+                    resume_context: resumeContext,
+                    job_preference: jobPreference
                 })
             });
             
@@ -949,12 +951,12 @@ class VoiceCallManager {
             } else {
                 this.logMessage(`获取prompt失败: ${response.status}`);
                 // 回退到默认prompt
-                return await this.getDefaultInstructions(resumeContext);
+                return await this.getDefaultInstructions(resumeContext, jobPreference);
             }
         } catch (error) {
             this.logMessage(`获取prompt错误: ${error.message}`);
             // 回退到默认prompt
-            return await this.getDefaultInstructions(resumeContext);
+            return await this.getDefaultInstructions(resumeContext, jobPreference);
         }
     }
     
@@ -962,18 +964,33 @@ class VoiceCallManager {
      * 获取默认指令（回退方案）
      * 优先从API获取prompts.py中的配置，最后才使用硬编码
      */
-    async getDefaultInstructions(resumeContext) {
+    async getDefaultInstructions(resumeContext, jobPreference) {
         try {
             // 尝试从API获取默认prompt
             const response = await fetch('/api/prompts/voice-call-default');
             if (response.ok) {
                 const data = await response.json();
                 this.logMessage(`✅ 从API获取默认prompt成功: ${data.source}`);
-                
+
                 let instructions = data.instructions;
+
+                // 添加简历信息
                 if (resumeContext) {
-                    instructions += `\n\n候选人简历信息：\n${resumeContext}\n\n请根据简历内容进行针对性的面试提问。`;
+                    instructions += `\n\n候选人简历信息：\n${resumeContext}`;
                 }
+
+                // 添加岗位偏好信息
+                if (jobPreference) {
+                    instructions += `\n\n候选人意向岗位：\n`;
+                    instructions += `岗位类别: ${jobPreference.category_label || jobPreference.categoryLabel || ''}\n`;
+                    instructions += `具体岗位: ${jobPreference.position_label || jobPreference.positionLabel || ''}\n`;
+                    instructions += `完整岗位: ${jobPreference.full_label || (jobPreference.categoryLabel && jobPreference.positionLabel ? `${jobPreference.categoryLabel} - ${jobPreference.positionLabel}` : '')}`;
+                }
+
+                if (resumeContext || jobPreference) {
+                    instructions += `\n\n请结合候选人的简历背景和意向岗位要求，进行针对性的面试提问和评估。`;
+                }
+
                 return instructions;
             } else {
                 this.logMessage(`❌ API获取默认prompt失败: ${response.status}`);
@@ -995,6 +1012,38 @@ class VoiceCallManager {
         return instructions;
     }
     
+    /**
+     * 获取岗位偏好信息
+     */
+    async getJobPreference() {
+        try {
+            // 从localStorage获取当前简历（包含岗位偏好）
+            const resumeData = localStorage.getItem('azure_current_resume');
+            if (!resumeData) {
+                return null;
+            }
+
+            const resume = JSON.parse(resumeData);
+            if (resume && resume.jobPreference) {
+                this.logMessage(`已获取岗位偏好: ${resume.jobPreference.full_label}`);
+                return resume.jobPreference;
+            }
+
+            // 如果简历数据中没有，尝试从独立的岗位偏好存储获取
+            const jobPreference = localStorage.getItem('job_preference');
+            if (jobPreference) {
+                const preference = JSON.parse(jobPreference);
+                this.logMessage(`从独立存储获取岗位偏好: ${preference.categoryLabel} - ${preference.positionLabel}`);
+                return preference;
+            }
+
+            return null;
+        } catch (error) {
+            this.logMessage(`获取岗位偏好失败: ${error.message}`);
+            return null;
+        }
+    }
+
     /**
      * 获取简历上下文信息
      */

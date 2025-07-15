@@ -3561,12 +3561,28 @@ class ResumeManager {
     }
 
     init() {
+        // 来自 07.09_TEST 分支的初始化
         this.resumeContent = document.getElementById('resumeContent');
         this.resumeSectionTitle = document.getElementById('resumeSectionTitle');
         this.sectionActions = document.getElementById('sectionActions');
         this.uploadTips = document.getElementById('uploadTips');
-        
+
+        // 来自 add_evaluation 分支的初始化
+        this.fileInput = document.getElementById('resumeFileInput');
+        this.uploadArea = document.getElementById('resumeFileUploadArea');
+        this.resumeInfo = document.getElementById('resumeInfo');
+        this.jobCategory = document.getElementById('jobCategory');
+        this.jobPosition = document.getElementById('jobPosition');
+
+        // 绑定事件方法
         this.bindDrawerEvents();
+        this.bindResumeEvents();
+        this.bindJobPreferenceEvents();
+
+        // 加载保存的作业偏好
+        this.loadSavedJobPreference();
+
+        // 刷新简历信息
         this.refreshResumeInfo();
     }
 
@@ -3754,7 +3770,30 @@ class ResumeManager {
 
     createResumeInfoHTML(resumeData) {
         const uploadDate = new Date(resumeData.uploadedAt).toLocaleString('zh-CN');
-        
+
+        // 获取当前岗位偏好信息
+        const currentJobInfo = this.getSelectedJobInfo();
+        const jobPreferenceFromResume = resumeData.jobPreference;
+
+        // 优先使用当前选择的岗位偏好，其次使用简历中保存的
+        const jobPreference = currentJobInfo.fullLabel ? currentJobInfo : jobPreferenceFromResume;
+
+        let jobPreferenceHTML = '';
+        if (jobPreference && (jobPreference.full_label || jobPreference.fullLabel)) {
+            const fullLabel = jobPreference.full_label || jobPreference.fullLabel ||
+                             (jobPreference.categoryLabel && jobPreference.positionLabel ?
+                              `${jobPreference.categoryLabel} - ${jobPreference.positionLabel}` : '');
+
+            jobPreferenceHTML = `
+                <div class="job-preference-info">
+                    <h5><i class="fas fa-bullseye"></i> 意向岗位</h5>
+                    <div class="preference-content">
+                        <span class="job-badge">${fullLabel}</span>
+                    </div>
+                </div>
+            `;
+        }
+
         return `
             <div class="resume-card">
                 <div class="resume-header">
@@ -3775,6 +3814,7 @@ class ResumeManager {
                         </div>
                     </div>
                 </div>
+                ${jobPreferenceHTML}
                 <div class="resume-preview">
                     <h5><i class="fas fa-eye"></i> 简历预览</h5>
                     <div class="preview-content">
@@ -3801,6 +3841,7 @@ class ResumeManager {
         // 事件已在HTML中绑定
     }
 
+
     /**
      * 绑定抽屉事件
      */
@@ -3821,6 +3862,294 @@ class ResumeManager {
             drawerContainer.addEventListener('click', (e) => {
                 e.stopPropagation();
             });
+          
+    /**
+     * 绑定岗位偏好事件
+     */
+    bindJobPreferenceEvents() {
+        // 行业大类选择事件
+        if (this.jobCategory) {
+            this.jobCategory.addEventListener('change', (e) => {
+                this.handleCategoryChange(e.target.value);
+            });
+        }
+
+        // 具体岗位选择事件
+        if (this.jobPosition) {
+            this.jobPosition.addEventListener('change', (e) => {
+                this.handlePositionChange(e.target.value);
+            });
+        }
+    }
+
+    handleCategoryChange(category) {
+        const positionSelect = this.jobPosition;
+
+        // 清空具体岗位选项
+        positionSelect.innerHTML = '<option value="">请选择具体岗位</option>';
+
+        if (!category) {
+            positionSelect.disabled = true;
+            positionSelect.innerHTML = '<option value="">请先选择行业大类</option>';
+            return;
+        }
+
+        // 启用具体岗位选择
+        positionSelect.disabled = false;
+
+        // 根据行业大类添加具体岗位选项
+        const positions = this.getPositionsByCategory(category);
+        positions.forEach(position => {
+            const option = document.createElement('option');
+            option.value = position.value;
+            option.textContent = position.label;
+            positionSelect.appendChild(option);
+        });
+
+        // 保存选择
+        this.saveJobPreference();
+    }
+
+    handlePositionChange(position) {
+        // 保存选择
+        this.saveJobPreference();
+
+        // 可以在这里添加其他逻辑，比如显示岗位相关信息
+        if (position) {
+            console.log('用户选择了岗位:', this.getSelectedJobInfo());
+        }
+    }
+
+    getPositionsByCategory(category) {
+        const positionMap = {
+            'computer': [
+                { value: 'frontend', label: '前端工程师' },
+                { value: 'backend', label: '后端工程师' },
+                { value: 'fullstack', label: '全栈工程师' },
+                { value: 'mobile', label: '移动端开发' },
+                { value: 'devops', label: 'DevOps工程师' },
+                { value: 'qa', label: '测试工程师' },
+                { value: 'data', label: '数据工程师' },
+                { value: 'ai', label: 'AI/机器学习工程师' },
+                { value: 'security', label: '网络安全工程师' },
+                { value: 'architect', label: '系统架构师' },
+                { value: 'pm_tech', label: '技术产品经理' },
+                { value: 'ui_ux', label: 'UI/UX设计师' },
+                { value: 'other_tech', label: '其他技术岗位' }
+            ],
+            'finance': [
+                { value: 'analyst', label: '金融分析师' },
+                { value: 'investment', label: '投资顾问' },
+                { value: 'risk', label: '风险管理' },
+                { value: 'accounting', label: '会计师' },
+                { value: 'auditor', label: '审计师' },
+                { value: 'banker', label: '银行业务' },
+                { value: 'insurance', label: '保险业务' },
+                { value: 'fintech', label: '金融科技' },
+                { value: 'quant', label: '量化分析师' },
+                { value: 'compliance', label: '合规专员' },
+                { value: 'other_finance', label: '其他金融岗位' }
+            ],
+            'engineering': [
+                { value: 'mechanical', label: '机械工程师' },
+                { value: 'electrical', label: '电气工程师' },
+                { value: 'civil', label: '土木工程师' },
+                { value: 'chemical', label: '化工工程师' },
+                { value: 'industrial', label: '工业工程师' },
+                { value: 'automotive', label: '汽车工程师' },
+                { value: 'aerospace', label: '航空航天工程师' },
+                { value: 'environmental', label: '环境工程师' },
+                { value: 'materials', label: '材料工程师' },
+                { value: 'other_engineering', label: '其他工程岗位' }
+            ],
+            'marketing': [
+                { value: 'digital_marketing', label: '数字营销专员' },
+                { value: 'content', label: '内容营销' },
+                { value: 'brand', label: '品牌经理' },
+                { value: 'social_media', label: '社交媒体运营' },
+                { value: 'seo_sem', label: 'SEO/SEM专员' },
+                { value: 'market_research', label: '市场调研' },
+                { value: 'pr', label: '公关专员' },
+                { value: 'event', label: '活动策划' },
+                { value: 'growth', label: '增长运营' },
+                { value: 'other_marketing', label: '其他营销岗位' }
+            ],
+            'design': [
+                { value: 'graphic', label: '平面设计师' },
+                { value: 'web_design', label: '网页设计师' },
+                { value: 'product_design', label: '产品设计师' },
+                { value: 'interior', label: '室内设计师' },
+                { value: 'fashion', label: '服装设计师' },
+                { value: 'industrial_design', label: '工业设计师' },
+                { value: 'animation', label: '动画设计师' },
+                { value: 'video', label: '视频制作' },
+                { value: 'photography', label: '摄影师' },
+                { value: 'other_design', label: '其他设计岗位' }
+            ],
+            'education': [
+                { value: 'teacher', label: '教师' },
+                { value: 'trainer', label: '培训师' },
+                { value: 'curriculum', label: '课程设计师' },
+                { value: 'education_tech', label: '教育技术' },
+                { value: 'academic_research', label: '学术研究' },
+                { value: 'student_affairs', label: '学生事务' },
+                { value: 'online_education', label: '在线教育' },
+                { value: 'other_education', label: '其他教育岗位' }
+            ],
+            'healthcare': [
+                { value: 'doctor', label: '医生' },
+                { value: 'nurse', label: '护士' },
+                { value: 'pharmacist', label: '药剂师' },
+                { value: 'medical_tech', label: '医疗技术' },
+                { value: 'health_admin', label: '医疗管理' },
+                { value: 'clinical_research', label: '临床研究' },
+                { value: 'public_health', label: '公共卫生' },
+                { value: 'other_healthcare', label: '其他医疗岗位' }
+            ],
+            'consulting': [
+                { value: 'management', label: '管理咨询' },
+                { value: 'strategy', label: '战略咨询' },
+                { value: 'it_consulting', label: 'IT咨询' },
+                { value: 'financial_consulting', label: '财务咨询' },
+                { value: 'hr_consulting', label: '人力资源咨询' },
+                { value: 'other_consulting', label: '其他咨询岗位' }
+            ],
+            'manufacturing': [
+                { value: 'production', label: '生产管理' },
+                { value: 'quality', label: '质量控制' },
+                { value: 'supply_chain', label: '供应链管理' },
+                { value: 'lean', label: '精益生产' },
+                { value: 'maintenance', label: '设备维护' },
+                { value: 'other_manufacturing', label: '其他制造业岗位' }
+            ],
+            'media': [
+                { value: 'journalist', label: '记者' },
+                { value: 'editor', label: '编辑' },
+                { value: 'broadcaster', label: '播音主持' },
+                { value: 'content_creator', label: '内容创作' },
+                { value: 'media_planning', label: '媒体策划' },
+                { value: 'other_media', label: '其他媒体岗位' }
+            ],
+            'legal': [
+                { value: 'lawyer', label: '律师' },
+                { value: 'legal_counsel', label: '法务顾问' },
+                { value: 'paralegal', label: '律师助理' },
+                { value: 'compliance_legal', label: '合规专员' },
+                { value: 'other_legal', label: '其他法律岗位' }
+            ],
+            'hr': [
+                { value: 'recruiter', label: '招聘专员' },
+                { value: 'hr_bp', label: 'HRBP' },
+                { value: 'training_dev', label: '培训发展' },
+                { value: 'compensation', label: '薪酬福利' },
+                { value: 'hr_admin', label: '人事行政' },
+                { value: 'other_hr', label: '其他人力资源岗位' }
+            ],
+            'sales': [
+                { value: 'account_manager', label: '客户经理' },
+                { value: 'sales_rep', label: '销售代表' },
+                { value: 'business_dev', label: '商务拓展' },
+                { value: 'channel_sales', label: '渠道销售' },
+                { value: 'inside_sales', label: '内部销售' },
+                { value: 'other_sales', label: '其他销售岗位' }
+            ],
+            'logistics': [
+                { value: 'logistics_coordinator', label: '物流协调员' },
+                { value: 'warehouse', label: '仓储管理' },
+                { value: 'transportation', label: '运输管理' },
+                { value: 'procurement', label: '采购专员' },
+                { value: 'inventory', label: '库存管理' },
+                { value: 'other_logistics', label: '其他物流岗位' }
+            ],
+            'other': [
+                { value: 'customer_service', label: '客户服务' },
+                { value: 'admin', label: '行政助理' },
+                { value: 'operations', label: '运营专员' },
+                { value: 'project_manager', label: '项目经理' },
+                { value: 'business_analyst', label: '业务分析师' },
+                { value: 'other_general', label: '其他岗位' }
+            ]
+        };
+
+        return positionMap[category] || [];
+    }
+
+    saveJobPreference() {
+        const category = this.jobCategory?.value || '';
+        const position = this.jobPosition?.value || '';
+
+        const preference = {
+            category: category,
+            position: position,
+            categoryLabel: this.jobCategory?.selectedOptions[0]?.text || '',
+            positionLabel: this.jobPosition?.selectedOptions[0]?.text || '',
+            updatedAt: new Date().toISOString()
+        };
+
+        try {
+            localStorage.setItem('job_preference', JSON.stringify(preference));
+            console.log('岗位偏好已保存:', preference);
+        } catch (e) {
+            console.error('保存岗位偏好失败:', e);
+        }
+    }
+
+    loadSavedJobPreference() {
+        try {
+            const saved = localStorage.getItem('job_preference');
+            if (saved) {
+                const preference = JSON.parse(saved);
+
+                // 恢复行业大类选择
+                if (preference.category && this.jobCategory) {
+                    this.jobCategory.value = preference.category;
+
+                    // 触发行业大类变化事件来加载具体岗位
+                    this.handleCategoryChange(preference.category);
+
+                    // 恢复具体岗位选择
+                    if (preference.position && this.jobPosition) {
+                        // 等待岗位选项加载完成后再设置值
+                        setTimeout(() => {
+                            this.jobPosition.value = preference.position;
+                        }, 100);
+                    }
+                }
+
+                console.log('已加载保存的岗位偏好:', preference);
+            }
+        } catch (e) {
+            console.error('加载岗位偏好失败:', e);
+        }
+    }
+
+    getSelectedJobInfo() {
+        const category = this.jobCategory?.value || '';
+        const position = this.jobPosition?.value || '';
+        const categoryLabel = this.jobCategory?.selectedOptions[0]?.text || '';
+        const positionLabel = this.jobPosition?.selectedOptions[0]?.text || '';
+
+        return {
+            category: category,
+            position: position,
+            categoryLabel: categoryLabel,
+            positionLabel: positionLabel,
+            fullLabel: categoryLabel && positionLabel ? `${categoryLabel} - ${positionLabel}` : ''
+        };
+    }
+
+    clearJobPreference() {
+        try {
+            localStorage.removeItem('job_preference');
+            if (this.jobCategory) this.jobCategory.value = '';
+            if (this.jobPosition) {
+                this.jobPosition.value = '';
+                this.jobPosition.disabled = true;
+                this.jobPosition.innerHTML = '<option value="">请先选择行业大类</option>';
+            }
+            console.log('岗位偏好已清除');
+        } catch (e) {
+            console.error('清除岗位偏好失败:', e);
         }
     }
 
@@ -3851,9 +4180,18 @@ class ResumeManager {
         const formData = new FormData();
         formData.append('file', file);
 
+        // 添加岗位偏好信息
+        const jobInfo = this.getSelectedJobInfo();
+        if (jobInfo.category && jobInfo.position) {
+            formData.append('job_category', jobInfo.category);
+            formData.append('job_position', jobInfo.position);
+            formData.append('job_category_label', jobInfo.categoryLabel);
+            formData.append('job_position_label', jobInfo.positionLabel);
+        }
+
         try {
             this.showUploadProgress();
-            
+
             const response = await fetch('/api/upload-resume', {
                 method: 'POST',
                 body: formData
@@ -3914,17 +4252,32 @@ class ResumeManager {
             uploadedAt: new Date().toISOString()
         };
 
+        // 如果有岗位偏好信息，也保存到resumeData中
+        if (response.job_preference) {
+            resumeData.jobPreference = response.job_preference;
+        }
+
         this.storageManager.saveCurrentResume(resumeData);
         // 清除之前的缓存内容，因为是新的简历
         this.cachedFullContent = null;
         this.refreshResumeInfo();
 
         // 通知主应用简历已上传
-        window.dispatchEvent(new CustomEvent('resumeUploaded', { 
-            detail: { resumeData, sessionId: response.session_id } 
+        window.dispatchEvent(new CustomEvent('resumeUploaded', {
+            detail: {
+                resumeData,
+                sessionId: response.session_id,
+                jobPreference: response.job_preference
+            }
         }));
 
-        alert('简历上传成功！系统将基于您的简历进行个性化面试。');
+        const jobInfo = this.getSelectedJobInfo();
+        let successMessage = '简历上传成功！系统将基于您的简历进行个性化面试。';
+        if (jobInfo.fullLabel) {
+            successMessage += `\n已设置意向岗位：${jobInfo.fullLabel}`;
+        }
+
+        alert(successMessage);
     }
 
     handleUploadError(errorMessage) {

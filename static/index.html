@@ -401,6 +401,86 @@
                                 </div>
                                 <div class="section-actions" id="sectionActions">
                                     <!-- 动态操作按钮将在这里显示 -->
+                            </div>
+                        </div>
+
+                        <!-- 简历上传区域 -->
+                        <div class="resume-section">
+                            <div class="section-header">
+                                <h2>
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                    上传简历
+                                </h2>
+                            </div>
+
+                            <!-- 岗位意向选择 -->
+                            <div class="job-preference-section">
+                                <div class="preference-header">
+                                    <h3>
+                                        <i class="fas fa-bullseye"></i>
+                                        岗位意向
+                                    </h3>
+                                    <p>请选择您的意向岗位类别，以便AI面试官为您提供更精准的面试体验</p>
+                                </div>
+
+                                <div class="preference-selectors">
+                                    <div class="selector-group">
+                                        <label for="jobCategory">
+                                            <i class="fas fa-layer-group"></i>
+                                            行业大类
+                                        </label>
+                                        <select id="jobCategory" class="preference-select">
+                                            <option value="">请选择行业大类</option>
+                                            <option value="computer">计算机/互联网</option>
+                                            <option value="finance">经济/金融</option>
+                                            <option value="engineering">工程技术</option>
+                                            <option value="marketing">市场营销</option>
+                                            <option value="design">设计创意</option>
+                                            <option value="education">教育培训</option>
+                                            <option value="healthcare">医疗健康</option>
+                                            <option value="consulting">咨询顾问</option>
+                                            <option value="manufacturing">制造业</option>
+                                            <option value="media">媒体传播</option>
+                                            <option value="legal">法律</option>
+                                            <option value="hr">人力资源</option>
+                                            <option value="sales">销售</option>
+                                            <option value="logistics">物流供应链</option>
+                                            <option value="other">其他</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="selector-group">
+                                        <label for="jobPosition">
+                                            <i class="fas fa-user-tie"></i>
+                                            具体岗位
+                                        </label>
+                                        <select id="jobPosition" class="preference-select" disabled>
+                                            <option value="">请先选择行业大类</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="preference-tips">
+                                    <i class="fas fa-info-circle"></i>
+                                    <span>选择岗位意向后，AI面试官将根据该岗位的要求进行针对性面试</span>
+                                </div>
+                            </div>
+
+                            <div class="upload-zone" id="resumeFileUploadArea">
+                                <div class="upload-content">
+                                    <div class="upload-icon">
+                                        <i class="fas fa-cloud-upload-alt"></i>
+                                    </div>
+                                    <div class="upload-text">
+                                        <h3>拖拽简历文件到此处</h3>
+                                        <p>或点击选择文件上传</p>
+                                        <div class="upload-formats">
+                                            <span class="format-tag">PDF</span>
+                                            <span class="format-tag">DOC</span>
+                                            <span class="format-tag">DOCX</span>
+                                        </div>
+                                    </div>
+                                    <input type="file" id="resumeFileInput" class="file-input" accept=".pdf,.doc,.docx" />
                                 </div>
                             </div>
                             <div class="resume-content" id="resumeContent">
