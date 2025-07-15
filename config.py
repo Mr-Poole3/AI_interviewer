@@ -66,11 +66,41 @@ def get_GEMINI_API_KEY() -> Optional[str]:
 def get_gemini_model() -> str:
     """
     获取Gemini模型名称
-    
+
     Returns:
         Gemini模型名称
     """
     return os.environ.get("GEMINI_MODEL", "gemini-2.0-flash-exp")
+
+
+def get_model_temperature() -> float:
+    """
+    获取模型温度设置
+
+    Returns:
+        模型温度值，默认为0.1以确保高稳定性
+    """
+    return float(os.environ.get("MODEL_TEMPERATURE", "0.1"))
+
+
+def get_max_tokens() -> int:
+    """
+    获取最大token数量
+
+    Returns:
+        最大token数量
+    """
+    return int(os.environ.get("MAX_TOKENS", "2000"))
+
+
+def get_top_p() -> float:
+    """
+    获取top_p参数
+
+    Returns:
+        top_p值
+    """
+    return float(os.environ.get("TOP_P", "0.9"))
 
 
 # Azure OpenAI Realtime API WebRTC 配置

@@ -1,9 +1,296 @@
 /**
  * Azure语音面试官前端应用
- * 
+ *
  * 基于Azure OpenAI实时语音模型的智能面试系统
  * 支持WebSocket流式通信、语音输出播放、简历上传等功能
  */
+
+/**
+ * 面试设置管理器
+ */
+class InterviewSettingsManager {
+    constructor() {
+        this.STORAGE_KEY = 'azure_interview_settings';
+        this.defaultSettings = {
+            voice: {
+                threshold: 0.5,           // 语音检测阈值
+                silence_duration_ms: 1500, // 静音时长
+                prefix_padding_ms: 300,    // 前缀缓冲
+            },
+            audio: {
+                volume: 1.0,              // 音量 (0.0-1.0)
+                playbackRate: 1.0,        // 播放速度 (0.5-2.0)
+            },
+            ui: {
+                theme: 'default',         // 主题
+                showAdvanced: false       // 显示高级选项
+            }
+        };
+
+        this.currentSettings = this.loadSettings();
+    }
+
+    /**
+     * 加载设置
+     */
+    loadSettings() {
+        try {
+            const stored = localStorage.getItem(this.STORAGE_KEY);
+            if (stored) {
+                const settings = JSON.parse(stored);
+                // 合并默认设置和存储的设置，确保新增的设置项有默认值
+                return this.mergeSettings(this.defaultSettings, settings);
+            }
+        } catch (e) {
+            console.error('加载设置失败:', e);
+        }
+        return { ...this.defaultSettings };
+    }
+
+    /**
+     * 保存设置
+     */
+    saveSettings(settings = null) {
+        try {
+            const toSave = settings || this.currentSettings;
+            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(toSave));
+            if (settings) {
+                this.currentSettings = { ...toSave };
+            }
+            return true;
+        } catch (e) {
+            console.error('保存设置失败:', e);
+            return false;
+        }
+    }
+
+    /**
+     * 获取当前设置
+     */
+    getSettings() {
+        return { ...this.currentSettings };
+    }
+
+    /**
+     * 更新设置
+     */
+    updateSettings(newSettings) {
+        this.currentSettings = this.mergeSettings(this.currentSettings, newSettings);
+        return this.saveSettings();
+    }
+
+    /**
+     * 重置为默认设置
+     */
+    resetToDefaults() {
+        this.currentSettings = { ...this.defaultSettings };
+        return this.saveSettings();
+    }
+
+    /**
+     * 深度合并设置对象
+     */
+    mergeSettings(target, source) {
+        const result = { ...target };
+
+        for (const key in source) {
+            if (source.hasOwnProperty(key)) {
+                if (typeof source[key] === 'object' && source[key] !== null && !Array.isArray(source[key])) {
+                    result[key] = this.mergeSettings(target[key] || {}, source[key]);
+                } else {
+                    result[key] = source[key];
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * 获取语音设置
+     */
+    getVoiceSettings() {
+        return { ...this.currentSettings.voice };
+    }
+
+    /**
+     * 获取音频设置
+     */
+    getAudioSettings() {
+        return { ...this.currentSettings.audio };
+    }
+
+    /**
+     * 更新语音设置
+     */
+    updateVoiceSettings(voiceSettings) {
+        return this.updateSettings({ voice: voiceSettings });
+    }
+
+    /**
+     * 更新音频设置
+     */
+    updateAudioSettings(audioSettings) {
+        return this.updateSettings({ audio: audioSettings });
+    }
+}
+
+/**
+ * 评分状态管理器
+ */
+class EvaluationStatusManager {
+    constructor() {
+        this.STORAGE_KEY = 'azure_evaluation_status';
+        this.evaluationStatuses = this.loadStatuses();
+        this.statusCheckInterval = null;
+    }
+
+    /**
+     * 加载评分状态
+     */
+    loadStatuses() {
+        try {
+            const stored = localStorage.getItem(this.STORAGE_KEY);
+            return stored ? JSON.parse(stored) : {};
+        } catch (e) {
+            console.error('加载评分状态失败:', e);
+            return {};
+        }
+    }
+
+    /**
+     * 保存评分状态
+     */
+    saveStatuses() {
+        try {
+            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.evaluationStatuses));
+            return true;
+        } catch (e) {
+            console.error('保存评分状态失败:', e);
+            return false;
+        }
+    }
+
+    /**
+     * 设置面试评分状态
+     */
+    setEvaluationStatus(interviewId, status, metadata = {}) {
+        this.evaluationStatuses[interviewId] = {
+            status: status, // 'pending', 'evaluating', 'completed', 'failed'
+            timestamp: new Date().toISOString(),
+            ...metadata
+        };
+        this.saveStatuses();
+        console.log(`评分状态已更新: ${interviewId} -> ${status}`);
+    }
+
+    /**
+     * 获取面试评分状态
+     */
+    getEvaluationStatus(interviewId) {
+        return this.evaluationStatuses[interviewId] || { status: 'unknown' };
+    }
+
+    /**
+     * 获取所有评分中的面试
+     */
+    getEvaluatingInterviews() {
+        return Object.entries(this.evaluationStatuses)
+            .filter(([id, status]) => status.status === 'evaluating')
+            .map(([id, status]) => ({ id, ...status }));
+    }
+
+    /**
+     * 清理过期的评分状态
+     */
+    cleanupExpiredStatuses() {
+        const now = new Date();
+        const expiredThreshold = 24 * 60 * 60 * 1000; // 24小时
+
+        let hasChanges = false;
+        for (const [id, status] of Object.entries(this.evaluationStatuses)) {
+            const statusTime = new Date(status.timestamp);
+            if (now - statusTime > expiredThreshold && status.status === 'evaluating') {
+                // 将超时的评分状态标记为失败
+                this.evaluationStatuses[id].status = 'failed';
+                this.evaluationStatuses[id].failureReason = 'timeout';
+                hasChanges = true;
+            }
+        }
+
+        if (hasChanges) {
+            this.saveStatuses();
+        }
+    }
+
+    /**
+     * 开始状态检查定时器
+     */
+    startStatusCheck() {
+        if (this.statusCheckInterval) {
+            clearInterval(this.statusCheckInterval);
+        }
+
+        // 每30秒检查一次状态
+        this.statusCheckInterval = setInterval(() => {
+            this.cleanupExpiredStatuses();
+            this.checkEvaluatingInterviews();
+        }, 30000);
+    }
+
+    /**
+     * 停止状态检查定时器
+     */
+    stopStatusCheck() {
+        if (this.statusCheckInterval) {
+            clearInterval(this.statusCheckInterval);
+            this.statusCheckInterval = null;
+        }
+    }
+
+    /**
+     * 检查评分中的面试状态
+     */
+    async checkEvaluatingInterviews() {
+        const evaluatingInterviews = this.getEvaluatingInterviews();
+
+        for (const interview of evaluatingInterviews) {
+            try {
+                // 检查评分是否完成
+                const response = await fetch(`/api/interview/evaluation-status/${interview.id}`);
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.status === 'completed') {
+                        this.setEvaluationStatus(interview.id, 'completed', {
+                            evaluation: result.evaluation
+                        });
+
+                        // 触发评分完成事件
+                        this.onEvaluationCompleted(interview.id, result.evaluation);
+                    } else if (result.status === 'failed') {
+                        this.setEvaluationStatus(interview.id, 'failed', {
+                            error: result.error
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error(`检查面试 ${interview.id} 评分状态失败:`, error);
+            }
+        }
+    }
+
+    /**
+     * 评分完成回调
+     */
+    onEvaluationCompleted(interviewId, evaluation) {
+        console.log(`面试 ${interviewId} 评分完成:`, evaluation);
+
+        // 触发自定义事件
+        window.dispatchEvent(new CustomEvent('evaluationCompleted', {
+            detail: { interviewId, evaluation }
+        }));
+    }
+}
 
 /**
  * LocalStorage数据管理器
@@ -284,17 +571,24 @@ class AzureVoiceChat {
         this.lastPlayTime = 0;
         this.currentSessionId = '';
 
-        
+        // 设置管理器
+        this.settingsManager = new InterviewSettingsManager();
+
+        // 评分状态管理器
+        this.evaluationStatusManager = new EvaluationStatusManager();
+
         // 面试记录相关
         this.currentInterviewMessages = [];
         this.interviewStartTime = null;
         this.isInterviewActive = false;
         this.currentInterviewId = null;
-        
+
         this.initElements();
         this.bindEvents();
         this.initAudio();
         this.setInitialStatus();
+        this.initPreparationSettings();
+        this.initEvaluationStatusManager();
     }
     
     initElements() {
@@ -312,20 +606,356 @@ class AzureVoiceChat {
             this.voiceHint.textContent = '正在连接Azure语音服务...';
         }
     }
+
+    /**
+     * 初始化准备页面设置功能
+     */
+    initPreparationSettings() {
+        // 获取设置面板相关元素
+        this.preparationSettingsButton = document.getElementById('preparationSettingsButton');
+        this.preparationSettingsPanel = document.getElementById('preparationSettingsPanel');
+        this.closePreparationSettings = document.getElementById('closePreparationSettings');
+        this.resetPreparationSettings = document.getElementById('resetPreparationSettings');
+        this.applyPreparationSettings = document.getElementById('applyPreparationSettings');
+
+        // 获取设置控件元素
+        this.prepVoiceSensitivity = document.getElementById('prepVoiceSensitivity');
+        this.prepVoiceSensitivityValue = document.getElementById('prepVoiceSensitivityValue');
+        this.prepSilenceDuration = document.getElementById('prepSilenceDuration');
+        this.prepSilenceDurationValue = document.getElementById('prepSilenceDurationValue');
+        this.prepPrefixPadding = document.getElementById('prepPrefixPadding');
+        this.prepPrefixPaddingValue = document.getElementById('prepPrefixPaddingValue');
+        this.prepAudioVolume = document.getElementById('prepAudioVolume');
+        this.prepAudioVolumeValue = document.getElementById('prepAudioVolumeValue');
+        this.prepPlaybackSpeed = document.getElementById('prepPlaybackSpeed');
+        this.prepPlaybackSpeedValue = document.getElementById('prepPlaybackSpeedValue');
+
+        // 绑定事件
+        this.bindPreparationSettingsEvents();
+
+        // 加载当前设置到界面
+        this.loadSettingsToUI();
+    }
+
+    /**
+     * 绑定准备页面设置事件
+     */
+    bindPreparationSettingsEvents() {
+        // 设置按钮点击事件
+        if (this.preparationSettingsButton) {
+            this.preparationSettingsButton.addEventListener('click', () => {
+                this.showPreparationSettings();
+            });
+        }
+
+        // 关闭设置面板
+        if (this.closePreparationSettings) {
+            this.closePreparationSettings.addEventListener('click', () => {
+                this.hidePreparationSettings();
+            });
+        }
+
+        // 重置设置
+        if (this.resetPreparationSettings) {
+            this.resetPreparationSettings.addEventListener('click', () => {
+                this.resetSettingsToDefaults();
+            });
+        }
+
+        // 应用设置
+        if (this.applyPreparationSettings) {
+            this.applyPreparationSettings.addEventListener('click', () => {
+                this.applyCurrentSettings();
+            });
+        }
+
+        // 滑块值变化事件
+        this.bindSliderEvents();
+
+        // 点击面板外部关闭
+        document.addEventListener('click', (e) => {
+            if (this.preparationSettingsPanel &&
+                this.preparationSettingsPanel.style.display === 'block' &&
+                !this.preparationSettingsPanel.contains(e.target) &&
+                !this.preparationSettingsButton.contains(e.target)) {
+                this.hidePreparationSettings();
+            }
+        });
+    }
+
+    /**
+     * 绑定滑块事件
+     */
+    bindSliderEvents() {
+        // 语音敏感度
+        if (this.prepVoiceSensitivity) {
+            this.prepVoiceSensitivity.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                this.prepVoiceSensitivityValue.textContent = value.toFixed(1);
+            });
+        }
+
+        // 静音时长
+        if (this.prepSilenceDuration) {
+            this.prepSilenceDuration.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                this.prepSilenceDurationValue.textContent = `${value}ms`;
+            });
+        }
+
+        // 语音缓冲
+        if (this.prepPrefixPadding) {
+            this.prepPrefixPadding.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                this.prepPrefixPaddingValue.textContent = `${value}ms`;
+            });
+        }
+
+        // 音量
+        if (this.prepAudioVolume) {
+            this.prepAudioVolume.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                this.prepAudioVolumeValue.textContent = `${Math.round(value * 100)}%`;
+            });
+        }
+
+        // 播放速度
+        if (this.prepPlaybackSpeed) {
+            this.prepPlaybackSpeed.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                this.prepPlaybackSpeedValue.textContent = `${value.toFixed(1)}x`;
+            });
+        }
+    }
+
+    /**
+     * 显示准备页面设置面板
+     */
+    showPreparationSettings() {
+        if (this.preparationSettingsPanel) {
+            this.preparationSettingsPanel.style.display = 'block';
+            this.loadSettingsToUI();
+            console.log('显示面试设置面板');
+        }
+    }
+
+    /**
+     * 隐藏准备页面设置面板
+     */
+    hidePreparationSettings() {
+        if (this.preparationSettingsPanel) {
+            this.preparationSettingsPanel.style.display = 'none';
+            console.log('隐藏面试设置面板');
+        }
+    }
+
+    /**
+     * 加载设置到UI
+     */
+    loadSettingsToUI() {
+        const settings = this.settingsManager.getSettings();
+
+        // 加载语音设置
+        if (this.prepVoiceSensitivity) {
+            this.prepVoiceSensitivity.value = settings.voice.threshold;
+            this.prepVoiceSensitivityValue.textContent = settings.voice.threshold.toFixed(1);
+        }
+
+        if (this.prepSilenceDuration) {
+            this.prepSilenceDuration.value = settings.voice.silence_duration_ms;
+            this.prepSilenceDurationValue.textContent = `${settings.voice.silence_duration_ms}ms`;
+        }
+
+        if (this.prepPrefixPadding) {
+            this.prepPrefixPadding.value = settings.voice.prefix_padding_ms;
+            this.prepPrefixPaddingValue.textContent = `${settings.voice.prefix_padding_ms}ms`;
+        }
+
+        // 加载音频设置
+        if (this.prepAudioVolume) {
+            this.prepAudioVolume.value = settings.audio.volume;
+            this.prepAudioVolumeValue.textContent = `${Math.round(settings.audio.volume * 100)}%`;
+        }
+
+        if (this.prepPlaybackSpeed) {
+            this.prepPlaybackSpeed.value = settings.audio.playbackRate;
+            this.prepPlaybackSpeedValue.textContent = `${settings.audio.playbackRate.toFixed(1)}x`;
+        }
+    }
+
+    /**
+     * 重置设置为默认值
+     */
+    resetSettingsToDefaults() {
+        this.settingsManager.resetToDefaults();
+        this.loadSettingsToUI();
+        console.log('设置已重置为默认值');
+    }
+
+    /**
+     * 应用当前设置
+     */
+    applyCurrentSettings() {
+        const newSettings = {
+            voice: {
+                threshold: parseFloat(this.prepVoiceSensitivity.value),
+                silence_duration_ms: parseInt(this.prepSilenceDuration.value),
+                prefix_padding_ms: parseInt(this.prepPrefixPadding.value)
+            },
+            audio: {
+                volume: parseFloat(this.prepAudioVolume.value),
+                playbackRate: parseFloat(this.prepPlaybackSpeed.value)
+            }
+        };
+
+        if (this.settingsManager.updateSettings(newSettings)) {
+            console.log('设置已保存:', newSettings);
+
+            // 如果有活跃的语音通话，更新配置
+            if (this.voiceCallManager) {
+                if (this.voiceCallManager.isConnected) {
+                    this.voiceCallManager.updateVADConfig(newSettings.voice);
+                }
+                this.voiceCallManager.updateAudioSettings(newSettings.audio);
+            }
+
+            this.hidePreparationSettings();
+        } else {
+            console.error('设置保存失败');
+        }
+    }
+
+    /**
+     * 获取当前设置
+     */
+    getCurrentSettings() {
+        return this.settingsManager.getSettings();
+    }
+
+    /**
+     * 初始化评分状态管理器
+     */
+    initEvaluationStatusManager() {
+        // 启动状态检查
+        this.evaluationStatusManager.startStatusCheck();
+
+        // 绑定评分完成事件
+        window.addEventListener('evaluationCompleted', (event) => {
+            const { interviewId, evaluation } = event.detail;
+            this.onEvaluationCompleted(interviewId, evaluation);
+        });
+
+        console.log('评分状态管理器已初始化');
+    }
+
+    /**
+     * 评分完成处理
+     */
+    onEvaluationCompleted(interviewId, evaluation) {
+        console.log(`面试 ${interviewId} 评分完成`, evaluation);
+
+        // 更新本地存储中的面试记录
+        if (this.app && this.app.storageManager) {
+            const interviews = this.app.storageManager.getInterviews();
+            const interview = interviews.find(item => item.id === interviewId);
+
+            if (interview) {
+                interview.evaluation = evaluation;
+                interview.score = evaluation.total_score;
+                interview.evaluationStatus = 'completed';
+
+                if (!interview.summary && evaluation.summary) {
+                    interview.summary = evaluation.summary;
+                }
+
+                this.app.storageManager.saveInterview(interview);
+                console.log('面试记录评分信息已更新');
+
+                // 如果当前在历史记录页面，刷新显示
+                if (this.app.router.currentPage === 'history') {
+                    this.app.historyManager.refreshHistoryList();
+                }
+            }
+        }
+
+        // 显示评分完成通知
+        this.showEvaluationCompleteNotification(interviewId);
+    }
+
+    /**
+     * 显示评分完成通知
+     */
+    showEvaluationCompleteNotification(interviewId) {
+        const notification = document.createElement('div');
+        notification.className = 'evaluation-complete-notification';
+        notification.innerHTML = `
+            <div class="notification-content">
+                <div class="notification-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="notification-text">
+                    <h4>面试评分已完成！</h4>
+                    <p>您的面试结果已生成，点击查看详细评分报告</p>
+                </div>
+                <div class="notification-actions">
+                    <button class="btn-primary btn-sm" onclick="window.app.router.navigateTo('history'); this.parentElement.parentElement.parentElement.remove();">
+                        查看结果
+                    </button>
+                    <button class="notification-close" onclick="this.parentElement.parentElement.parentElement.remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // 添加样式
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            z-index: 10000;
+            max-width: 400px;
+            animation: slideInRight 0.5s ease-out;
+        `;
+
+        // 添加到页面
+        document.body.appendChild(notification);
+
+        // 自动移除（15秒后）
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.style.animation = 'slideOutRight 0.5s ease-out';
+                setTimeout(() => {
+                    if (notification.parentElement) {
+                        notification.remove();
+                    }
+                }, 500);
+            }
+        }, 15000);
+    }
     
     bindEvents() {
+        // 保存绑定的函数引用，以便后续移除
+        this.startInterviewHandler = () => {
+            this.startInterview();
+        };
+        
+        this.startActualInterviewHandler = () => {
+            this.startActualInterview();
+        };
+        
         // 语音通话按钮事件
         if (this.voiceCallButton) {
-            this.voiceCallButton.addEventListener('click', () => {
-                this.startInterview();
-            });
+            this.voiceCallButton.addEventListener('click', this.startInterviewHandler);
         }
         
         // 欢迎界面开始面试按钮事件
         if (this.heroStartButton) {
-            this.heroStartButton.addEventListener('click', () => {
-                this.startInterview();
-            });
+            this.heroStartButton.addEventListener('click', this.startInterviewHandler);
         }
     }
     
@@ -339,18 +969,65 @@ class AzureVoiceChat {
             return;
         }
         
-        // 开始记录面试
-        this.startInterviewRecording();
+        // 显示准备页面阶段
+        this.showPreparationStage();
+    }
+    
+    showPreparationStage() {
+        console.log('显示面试准备页面');
         
-        // 切换到聊天界面
+        // 切换到聊天界面但保持在准备状态
         const welcomeSection = document.querySelector('.interview-welcome');
         const chatSection = document.querySelector('.interview-chat');
         
         if (welcomeSection && chatSection) {
-            console.log('切换到聊天界面');
+            console.log('切换到准备界面');
             welcomeSection.style.display = 'none';
             chatSection.style.display = 'flex';
+            chatSection.classList.add('preparation-mode');
+        }
+        
+        // 更新语音控制按钮为真正的开始面试
+        if (this.voiceCallButton) {
+            const btnText = this.voiceCallButton.querySelector('.btn-text');
+            if (btnText) {
+                btnText.textContent = '确认开始面试';
+            }
+            
+            // 移除旧的事件监听器并添加新的
+            this.voiceCallButton.removeEventListener('click', this.startInterviewHandler);
+            this.voiceCallButton.addEventListener('click', this.startActualInterviewHandler);
+        }
+        
+        // 更新状态提示
+        if (this.voiceHint) {
+            this.voiceHint.textContent = '确认开始您的AI语音面试';
+        }
+    }
+    
+    startActualInterview() {
+        console.log('确认开始实际面试');
+        
+        // 移除准备模式样式
+        const chatSection = document.querySelector('.interview-chat');
+        if (chatSection) {
+            chatSection.classList.remove('preparation-mode');
             chatSection.classList.add('active');
+        }
+        
+        // 开始记录面试
+        this.startInterviewRecording();
+        
+        // 恢复按钮原始状态和文本
+        if (this.voiceCallButton) {
+            const btnText = this.voiceCallButton.querySelector('.btn-text');
+            if (btnText) {
+                btnText.textContent = '开始面试';
+            }
+            
+            // 恢复原始的事件监听器
+            this.voiceCallButton.removeEventListener('click', this.startActualInterviewHandler);
+            this.voiceCallButton.addEventListener('click', this.startInterviewHandler);
         }
         
         // 启动语音通话
@@ -402,6 +1079,8 @@ class AzureVoiceChat {
             this.setStatus('已连接 - Azure语音服务', 'connected');
             this.enableInput();
             this.hideLoadingOverlay();
+            
+
         };
         
         this.ws.onmessage = (event) => {
@@ -427,34 +1106,56 @@ class AzureVoiceChat {
     
 
     setStatus(text, className = '') {
-        console.log('更新状态:', text, className);
+        const statusElement = document.querySelector('.status-text');
+        const connectionIndicator = document.querySelector('.connection-indicator');
         
-        // 更新导航栏状态
-        const navStatus = document.getElementById('connectionStatus');
-        if (navStatus) {
-            const statusText = navStatus.querySelector('.status-text');
-            const statusDot = navStatus.querySelector('.status-dot');
-            if (statusText) {
-                statusText.textContent = text;
-            }
-            navStatus.className = `connection-indicator ${className}`;
+        if (statusElement) {
+            statusElement.textContent = text;
+        }
+        
+        if (connectionIndicator) {
+            const statusDot = connectionIndicator.querySelector('.status-dot');
             if (statusDot) {
-                statusDot.className = `status-dot ${className}`;
-                // 根据状态更新点的样式
-                if (className === 'connected') {
-                    statusDot.classList.add('connected');
-                } else if (className === 'error') {
-                    statusDot.classList.add('error');
-                } else {
-                    statusDot.classList.remove('connected', 'error');
+                // 移除所有状态类
+                statusDot.classList.remove('connected', 'connecting', 'disconnected', 'error');
+                
+                // 根据className设置状态
+                switch (className) {
+                    case 'connected':
+                        statusDot.classList.add('connected');
+                        break;
+                    case 'connecting':
+                        statusDot.classList.add('connecting');
+                        break;
+                    case 'error':
+                    case 'disconnected':
+                        statusDot.classList.add('disconnected');
+                        break;
+                    default:
+                        statusDot.classList.add('connecting');
                 }
             }
         }
         
-        // 更新语音提示
-        if (this.voiceHint) {
-            this.voiceHint.textContent = text;
+        // 同时更新状态面板（如果存在）
+        if (this.app && this.app.voiceCallManager) {
+            switch (className) {
+                case 'connected':
+                    this.app.voiceCallManager.updateConnectionStatus('connected', text);
+                    break;
+                case 'connecting':
+                    this.app.voiceCallManager.updateConnectionStatus('connecting', text);
+                    break;
+                case 'error':
+                case 'disconnected':
+                    this.app.voiceCallManager.updateConnectionStatus('disconnected', text);
+                    break;
+                default:
+                    this.app.voiceCallManager.updateConnectionStatus('connecting', text);
+            }
         }
+        
+        console.log('状态更新:', text, className);
     }
     
     showLoadingOverlay(text = '正在连接天汇AI面试官') {
@@ -1129,7 +1830,6 @@ class AzureVoiceChat {
                             <div class="total-score">
                                 <div class="score-circle">
                                     <span class="score-number">${evaluation.total_score || 0}</span>
-                                    <span class="score-label">总分</span>
                                 </div>
                             </div>
                             <div class="score-summary">
@@ -1167,11 +1867,8 @@ class AzureVoiceChat {
                         <button class="btn btn-secondary" onclick="this.closest('.evaluation-result-modal').remove()">
                             关闭
                         </button>
-                        <button class="btn btn-outline" onclick="window.app.voiceChat.exportEvaluationToPDF(this.closest('.evaluation-result-modal'))">
+                        <button class="btn btn-primary" onclick="window.app.voiceChat.exportEvaluationToPDF(this.closest('.evaluation-result-modal'))">
                             <i class="fas fa-file-pdf"></i> 导出PDF
-                        </button>
-                        <button class="btn btn-primary" onclick="window.app.router.navigateTo('history')">
-                            查看历史记录
                         </button>
                     </div>
                 </div>
@@ -1589,6 +2286,10 @@ class AzureVoiceChat {
             }
         }
     }
+
+
+
+
 }
 
 /**
@@ -1609,6 +2310,15 @@ class HistoryManager {
         this.modalEvaluationContent = null;
         this.modalLoadingSpinner = null;
         this.modalActualContent = null;
+        
+        // 对话详情模态框元素
+        this.conversationModal = null;
+        this.conversationMessages = null;
+        this.conversationDate = null;
+        this.conversationDuration = null;
+        this.conversationCount = null;
+        this.closeConversationModal = null;
+        this.exportConversationBtn = null;
 
         this.init();
     }
@@ -1625,9 +2335,19 @@ class HistoryManager {
         this.modalActualContent = this.modalEvaluationContent?.querySelector('.evaluation-actual-content');
         this.modalCloseButton = this.evaluationModal?.querySelector('.close-button');
         
+        // 初始化对话详情模态框元素
+        this.conversationModal = document.getElementById('conversationModal');
+        this.conversationMessages = document.getElementById('conversationMessages');
+        this.conversationDate = document.getElementById('conversationDate');
+        this.conversationDuration = document.getElementById('conversationDuration');
+        this.conversationCount = document.getElementById('conversationCount');
+        this.closeConversationModal = document.getElementById('closeConversationModal');
+        this.exportConversationBtn = document.getElementById('exportConversationBtn');
+        
         this.bindHistoryEvents();
         this.bindSearchEvents(); 
         this.bindModalEvents();
+        this.bindConversationModalEvents();
         this.refreshHistoryList();
     }
 
@@ -1827,7 +2547,11 @@ class HistoryManager {
         const messageCount = interview.messages?.length || 0;
         const score = interview.score || interview.evaluation?.total_score;
         const hasEvaluation = interview.evaluation || interview.score;
-        
+
+        // 获取评分状态
+        const evaluationStatus = interview.evaluationStatus || 'unknown';
+        const statusInfo = this.getEvaluationStatusInfo(evaluationStatus, hasEvaluation);
+
         return `
             <div class="history-item" data-id="${interview.id}">
                 <div class="history-icon">
@@ -1836,8 +2560,8 @@ class HistoryManager {
                 <div class="history-content">
                     <div class="history-title">
                         ${interview.title || 'AI语音面试记录'}
-                        <span class="history-badge ${hasEvaluation ? 'evaluated' : 'completed'}">
-                            ${hasEvaluation ? '已评分' : '完成'}
+                        <span class="history-badge ${statusInfo.badgeClass}">
+                            ${statusInfo.badgeText}
                         </span>
                         ${score ? `<span class="history-score ${this.getScoreColorClass(score)}">${score}分</span>` : ''}
                     </div>
@@ -1845,36 +2569,129 @@ class HistoryManager {
                         <span><i class="fas fa-clock"></i> ${date}</span>
                         <span><i class="fas fa-stopwatch"></i> ${duration}</span>
                         <span><i class="fas fa-comments"></i> ${messageCount}条对话</span>
-                        ${hasEvaluation ? `<span><i class="fas fa-chart-bar"></i> 已评分</span>` : ''}
+                        <span class="evaluation-status ${statusInfo.statusClass}">
+                            <i class="${statusInfo.statusIcon}"></i> ${statusInfo.statusText}
+                        </span>
                     </div>
                     <div class="history-summary">
                         ${interview.summary || '本次面试涵盖了技术能力、项目经验等多个方面的深入交流...'}
                     </div>
                 </div>
                 <div class="history-actions">
-                    ${hasEvaluation ? `
-                        <button class="history-action-btn" onclick="historyManager.viewEvaluation('${interview.id}')" title="查看评分">
-                            <i class="fas fa-chart-bar"></i>
-                        </button>
-                    ` : `
-                        <button class="history-action-btn evaluate-btn" data-id="${interview.id}" onclick="historyManager.startEvaluation('${interview.id}')" title="开始评估">
-                            <i class="fas fa-star"></i>
-                        </button>
-                    `}
-                    <button class="history-action-btn" onclick="historyManager.continueInterview('${interview.id}')" title="继续面试">
-                        <i class="fas fa-play"></i>
+                    <!-- 查看对话记录 -->
+                    <button class="history-action-btn conversation-btn" onclick="historyManager.viewConversation('${interview.id}')" title="查看对话记录">
+                        <i class="fas fa-comments"></i>
+                        <span class="btn-label">对话</span>
                     </button>
-                    <button class="history-action-btn" onclick="historyManager.deleteInterview('${interview.id}')" title="删除记录">
+
+                    <!-- 评分相关按钮 -->
+                    ${this.getEvaluationActionButton(interview, evaluationStatus, hasEvaluation)}
+
+                    <!-- 其他操作 -->
+                    <button class="history-action-btn delete-btn" onclick="historyManager.deleteInterview('${interview.id}')" title="删除记录">
                         <i class="fas fa-trash"></i>
+                        <span class="btn-label">删除</span>
                     </button>
                 </div>
             </div>
         `;
     }
-                // <div class="evaluation-display" id="evaluation-${interview.id}" style="display:none; margin-top: 10px; padding: 10px; background-color: #f0f0f0; border-radius: 5px;">
-                //     <div class="loading-spinner" style="display:none;">加载中...</div>
-                //     <div class="evaluation-content"></div>
-                // </div>
+
+    /**
+     * 获取评分状态信息
+     */
+    getEvaluationStatusInfo(evaluationStatus, hasEvaluation) {
+        switch (evaluationStatus) {
+            case 'evaluating':
+                return {
+                    badgeClass: 'evaluating',
+                    badgeText: '评分中',
+                    statusClass: 'evaluating',
+                    statusIcon: 'fas fa-spinner fa-spin',
+                    statusText: '正在评分'
+                };
+            case 'completed':
+                return {
+                    badgeClass: 'evaluated',
+                    badgeText: '已评分',
+                    statusClass: 'completed',
+                    statusIcon: 'fas fa-check-circle',
+                    statusText: '评分完成'
+                };
+            case 'failed':
+                return {
+                    badgeClass: 'evaluation-failed',
+                    badgeText: '评分失败',
+                    statusClass: 'failed',
+                    statusIcon: 'fas fa-exclamation-triangle',
+                    statusText: '评分失败'
+                };
+            default:
+                if (hasEvaluation) {
+                    return {
+                        badgeClass: 'evaluated',
+                        badgeText: '已评分',
+                        statusClass: 'completed',
+                        statusIcon: 'fas fa-chart-bar',
+                        statusText: '已评分'
+                    };
+                } else {
+                    return {
+                        badgeClass: 'completed',
+                        badgeText: '完成',
+                        statusClass: 'pending',
+                        statusIcon: 'fas fa-clock',
+                        statusText: '待评分'
+                    };
+                }
+        }
+    }
+
+    /**
+     * 获取评分操作按钮
+     */
+    getEvaluationActionButton(interview, evaluationStatus, hasEvaluation) {
+        switch (evaluationStatus) {
+            case 'evaluating':
+                return `
+                    <button class="history-action-btn evaluating-btn" disabled title="正在评分中">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <span class="btn-label">评分中</span>
+                    </button>
+                `;
+            case 'completed':
+            case 'unknown':
+                if (hasEvaluation) {
+                    return `
+                        <button class="history-action-btn evaluation-btn" onclick="historyManager.viewEvaluation('${interview.id}')" title="查看评分报告">
+                            <i class="fas fa-chart-bar"></i>
+                            <span class="btn-label">评分</span>
+                        </button>
+                    `;
+                } else {
+                    return `
+                        <button class="history-action-btn start-evaluation-btn" onclick="historyManager.startEvaluation('${interview.id}')" title="开始评分">
+                            <i class="fas fa-star"></i>
+                            <span class="btn-label">评分</span>
+                        </button>
+                    `;
+                }
+            case 'failed':
+                return `
+                    <button class="history-action-btn retry-evaluation-btn" onclick="historyManager.retryEvaluation('${interview.id}')" title="重新评分">
+                        <i class="fas fa-redo"></i>
+                        <span class="btn-label">重试</span>
+                    </button>
+                `;
+            default:
+                return `
+                    <button class="history-action-btn start-evaluation-btn" onclick="historyManager.startEvaluation('${interview.id}')" title="开始评分">
+                        <i class="fas fa-star"></i>
+                        <span class="btn-label">评分</span>
+                    </button>
+                `;
+        }
+    }
     bindHistoryItemEvents() {
         // 事件已在HTML中绑定
             this.historyList.querySelectorAll('.evaluate-btn').forEach(button => {
@@ -1882,18 +2699,7 @@ class HistoryManager {
         });
     }
 
-    continueInterview(id) {
-        const interviews = this.storageManager.getInterviews();
-        const interview = interviews.find(item => item.id === id);
-        
-        if (interview) {
-            // 触发继续面试事件
-            window.dispatchEvent(new CustomEvent('continueInterview', { 
-                detail: { interview } 
-            }));
-            this.router.navigateTo('interview');
-        }
-    }
+
 
     deleteInterview(id) {
         if (confirm('确定要删除这条面试记录吗？')) {
@@ -1914,6 +2720,30 @@ class HistoryManager {
 
         if (!interviewToEvaluate || !interviewToEvaluate.messages) {
             alert("错误：未找到面试记录或对话消息。");
+            return;
+        }
+
+        // 检查是否已经评估过
+        const hasEvaluation = interviewToEvaluate.evaluation || interviewToEvaluate.score || 
+                             interviewToEvaluate.evaluationMarkdown || interviewToEvaluate.evaluationScore;
+        
+        if (hasEvaluation) {
+            console.log(`面试记录 ${interviewId} 已经评估过，直接显示评估结果`);
+            // 如果已评估，直接显示评估结果而不是重新评估
+            if (interviewToEvaluate.evaluation && window.app && window.app.voiceChat) {
+                window.app.voiceChat.showEvaluationResult(interviewToEvaluate.evaluation);
+            } else if (interviewToEvaluate.evaluationMarkdown) {
+                // 显示模态窗口
+                if (this.evaluationModal) {
+                    this.evaluationModal.style.display = 'flex';
+                }
+                if (this.modalLoadingSpinner) {
+                    this.modalLoadingSpinner.style.display = 'none';
+                }
+                this.displayCompleteEvaluation(interviewToEvaluate);
+            } else {
+                alert(`该面试记录已评估，评分：${interviewToEvaluate.score || '未知'}分`);
+            }
             return;
         }
 
@@ -2248,7 +3078,7 @@ class HistoryManager {
     viewEvaluation(id) {
         const interviews = this.storageManager.getInterviews();
         const interview = interviews.find(item => item.id === id);
-        
+
         if (interview && interview.evaluation) {
             // 使用AzureVoiceChat的showEvaluationResult方法显示评分
             if (window.app && window.app.voiceChat) {
@@ -2261,6 +3091,457 @@ class HistoryManager {
             alert('该面试记录暂无评分信息');
         }
     }
+
+    /**
+     * 重试评分
+     */
+    async retryEvaluation(id) {
+        const interviews = this.storageManager.getInterviews();
+        const interview = interviews.find(item => item.id === id);
+
+        if (!interview) {
+            alert('未找到面试记录');
+            return;
+        }
+
+        if (confirm('确定要重新评分这次面试吗？')) {
+            try {
+                // 重置评分状态
+                interview.evaluationStatus = 'evaluating';
+                interview.evaluation = null;
+                interview.score = null;
+                this.storageManager.saveInterview(interview);
+
+                // 刷新显示
+                this.refreshHistoryList();
+
+                // 触发重新评分
+                await this.triggerEvaluationForInterview(interview);
+
+            } catch (error) {
+                console.error('重试评分失败:', error);
+                alert('重试评分失败: ' + error.message);
+            }
+        }
+    }
+
+    /**
+     * 为指定面试触发评分
+     */
+    async triggerEvaluationForInterview(interview) {
+        try {
+            // 获取简历上下文
+            const resumeContext = await this.getResumeContext();
+
+            // 构建评分请求
+            const evaluationRequest = {
+                interview_id: interview.id,
+                messages: interview.messages,
+                resume_context: resumeContext || '',
+                duration: interview.duration || 0
+            };
+
+            console.log('开始评分处理...');
+
+            // 调用评分API
+            const response = await fetch('/api/interview/evaluate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(evaluationRequest)
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                console.log('评分完成');
+
+                if (result.success) {
+                    // 更新面试记录的评分信息
+                    interview.evaluation = result.evaluation;
+                    interview.score = result.evaluation.total_score;
+                    interview.evaluationStatus = 'completed';
+                    this.storageManager.saveInterview(interview);
+
+                    // 刷新显示
+                    this.refreshHistoryList();
+
+                    alert('评分完成！');
+                } else {
+                    throw new Error(result.message || '评分失败');
+                }
+            } else {
+                throw new Error(`评分API调用失败: ${response.status}`);
+            }
+
+        } catch (error) {
+            console.error('评分处理失败:', error);
+
+            // 标记评分失败
+            interview.evaluationStatus = 'failed';
+            this.storageManager.saveInterview(interview);
+            this.refreshHistoryList();
+
+            throw error;
+        }
+    }
+
+    /**
+     * 获取简历上下文（简化版本）
+     */
+    async getResumeContext() {
+        try {
+            const resumeData = this.storageManager.getCurrentResume();
+            if (resumeData && resumeData.sessionId) {
+                const response = await fetch(`/api/resume/${resumeData.sessionId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    return data.content;
+                }
+            }
+            return null;
+        } catch (error) {
+            console.error('获取简历上下文失败:', error);
+            return null;
+        }
+    }
+    
+    /**
+     * 绑定对话详情模态框事件
+     */
+    bindConversationModalEvents() {
+        // 关闭按钮事件
+        if (this.closeConversationModal) {
+            this.closeConversationModal.addEventListener('click', () => {
+                this.hideConversationModal();
+            });
+        }
+        
+        // 导出按钮事件
+        if (this.exportConversationBtn) {
+            this.exportConversationBtn.addEventListener('click', () => {
+                this.exportConversation();
+            });
+        }
+        
+        // 点击模态框外部关闭
+        if (this.conversationModal) {
+            this.conversationModal.addEventListener('click', (event) => {
+                if (event.target === this.conversationModal) {
+                    this.hideConversationModal();
+                }
+            });
+        }
+        
+        // ESC键关闭
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && this.conversationModal && this.conversationModal.style.display === 'flex') {
+                this.hideConversationModal();
+            }
+        });
+    }
+    
+    /**
+     * 查看面试对话详情
+     */
+    viewConversation(id) {
+        const interviews = this.storageManager.getInterviews();
+        const interview = interviews.find(item => item.id === id);
+        
+        if (!interview) {
+            alert('未找到面试记录');
+            return;
+        }
+        
+        if (!interview.messages || interview.messages.length === 0) {
+            alert('该面试记录没有对话内容');
+            return;
+        }
+        
+        this.showConversationModal(interview);
+    }
+    
+    /**
+     * 显示对话详情模态框
+     */
+    showConversationModal(interview) {
+        if (!this.conversationModal) {
+            console.error('对话详情模态框未找到');
+            return;
+        }
+        
+        // 设置面试信息
+        this.setConversationInfo(interview);
+        
+        // 渲染对话消息
+        this.renderConversationMessages(interview.messages);
+        
+        // 显示模态框
+        this.conversationModal.style.display = 'flex';
+
+        // 记录当前查看的面试ID，用于导出功能
+        this.currentViewingInterviewId = interview.id;
+
+        // 延迟更新滚动指示器，确保DOM已渲染
+        setTimeout(() => {
+            this.updateScrollIndicator();
+        }, 200);
+
+        console.log('显示面试对话详情:', interview.id);
+    }
+    
+    /**
+     * 隐藏对话详情模态框
+     */
+    hideConversationModal() {
+        if (this.conversationModal) {
+            this.conversationModal.style.display = 'none';
+            this.currentViewingInterviewId = null;
+        }
+    }
+    
+    /**
+     * 设置对话信息
+     */
+    setConversationInfo(interview) {
+        // 面试时间
+        if (this.conversationDate) {
+            const date = new Date(interview.createdAt).toLocaleString('zh-CN');
+            this.conversationDate.textContent = date;
+        }
+        
+        // 面试时长
+        if (this.conversationDuration) {
+            const duration = interview.duration || 0;
+            if (duration >= 60) {
+                const minutes = Math.floor(duration / 60);
+                const seconds = duration % 60;
+                this.conversationDuration.textContent = `${minutes}分${seconds}秒`;
+            } else {
+                this.conversationDuration.textContent = `${duration}秒`;
+            }
+        }
+        
+        // 对话轮次
+        if (this.conversationCount) {
+            this.conversationCount.textContent = `${interview.messages.length}条`;
+        }
+    }
+    
+    /**
+     * 渲染对话消息
+     */
+    renderConversationMessages(messages) {
+        if (!this.conversationMessages) {
+            console.error('对话消息容器未找到');
+            return;
+        }
+        
+        // 清空现有内容
+        this.conversationMessages.innerHTML = '';
+        
+        if (!messages || messages.length === 0) {
+            this.conversationMessages.innerHTML = `
+                <div class="conversation-empty">
+                    <i class="fas fa-comments"></i>
+                    <h3>暂无对话记录</h3>
+                    <p>该面试记录中没有保存对话内容</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // 渲染每条消息
+        messages.forEach((message, index) => {
+            const messageElement = this.createConversationMessageElement(message, index);
+            this.conversationMessages.appendChild(messageElement);
+        });
+        
+        // 滚动到底部并检查是否需要滚动提示
+        setTimeout(() => {
+            this.conversationMessages.scrollTop = this.conversationMessages.scrollHeight;
+            this.updateScrollIndicator();
+        }, 100);
+    }
+    
+    /**
+     * 创建对话消息元素
+     */
+    createConversationMessageElement(message, index) {
+        // 兼容不同的消息格式：type 或 role 字段
+        const messageType = message.type || message.role;
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `conversation-message ${messageType}`;
+        
+        // 头像
+        const avatar = document.createElement('div');
+        avatar.className = 'conversation-avatar';
+        avatar.innerHTML = messageType === 'assistant' ? '<i class="fas fa-robot"></i>' : '<i class="fas fa-user"></i>';
+        
+        // 对话气泡
+        const bubble = document.createElement('div');
+        bubble.className = 'conversation-bubble';
+        
+        const text = document.createElement('p');
+        text.className = 'conversation-text';
+        text.textContent = message.content;
+        
+        const time = document.createElement('div');
+        time.className = 'conversation-time';
+        if (message.timestamp) {
+            const messageTime = new Date(message.timestamp);
+            time.textContent = messageTime.toLocaleTimeString('zh-CN', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        } else {
+            time.textContent = `第${index + 1}轮`;
+        }
+        
+        bubble.appendChild(text);
+        bubble.appendChild(time);
+        
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(bubble);
+        
+        return messageDiv;
+    }
+
+    /**
+     * 更新滚动指示器
+     */
+    updateScrollIndicator() {
+        if (!this.conversationMessages) return;
+
+        const container = this.conversationMessages.parentElement; // conversation-container
+        const hasScroll = this.conversationMessages.scrollHeight > this.conversationMessages.clientHeight;
+
+        if (hasScroll) {
+            container.classList.add('has-scroll');
+        } else {
+            container.classList.remove('has-scroll');
+        }
+
+        // 监听滚动事件，当滚动到底部时隐藏指示器
+        this.conversationMessages.addEventListener('scroll', () => {
+            const isAtBottom = this.conversationMessages.scrollTop + this.conversationMessages.clientHeight >=
+                              this.conversationMessages.scrollHeight - 5; // 5px 容差
+
+            if (isAtBottom) {
+                container.classList.remove('has-scroll');
+            } else if (hasScroll) {
+                container.classList.add('has-scroll');
+            }
+        });
+    }
+    
+    /**
+     * 导出对话记录
+     */
+    exportConversation() {
+        if (!this.currentViewingInterviewId) {
+            alert('无法导出：未找到当前查看的面试记录');
+            return;
+        }
+        
+        const interviews = this.storageManager.getInterviews();
+        const interview = interviews.find(item => item.id === this.currentViewingInterviewId);
+        
+        if (!interview || !interview.messages) {
+            alert('无法导出：面试记录数据不完整');
+            return;
+        }
+        
+        try {
+            // 生成导出内容
+            const exportContent = this.generateExportContent(interview);
+            
+            // 创建并下载文件
+            const blob = new Blob([exportContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `面试记录_${interview.id}_${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            console.log('对话记录导出成功');
+            alert('对话记录导出成功！');
+        } catch (error) {
+            console.error('导出对话记录失败:', error);
+            alert('导出失败：' + error.message);
+        }
+    }
+    
+    /**
+     * 生成导出内容
+     */
+    generateExportContent(interview) {
+        const lines = [];
+        
+        // 头部信息
+        lines.push('='.repeat(50));
+        lines.push('AI面试官 - 面试对话记录');
+        lines.push('='.repeat(50));
+        lines.push('');
+        lines.push(`面试ID: ${interview.id}`);
+        lines.push(`面试时间: ${new Date(interview.createdAt).toLocaleString('zh-CN')}`);
+        
+        if (interview.duration) {
+            const duration = interview.duration;
+            if (duration >= 60) {
+                const minutes = Math.floor(duration / 60);
+                const seconds = duration % 60;
+                lines.push(`面试时长: ${minutes}分${seconds}秒`);
+            } else {
+                lines.push(`面试时长: ${duration}秒`);
+            }
+        }
+        
+        lines.push(`对话轮次: ${interview.messages.length}条`);
+        
+        if (interview.title) {
+            lines.push(`面试标题: ${interview.title}`);
+        }
+        
+        if (interview.summary) {
+            lines.push(`面试摘要: ${interview.summary}`);
+        }
+        
+        if (interview.score || (interview.evaluation && interview.evaluation.total_score)) {
+            lines.push(`面试评分: ${interview.score || interview.evaluation.total_score}分`);
+        }
+        
+        lines.push('');
+        lines.push('-'.repeat(50));
+        lines.push('对话内容');
+        lines.push('-'.repeat(50));
+        lines.push('');
+        
+        // 对话内容
+        interview.messages.forEach((message, index) => {
+            const messageType = message.type || message.role;
+            const speaker = messageType === 'assistant' ? 'AI面试官' : '求职者';
+            const timestamp = message.timestamp ? 
+                new Date(message.timestamp).toLocaleTimeString('zh-CN') : 
+                `第${index + 1}轮`;
+            
+            lines.push(`[${timestamp}] ${speaker}:`);
+            lines.push(message.content);
+            lines.push('');
+        });
+        
+        lines.push('-'.repeat(50));
+        lines.push(`导出时间: ${new Date().toLocaleString('zh-CN')}`);
+        lines.push('由 AI面试官系统 生成');
+        lines.push('='.repeat(50));
+        
+        return lines.join('\n');
+    }
 }
 
 /**
@@ -2270,6 +3551,8 @@ class ResumeManager {
     constructor(storageManager, router) {
         this.storageManager = storageManager;
         this.router = router;
+        // 缓存完整简历内容，避免重复API调用
+        this.cachedFullContent = null;
         this.fileInput = null;
         this.uploadArea = null;
         this.resumeInfo = null;
@@ -2278,45 +3561,66 @@ class ResumeManager {
     }
 
     init() {
+        // 来自 07.09_TEST 分支的初始化
+        this.resumeContent = document.getElementById('resumeContent');
+        this.resumeSectionTitle = document.getElementById('resumeSectionTitle');
+        this.sectionActions = document.getElementById('sectionActions');
+        this.uploadTips = document.getElementById('uploadTips');
+
+        // 来自 add_evaluation 分支的初始化
         this.fileInput = document.getElementById('resumeFileInput');
         this.uploadArea = document.getElementById('resumeFileUploadArea');
         this.resumeInfo = document.getElementById('resumeInfo');
         this.jobCategory = document.getElementById('jobCategory');
         this.jobPosition = document.getElementById('jobPosition');
 
+        // 绑定事件方法
+        this.bindDrawerEvents();
         this.bindResumeEvents();
         this.bindJobPreferenceEvents();
+
+        // 加载保存的作业偏好
         this.loadSavedJobPreference();
+
+        // 刷新简历信息
         this.refreshResumeInfo();
     }
 
     bindResumeEvents() {
+        // 先清理旧的事件监听器
+        this.unbindResumeEvents();
+        
+        // 重新获取元素引用（因为可能是动态创建的）
+        this.fileInput = document.getElementById('resumeFileInput');
+        this.uploadArea = document.getElementById('resumeFileUploadArea');
+        
         // 文件选择
         if (this.fileInput) {
-            this.fileInput.addEventListener('change', (e) => {
+            this.fileChangeHandler = (e) => {
                 const file = e.target.files[0];
                 if (file) {
                     this.handleFileSelect(file);
                 }
-            });
+            };
+            this.fileInput.addEventListener('change', this.fileChangeHandler);
         }
 
         // 拖拽上传
         if (this.uploadArea) {
-            this.uploadArea.addEventListener('click', () => {
+            this.uploadClickHandler = () => {
                 this.fileInput?.click();
-            });
-
-            this.uploadArea.addEventListener('dragover', (e) => {
+            };
+            
+            this.dragOverHandler = (e) => {
                 e.preventDefault();
                 this.uploadArea.classList.add('drag-over');
-            });
-
-            this.uploadArea.addEventListener('dragleave', () => {
+            };
+            
+            this.dragLeaveHandler = () => {
                 this.uploadArea.classList.remove('drag-over');
-            });
-
-            this.uploadArea.addEventListener('drop', (e) => {
+            };
+            
+            this.dropHandler = (e) => {
                 e.preventDefault();
                 this.uploadArea.classList.remove('drag-over');
                 
@@ -2324,7 +3628,41 @@ class ResumeManager {
                 if (files.length > 0) {
                     this.handleFileSelect(files[0]);
                 }
-            });
+            };
+
+            this.uploadArea.addEventListener('click', this.uploadClickHandler);
+            this.uploadArea.addEventListener('dragover', this.dragOverHandler);
+            this.uploadArea.addEventListener('dragleave', this.dragLeaveHandler);
+            this.uploadArea.addEventListener('drop', this.dropHandler);
+        }
+    }
+
+    /**
+     * 解绑简历事件
+     */
+    unbindResumeEvents() {
+        if (this.fileInput && this.fileChangeHandler) {
+            this.fileInput.removeEventListener('change', this.fileChangeHandler);
+            this.fileChangeHandler = null;
+        }
+
+        if (this.uploadArea) {
+            if (this.uploadClickHandler) {
+                this.uploadArea.removeEventListener('click', this.uploadClickHandler);
+                this.uploadClickHandler = null;
+            }
+            if (this.dragOverHandler) {
+                this.uploadArea.removeEventListener('dragover', this.dragOverHandler);
+                this.dragOverHandler = null;
+            }
+            if (this.dragLeaveHandler) {
+                this.uploadArea.removeEventListener('dragleave', this.dragLeaveHandler);
+                this.dragLeaveHandler = null;
+            }
+            if (this.dropHandler) {
+                this.uploadArea.removeEventListener('drop', this.dropHandler);
+                this.dropHandler = null;
+            }
         }
     }
 
@@ -2339,20 +3677,35 @@ class ResumeManager {
     }
 
     showResumeInfo(resumeData) {
-        if (this.resumeInfo) {
-            this.resumeInfo.innerHTML = this.createResumeInfoHTML(resumeData);
+        if (this.resumeContent) {
+            this.resumeContent.innerHTML = this.createResumeInfoHTML(resumeData);
             this.bindResumeInfoEvents();
+        }
+        
+        // 清空标题右侧的操作按钮
+        if (this.sectionActions) {
+            this.sectionActions.innerHTML = '';
+        }
+        
+        // 更新标题和提示
+        if (this.resumeSectionTitle) {
+            this.resumeSectionTitle.textContent = '当前简历';
+        }
+        
+        // 隐藏上传提示
+        if (this.uploadTips) {
+            this.uploadTips.style.display = 'none';
         }
     }
 
     showNoResume() {
-        if (this.resumeInfo) {
-            this.resumeInfo.innerHTML = `
+        if (this.resumeContent) {
+            this.resumeContent.innerHTML = `
                 <div class="no-resume" id="noResume">
                     <div class="no-resume-illustration">
                         <i class="fas fa-file-upload"></i>
                     </div>
-                    <h3>暂未上传简历</h3>
+                    <h3>暂无简历？右上角使用天汇AI工具快速制作简历</h3>
                     <p>上传简历后，天汇AI面试官将基于您的背景生成个性化面试问题</p>
                     <div class="resume-benefits">
                         <div class="benefit-item">
@@ -2368,8 +3721,50 @@ class ResumeManager {
                             <span>深度分析</span>
                         </div>
                     </div>
+                    
+                    <!-- 上传区域 -->
+                    <div class="upload-zone" id="resumeFileUploadArea">
+                        <div class="upload-content">
+                            <div class="upload-icon">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                            </div>
+                            <div class="upload-text">
+                                <h3>拖拽简历文件到此处</h3>
+                                <p>或点击选择文件上传</p>
+                                <div class="upload-formats">
+                                    <span class="format-tag">PDF</span>
+                                    <span class="format-tag">DOC</span>
+                                    <span class="format-tag">DOCX</span>
+                                </div>
+                            </div>
+                            <input type="file" id="resumeFileInput" class="file-input" accept=".pdf,.doc,.docx" />
+                        </div>
+                    </div>
                 </div>
             `;
+            
+            // 重新绑定上传事件
+            this.bindResumeEvents();
+        }
+        
+        // 在标题右侧显示制作简历按钮
+        if (this.sectionActions) {
+            this.sectionActions.innerHTML = `
+                <button class="header-action-btn" onclick="window.open('https://tianhuiai.com.cn/', '_blank')" title="天汇AI简历">
+                    <i class="fas fa-magic"></i>
+                    <span>天汇AI简历</span>
+                </button>
+            `;
+        }
+        
+        // 更新标题和提示
+        if (this.resumeSectionTitle) {
+            this.resumeSectionTitle.textContent = '上传简历';
+        }
+        
+        // 显示上传提示
+        if (this.uploadTips) {
+            this.uploadTips.style.display = 'block';
         }
     }
 
@@ -2423,7 +3818,13 @@ class ResumeManager {
                 <div class="resume-preview">
                     <h5><i class="fas fa-eye"></i> 简历预览</h5>
                     <div class="preview-content">
-                    <p class="preview-text">${resumeData.preview}</p>
+                        <p class="preview-text">${resumeData.preview}</p>
+                        <div class="preview-expand">
+                            <button class="expand-btn" onclick="resumeManager.showFullResume()">
+                                <i class="fas fa-expand-alt"></i>
+                                查看完整简历
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="resume-actions">
@@ -2440,6 +3841,31 @@ class ResumeManager {
         // 事件已在HTML中绑定
     }
 
+
+    /**
+     * 绑定抽屉事件
+     */
+    bindDrawerEvents() {
+        // ESC键关闭抽屉
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('resumeDrawerModal');
+                if (modal && modal.classList.contains('show')) {
+                    this.hideFullResume();
+                }
+            }
+        });
+
+        // 防止抽屉内容区域点击时关闭抽屉
+        const drawerContainer = document.querySelector('.drawer-container');
+        if (drawerContainer) {
+            drawerContainer.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+          
+    /**
+     * 绑定岗位偏好事件
+     */
     bindJobPreferenceEvents() {
         // 行业大类选择事件
         if (this.jobCategory) {
@@ -2787,33 +4213,34 @@ class ResumeManager {
     }
 
     showUploadProgress() {
-        if (this.uploadArea) {
-            this.uploadArea.innerHTML = `
+        if (this.resumeContent) {
+            this.resumeContent.innerHTML = `
                 <div class="upload-progress">
                     <div class="loading-spinner"></div>
                     <p>正在上传和解析简历...</p>
                 </div>
             `;
         }
+        
+        // 清空标题右侧的操作按钮
+        if (this.sectionActions) {
+            this.sectionActions.innerHTML = '';
+        }
+        
+        // 更新标题
+        if (this.resumeSectionTitle) {
+            this.resumeSectionTitle.textContent = '上传中...';
+        }
+        
+        // 隐藏上传提示
+        if (this.uploadTips) {
+            this.uploadTips.style.display = 'none';
+        }
     }
 
     hideUploadProgress() {
-        if (this.uploadArea) {
-            this.uploadArea.innerHTML = `
-                <div class="upload-content">
-                    <div class="upload-icon">📁</div>
-                    <div class="upload-text">
-                        <p class="upload-main-text">拖拽简历文件到此处，或点击选择文件</p>
-                        <p class="upload-sub-text">支持 PDF、Word (.doc/.docx) 格式，最大 10MB</p>
-                    </div>
-                    <input type="file" id="resumeFileInput" class="file-input" accept=".pdf,.doc,.docx" />
-                </div>
-            `;
-            
-            // 重新绑定事件
-            this.fileInput = document.getElementById('resumeFileInput');
-            this.bindResumeEvents();
-        }
+        // 恢复无简历状态的完整内容
+        this.showNoResume();
     }
 
     handleUploadSuccess(response, fileName) {
@@ -2831,6 +4258,8 @@ class ResumeManager {
         }
 
         this.storageManager.saveCurrentResume(resumeData);
+        // 清除之前的缓存内容，因为是新的简历
+        this.cachedFullContent = null;
         this.refreshResumeInfo();
 
         // 通知主应用简历已上传
@@ -2858,12 +4287,227 @@ class ResumeManager {
     removeResume() {
         if (confirm('确定要删除当前简历吗？')) {
             this.storageManager.removeCurrentResume();
+            // 清除缓存的完整内容
+            this.cachedFullContent = null;
             this.refreshResumeInfo();
             
             // 通知主应用简历已删除
             window.dispatchEvent(new CustomEvent('resumeRemoved'));
             
             alert('简历已删除');
+        }
+    }
+
+
+
+    /**
+     * 显示完整简历内容抽屉
+     */
+    async showFullResume() {
+        const resumeData = this.storageManager.getCurrentResume();
+        if (!resumeData) {
+            alert('未找到简历数据');
+            return;
+        }
+
+        const modal = document.getElementById('resumeDrawerModal');
+        const contentContainer = document.getElementById('resumeFullContent');
+        
+        if (!modal || !contentContainer) {
+            console.error('未找到抽屉Modal元素');
+            return;
+        }
+
+        // 显示抽屉
+        modal.style.display = 'flex';
+        // 使用setTimeout确保DOM更新后再添加show类
+        setTimeout(() => {
+            modal.classList.add('show');
+        }, 10);
+
+        // 阻止背景滚动
+        document.body.style.overflow = 'hidden';
+
+        // 显示加载状态
+        contentContainer.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #666;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 16px;"></i>
+                <div>正在加载完整简历内容...</div>
+            </div>
+        `;
+
+        try {
+            // 通过API获取完整简历内容
+            const response = await fetch(`/api/resume/${resumeData.sessionId}`);
+            if (response.ok) {
+                const data = await response.json();
+                const fullContent = data.content || '无法获取简历内容';
+                // 缓存完整内容供复制功能使用
+                this.cachedFullContent = fullContent;
+                // 渲染Markdown格式的简历内容
+                this.renderResumeContent(contentContainer, fullContent);
+                console.log('成功获取完整简历内容，长度:', fullContent.length);
+            } else {
+                console.warn('获取完整简历内容失败，使用预览内容');
+                // 清除缓存
+                this.cachedFullContent = null;
+                // 回退到预览内容
+                const fallbackContent = resumeData.preview || '暂无内容';
+                this.renderResumeContent(contentContainer, fallbackContent);
+            }
+        } catch (error) {
+            console.error('获取简历内容时发生错误:', error);
+            // 清除缓存
+            this.cachedFullContent = null;
+            // 回退到预览内容
+            const fallbackContent = resumeData.preview || '暂无内容';
+            this.renderResumeContent(contentContainer, fallbackContent);
+        }
+    }
+
+    /**
+     * 隐藏完整简历内容抽屉
+     */
+    hideFullResume() {
+        const modal = document.getElementById('resumeDrawerModal');
+        
+        if (!modal) {
+            console.error('未找到抽屉Modal元素');
+            return;
+        }
+
+        // 隐藏抽屉
+        modal.classList.remove('show');
+        
+        // 等待动画完成后隐藏元素
+        setTimeout(() => {
+            modal.style.display = 'none';
+            // 恢复背景滚动
+            document.body.style.overflow = '';
+        }, 250);
+    }
+
+    /**
+     * 渲染简历内容（支持Markdown格式）
+     * @param {HTMLElement} container - 内容容器
+     * @param {string} content - 简历内容
+     */
+    renderResumeContent(container, content) {
+        try {
+            // 检查是否包含Markdown语法
+            const hasMarkdown = this.detectMarkdownSyntax(content);
+            
+            if (hasMarkdown && typeof marked !== 'undefined') {
+                // 配置marked选项
+                marked.setOptions({
+                    breaks: true,          // 支持换行
+                    gfm: true,            // 支持GitHub风格Markdown
+                    sanitize: false,      // 允许HTML（简历内容可信）
+                    smartLists: true,     // 智能列表
+                    smartypants: true     // 智能标点
+                });
+                
+                // 转换Markdown为HTML
+                const htmlContent = marked.parse(content);
+                
+                // 更新容器样式以支持Markdown渲染
+                container.className = 'resume-full-content markdown-content';
+                container.innerHTML = htmlContent;
+                
+                console.log('简历内容已渲染为Markdown格式');
+            } else {
+                // 显示为纯文本
+                container.className = 'resume-full-content';
+                container.textContent = content;
+                
+                if (hasMarkdown) {
+                    console.warn('检测到Markdown语法但marked库未加载，显示为纯文本');
+                }
+            }
+        } catch (error) {
+            console.error('渲染简历内容时出错:', error);
+            // 降级显示纯文本
+            container.className = 'resume-full-content';
+            container.textContent = content;
+        }
+    }
+
+    /**
+     * 检测内容是否包含Markdown语法
+     * @param {string} content - 待检测的内容
+     * @returns {boolean} - 是否包含Markdown语法
+     */
+    detectMarkdownSyntax(content) {
+        if (!content || typeof content !== 'string') {
+            return false;
+        }
+
+        // 检测常见的Markdown语法模式
+        const markdownPatterns = [
+            /\*\*.*?\*\*/,           // 粗体 **text**
+            /\*.*?\*/,               // 斜体 *text*
+            /^#{1,6}\s+/m,           // 标题 # ## ###
+            /^[\*\-\+]\s+/m,         // 无序列表 * - +
+            /^\d+\.\s+/m,            // 有序列表 1. 2.
+            /\[.*?\]\(.*?\)/,        // 链接 [text](url)
+            /`.*?`/,                 // 行内代码 `code`
+            /^```/m,                 // 代码块 ```
+            /^>\s+/m,                // 引用 >
+            /\|.*?\|/,               // 表格 |col1|col2|
+            /^-{3,}$/m,              // 分隔线 ---
+            /^=+$/m                  // 标题下划线 ===
+        ];
+
+        // 如果匹配任何一个模式，则认为包含Markdown
+        return markdownPatterns.some(pattern => pattern.test(content));
+    }
+
+    /**
+     * 复制简历内容到剪贴板
+     */
+    async copyResumeContent() {
+        const resumeData = this.storageManager.getCurrentResume();
+        if (!resumeData) {
+            alert('未找到简历数据');
+            return;
+        }
+
+        // 优先使用缓存的完整内容，如果没有则通过API获取，最后回退到预览
+        let content = this.cachedFullContent;
+
+        if (!content) {
+            // 尝试通过API获取完整内容
+            try {
+                showNotification('获取中', '正在获取完整简历内容...', 'info', 1000);
+                const response = await fetch(`/api/resume/${resumeData.sessionId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    content = data.content;
+                    // 同时缓存起来
+                    this.cachedFullContent = content;
+                } else {
+                    console.warn('无法获取完整简历内容，使用预览内容');
+                    content = resumeData.preview || '';
+                }
+            } catch (error) {
+                console.error('获取简历内容失败:', error);
+                content = resumeData.preview || '';
+            }
+        }
+
+        if (!content) {
+            alert('简历内容为空');
+            return;
+        }
+
+        try {
+            await copyToClipboard(content);
+            // 显示成功提示
+            const message = this.cachedFullContent ? '完整简历内容已复制到剪贴板' : '简历预览内容已复制到剪贴板';
+            showNotification('复制成功', message, 'success', 2000);
+        } catch (error) {
+            console.error('复制失败:', error);
+            alert('复制失败，请手动选择文本复制');
         }
     }
 }
@@ -2932,9 +4576,18 @@ class AzureVoiceInterviewApp {
     initVoiceCallManager() {
         try {
             this.voiceCallManager = new VoiceCallManager(this.voiceChat, this.storageManager);
-            
+
+            // 确保VoiceCallManager使用最新的设置
+            if (this.voiceChat.settingsManager) {
+                const settings = this.voiceChat.settingsManager.getSettings();
+                this.voiceCallManager.updateVADConfig(settings.voice);
+                this.voiceCallManager.updateAudioSettings(settings.audio);
+            }
+
             // 浏览器兼容性检查现在在startVoiceCall方法中进行
             console.log('语音通话管理器初始化完成');
+
+
         } catch (error) {
             console.error('语音通话管理器初始化失败:', error);
         }
@@ -2967,11 +4620,7 @@ class AzureVoiceInterviewApp {
         }
     }
 
-    continueInterviewFromHistory(interview) {
-        // 这里可以实现从历史记录继续面试的逻辑
-        console.log('继续面试:', interview);
-        // 暂时只是切换到面试页面
-    }
+
 }
 
 // 全局变量，供HTML中的事件处理使用
@@ -2997,7 +4646,13 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // 拖拽上传功能
+// 用于跟踪是否已经初始化过拖拽功能
+let isDragAndDropInitialized = false;
+
 function initDragAndDrop() {
+    // 避免重复初始化
+    if (isDragAndDropInitialized) return;
+    
     const uploadZone = document.querySelector('.upload-content');
     if (!uploadZone) return;
 
@@ -3015,6 +4670,9 @@ function initDragAndDrop() {
     });
 
     uploadZone.addEventListener('drop', handleDrop, false);
+    
+    // 标记已初始化
+    isDragAndDropInitialized = true;
 
     function preventDefaults(e) {
         e.preventDefault();
@@ -3251,15 +4909,20 @@ function addQuickActions() {
     if (!quickActions) return;
 
     const buttons = quickActions.querySelectorAll('.quick-btn');
-    
+
     buttons.forEach((btn, index) => {
+        // 跳过已经有特定ID的按钮（如preparationSettingsButton）
+        if (btn.id && btn.id !== '') {
+            return;
+        }
+
         btn.addEventListener('click', () => {
             // 添加点击动画
             btn.style.transform = 'scale(0.95)';
             setTimeout(() => {
                 btn.style.transform = 'scale(1)';
             }, 150);
-            
+
             // 根据按钮执行不同操作
             switch(index) {
                 case 0: // 上传简历 - 切换到简历页面
@@ -3282,15 +4945,24 @@ function addQuickActions() {
 
 // 设置面板功能
 function showSettingsPanel() {
-    showNotification('设置', '设置功能开发中，敬请期待！', 'info', 3000);
+    // 检查是否在准备页面，如果是则显示准备页面设置
+    const preparationPage = document.querySelector('.preparation-page');
+    if (preparationPage && preparationPage.style.display !== 'none') {
+        // 调用准备页面设置功能
+        if (window.app && window.app.voiceChat && window.app.voiceChat.showPreparationSettings) {
+            window.app.voiceChat.showPreparationSettings();
+        } else {
+            showNotification('设置', '准备页面设置功能正在加载中...', 'info', 2000);
+        }
+    } else {
+        // 其他页面显示通用设置
+        showNotification('设置', '更多设置功能开发中，敬请期待！', 'info', 3000);
+    }
     console.log('显示设置面板');
 }
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
-    // 初始化拖拽上传
-    initDragAndDrop();
-    
     // 初始化快捷操作
     addQuickActions();
     
@@ -3574,6 +5246,402 @@ function initializeApp() {
     });
     
     console.log('AI智能面试官应用已完全初始化');
+
+    // 初始化新手引导系统集成
+    initTutorialIntegration();
+}
+
+/**
+ * 初始化新手引导系统集成
+ */
+function initTutorialIntegration() {
+    // 等待引导系统加载完成
+    const checkTutorialSystem = () => {
+        if (window.tutorialGuide) {
+            // 绑定引导触发事件
+            bindTutorialTriggers();
+            console.log('✅ 新手引导系统集成完成');
+        } else {
+            setTimeout(checkTutorialSystem, 100);
+        }
+    };
+    checkTutorialSystem();
+}
+
+/**
+ * 绑定引导触发器
+ */
+function bindTutorialTriggers() {
+    // 添加设置中的引导重启选项
+    addTutorialSettings();
+
+    // 监听页面切换事件，提供上下文相关的引导
+    window.addEventListener('pageChanged', (event) => {
+        const page = event.detail.page;
+        handlePageSpecificTutorial(page);
+    });
+
+    // 监听简历上传事件，提供相关引导
+    window.addEventListener('resumeUploaded', () => {
+        showContextualTip('resume-uploaded');
+    });
+
+    // 监听面试开始事件
+    window.addEventListener('interviewStarted', () => {
+        showContextualTip('interview-started');
+    });
+}
+
+/**
+ * 添加引导相关的设置选项
+ */
+function addTutorialSettings() {
+    // 在设置面板中添加引导选项
+    const settingsPanel = document.querySelector('.settings-panel');
+    if (settingsPanel) {
+        const tutorialSection = document.createElement('div');
+        tutorialSection.className = 'settings-section';
+        tutorialSection.innerHTML = `
+            <h3 class="settings-title">
+                <i class="fas fa-graduation-cap"></i>
+                新手引导与帮助
+            </h3>
+            <div class="settings-item">
+                <label class="settings-label">
+                    <span>重新开始引导教程</span>
+                    <button class="btn-secondary btn-sm" id="restartTutorialBtn">
+                        <i class="fas fa-redo"></i>
+                        重新开始
+                    </button>
+                </label>
+            </div>
+            <div class="settings-item">
+                <label class="settings-label">
+                    <span>功能引导</span>
+                    <select class="settings-select" id="featureTutorialSelect">
+                        <option value="">选择功能引导</option>
+                        <option value="voice-interview">语音面试</option>
+                        <option value="resume-upload">简历上传</option>
+                        <option value="interview-history">面试历史</option>
+                    </select>
+                </label>
+            </div>
+            <div class="settings-item">
+                <label class="settings-label">
+                    <span>智能提示</span>
+                    <div class="settings-toggle">
+                        <input type="checkbox" id="smartTipsToggle" checked>
+                        <span class="toggle-slider"></span>
+                    </div>
+                </label>
+            </div>
+            <div class="settings-item">
+                <label class="settings-label">
+                    <span>引导数据管理</span>
+                    <div class="settings-actions">
+                        <button class="btn-outline btn-sm" id="exportTutorialDataBtn">
+                            <i class="fas fa-download"></i>
+                            导出数据
+                        </button>
+                        <button class="btn-outline btn-sm" id="resetTutorialDataBtn">
+                            <i class="fas fa-trash"></i>
+                            重置数据
+                        </button>
+                    </div>
+                </label>
+            </div>
+            <div class="settings-item">
+                <label class="settings-label">
+                    <span>引导统计</span>
+                    <div class="tutorial-stats" id="tutorialStats">
+                        <div class="stat-item">
+                            <span class="stat-label">完成的引导:</span>
+                            <span class="stat-value" id="completedTutorials">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">智能提示:</span>
+                            <span class="stat-value" id="smartTipsCount">0</span>
+                        </div>
+                    </div>
+                </label>
+            </div>
+        `;
+
+        settingsPanel.appendChild(tutorialSection);
+
+        // 绑定事件
+        bindTutorialSettingsEvents();
+
+        // 更新统计数据
+        updateTutorialStats();
+    }
+}
+
+/**
+ * 绑定引导设置事件
+ */
+function bindTutorialSettingsEvents() {
+    // 重新开始引导
+    document.getElementById('restartTutorialBtn')?.addEventListener('click', () => {
+        if (window.tutorialGuide) {
+            window.tutorialGuide.restartTutorial();
+            hideCurrentSettingsPanel();
+        }
+    });
+
+    // 功能引导选择
+    document.getElementById('featureTutorialSelect')?.addEventListener('change', (e) => {
+        const feature = e.target.value;
+        if (feature && window.tutorialGuide) {
+            window.tutorialGuide.startFeatureTutorial(feature);
+            hideCurrentSettingsPanel();
+            e.target.value = '';
+        }
+    });
+
+    // 智能提示开关
+    document.getElementById('smartTipsToggle')?.addEventListener('change', (e) => {
+        if (window.smartTips) {
+            window.smartTips.setEnabled(e.target.checked);
+            showNotification(
+                '设置已保存',
+                `智能提示已${e.target.checked ? '启用' : '禁用'}`,
+                'success',
+                2000
+            );
+        }
+    });
+
+    // 导出引导数据
+    document.getElementById('exportTutorialDataBtn')?.addEventListener('click', () => {
+        exportTutorialData();
+    });
+
+    // 重置引导数据
+    document.getElementById('resetTutorialDataBtn')?.addEventListener('click', () => {
+        if (confirm('确定要重置所有引导数据吗？这将清除您的引导进度和偏好设置。')) {
+            resetTutorialData();
+            updateTutorialStats();
+            showNotification('数据已重置', '所有引导数据已清除', 'success', 3000);
+        }
+    });
+}
+
+/**
+ * 更新引导统计数据
+ */
+function updateTutorialStats() {
+    const completedElement = document.getElementById('completedTutorials');
+    const tipsCountElement = document.getElementById('smartTipsCount');
+
+    if (completedElement && tipsCountElement) {
+        // 统计完成的引导数量
+        const completedTutorials = getTutorialCompletionCount();
+        const smartTipsCount = getSmartTipsCount();
+
+        completedElement.textContent = completedTutorials;
+        tipsCountElement.textContent = smartTipsCount;
+    }
+
+    // 更新智能提示开关状态
+    const smartTipsToggle = document.getElementById('smartTipsToggle');
+    if (smartTipsToggle && window.smartTips) {
+        smartTipsToggle.checked = window.smartTips.isEnabled;
+    }
+}
+
+/**
+ * 获取引导完成数量
+ */
+function getTutorialCompletionCount() {
+    const keys = [
+        'tutorial_completed',
+        'tutorial_welcome_completed',
+        'tutorial_voice-interview_completed',
+        'tutorial_resume-upload_completed',
+        'tutorial_interview-history_completed'
+    ];
+
+    return keys.filter(key => localStorage.getItem(key) === 'true').length;
+}
+
+/**
+ * 获取智能提示数量
+ */
+function getSmartTipsCount() {
+    const tipsHistory = localStorage.getItem('smart_tips_history');
+    if (tipsHistory) {
+        try {
+            return JSON.parse(tipsHistory).length;
+        } catch (e) {
+            return 0;
+        }
+    }
+    return 0;
+}
+
+/**
+ * 导出引导数据
+ */
+function exportTutorialData() {
+    const tutorialData = {
+        timestamp: new Date().toISOString(),
+        version: '1.0',
+        data: {
+            tutorialCompleted: localStorage.getItem('tutorial_completed'),
+            tutorialProgress: localStorage.getItem('tutorial_progress'),
+            userPreferences: localStorage.getItem('tutorial_preferences'),
+            skipTutorials: localStorage.getItem('skip_tutorials'),
+            smartTipsEnabled: localStorage.getItem('smart_tips_enabled'),
+            smartTipsHistory: localStorage.getItem('smart_tips_history'),
+            dismissedTips: localStorage.getItem('dismissed_tips'),
+            completedTutorials: getTutorialCompletionCount(),
+            smartTipsCount: getSmartTipsCount()
+        }
+    };
+
+    const dataStr = JSON.stringify(tutorialData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = `tutorial-data-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+
+    showNotification('导出成功', '引导数据已导出到文件', 'success', 3000);
+}
+
+/**
+ * 重置引导数据
+ */
+function resetTutorialData() {
+    const tutorialKeys = [
+        'tutorial_completed',
+        'tutorial_progress',
+        'tutorial_preferences',
+        'skip_tutorials',
+        'smart_tips_enabled',
+        'smart_tips_history',
+        'dismissed_tips',
+        'tutorial_welcome_completed',
+        'tutorial_voice-interview_completed',
+        'tutorial_resume-upload_completed',
+        'tutorial_interview-history_completed',
+        'tutorial_interview_shown',
+        'tutorial_resume_shown',
+        'tutorial_history_shown'
+    ];
+
+    tutorialKeys.forEach(key => {
+        localStorage.removeItem(key);
+    });
+
+    // 重置引导系统状态
+    if (window.tutorialGuide) {
+        window.tutorialGuide.endTutorial();
+    }
+
+    // 重置智能提示系统
+    if (window.smartTips) {
+        window.smartTips.resetTipHistory();
+        window.smartTips.setEnabled(true);
+    }
+}
+
+/**
+ * 隐藏当前显示的设置面板
+ */
+function hideCurrentSettingsPanel() {
+    // 隐藏准备页面设置面板
+    const preparationSettingsPanel = document.getElementById('preparationSettingsPanel');
+    if (preparationSettingsPanel && preparationSettingsPanel.style.display === 'block') {
+        preparationSettingsPanel.style.display = 'none';
+        return;
+    }
+
+    // 隐藏其他可能的设置面板
+    const settingsPanels = document.querySelectorAll('.settings-panel, .modal[style*="display: block"]');
+    settingsPanels.forEach(panel => {
+        if (panel.style.display === 'block' || panel.style.display === 'flex') {
+            panel.style.display = 'none';
+        }
+    });
+}
+
+/**
+ * 处理页面特定的引导
+ */
+function handlePageSpecificTutorial(page) {
+    // 检查用户是否需要该页面的引导
+    const tutorialKey = `tutorial_${page}_shown`;
+    const hasShownTutorial = localStorage.getItem(tutorialKey);
+
+    if (!hasShownTutorial && window.tutorialGuide) {
+        // 延迟显示，等待页面渲染完成
+        setTimeout(() => {
+            switch(page) {
+                case 'resume':
+                    // 检查是否有简历和相关元素
+                    const hasUploadArea = document.querySelector('.upload-area');
+                    const hasNoResumeContent = document.querySelector('#noResume');
+                    const hasHeaderActionBtn = document.querySelector('.header-action-btn');
+                    
+                    // 如果是无简历状态且有天汇AI工具按钮，显示完整引导
+                    if (hasNoResumeContent && hasHeaderActionBtn && hasUploadArea) {
+                        window.tutorialGuide.startFeatureTutorial('resume-upload');
+                        localStorage.setItem(tutorialKey, 'true');
+                    }
+                    // 如果只有上传区域（有简历状态），显示简化引导
+                    else if (hasUploadArea && !hasNoResumeContent) {
+                        window.tutorialGuide.startFeatureTutorial('resume-upload-simple');
+                        localStorage.setItem(tutorialKey, 'true');
+                    }
+                    break;
+                case 'history':
+                    if (document.querySelector('.history-list')) {
+                        window.tutorialGuide.startFeatureTutorial('interview-history');
+                        localStorage.setItem(tutorialKey, 'true');
+                    }
+                    break;
+            }
+        }, 500);
+    }
+}
+
+/**
+ * 显示上下文相关的提示
+ */
+function showContextualTip(context) {
+    const tips = {
+        'resume-uploaded': {
+            title: '简历上传成功！',
+            message: '现在AI将基于您的简历进行个性化面试。建议您先熟悉一下语音面试功能。',
+            action: () => {
+                if (window.tutorialGuide) {
+                    window.tutorialGuide.startFeatureTutorial('voice-interview');
+                }
+            }
+        },
+        'interview-started': {
+            title: '面试开始提示',
+            message: '💡 小贴士：您可以随时切换语音和文字输入模式，放松心情，正常发挥即可。',
+            duration: 5000
+        }
+    };
+
+    const tip = tips[context];
+    if (tip) {
+        if (tip.action) {
+            // 显示带操作的提示
+            const result = confirm(`${tip.title}\n\n${tip.message}\n\n是否查看语音面试引导？`);
+            if (result) {
+                tip.action();
+            }
+        } else {
+            // 显示普通提示
+            showNotification(tip.title, tip.message, 'info', tip.duration || 3000);
+        }
+    }
 }
 
 // 删除重复的DOMContentLoaded监听器，使用主应用初始化

@@ -1,0 +1,928 @@
+/**
+ * 新手引导系统样式
+ * 
+ * 包含引导遮罩、高亮效果、工具栏和动画
+ */
+
+/* ===== 引导系统基础样式 ===== */
+.tutorial-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+    pointer-events: none;
+}
+
+.tutorial-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(2px);
+    animation: fadeIn 0.3s ease-out;
+}
+
+.tutorial-highlight {
+    position: absolute;
+    background: transparent;
+    border: 3px solid var(--primary-color, #007bff);
+    border-radius: 8px;
+    box-shadow: 
+        0 0 0 4px rgba(0, 123, 255, 0.2),
+        0 0 20px rgba(0, 123, 255, 0.3),
+        inset 0 0 0 2000px rgba(255, 255, 255, 0.1);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: auto;
+}
+
+.tutorial-highlight.highlight-pulse {
+    animation: highlightPulse 1s ease-in-out;
+}
+
+/* ===== 引导工具栏样式 ===== */
+.tutorial-tooltip {
+    position: fixed;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 
+        0 20px 40px rgba(0, 0, 0, 0.15),
+        0 8px 16px rgba(0, 0, 0, 0.1);
+    max-width: 380px;
+    min-width: 320px;
+    z-index: 10000;
+    pointer-events: auto;
+    animation: tooltipSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.tutorial-tooltip::before {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: white;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    transform: rotate(45deg);
+    z-index: -1;
+}
+
+/* 箭头位置 */
+.tutorial-tooltip.position-top::before {
+    bottom: -7px;
+    left: 50%;
+    margin-left: -6px;
+    border-top: none;
+    border-left: none;
+}
+
+.tutorial-tooltip.position-bottom::before {
+    top: -7px;
+    left: 50%;
+    margin-left: -6px;
+    border-bottom: none;
+    border-right: none;
+}
+
+.tutorial-tooltip.position-left::before {
+    right: -7px;
+    top: 50%;
+    margin-top: -6px;
+    border-left: none;
+    border-bottom: none;
+}
+
+.tutorial-tooltip.position-right::before {
+    left: -7px;
+    top: 50%;
+    margin-top: -6px;
+    border-right: none;
+    border-top: none;
+}
+
+/* ===== 工具栏头部 ===== */
+.tooltip-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.tooltip-progress {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.step-counter {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primary-color, #007bff);
+    min-width: 40px;
+}
+
+.progress-bar {
+    flex: 1;
+    height: 4px;
+    background: rgba(0, 123, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color, #007bff), #0056b3);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.tooltip-close {
+    background: none;
+    border: none;
+    color: #6c757d;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    pointer-events: auto !important;
+    position: relative;
+    z-index: 10001;
+}
+
+.tooltip-close:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #495057;
+}
+
+/* ===== 工具栏内容 ===== */
+.tooltip-content {
+    padding: 16px 20px;
+}
+
+.tooltip-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #212529;
+    margin-bottom: 8px;
+    line-height: 1.3;
+}
+
+.tooltip-description {
+    font-size: 15px;
+    color: #495057;
+    line-height: 1.5;
+    margin-bottom: 12px;
+}
+
+.tooltip-tips {
+    font-size: 13px;
+    color: #6c757d;
+    background: rgba(0, 123, 255, 0.05);
+    padding: 8px 12px;
+    border-radius: 6px;
+    border-left: 3px solid var(--primary-color, #007bff);
+    margin-top: 12px;
+}
+
+/* ===== 工具栏操作按钮 ===== */
+.tooltip-actions {
+    display: flex;
+    gap: 8px;
+    padding: 16px 20px;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    background: rgba(248, 249, 250, 0.5);
+    border-radius: 0 0 12px 12px;
+}
+
+.btn-tutorial {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    min-height: 36px;
+    pointer-events: auto !important;
+    position: relative;
+    z-index: 10001;
+}
+
+.btn-tutorial:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-tutorial.btn-primary {
+    background: var(--primary-color, #007bff);
+    color: white;
+    flex: 1;
+}
+
+.btn-tutorial.btn-primary:hover:not(:disabled) {
+    background: #0056b3;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+}
+
+.btn-tutorial.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-tutorial.btn-secondary:hover:not(:disabled) {
+    background: #545b62;
+    transform: translateY(-1px);
+}
+
+.btn-tutorial.btn-success {
+    background: #28a745;
+    color: white;
+    flex: 1;
+}
+
+.btn-tutorial.btn-success:hover:not(:disabled) {
+    background: #1e7e34;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+/* ===== 页面状态样式 ===== */
+body.tutorial-active {
+    overflow: hidden;
+}
+
+/* 只有遮罩背景阻止交互，其他元素保持可交互 */
+.tutorial-backdrop {
+    pointer-events: auto;
+}
+
+.tutorial-overlay,
+.tutorial-tooltip,
+.tutorial-highlight {
+    pointer-events: auto;
+}
+
+/* 高亮的目标元素应该可以交互 */
+.tutorial-highlight {
+    pointer-events: none;
+}
+
+/* 工具栏内的元素可以交互 */
+.tutorial-tooltip * {
+    pointer-events: auto;
+}
+
+/* ===== 动画效果 ===== */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes tooltipSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes highlightPulse {
+    0%, 100% {
+        box-shadow:
+            0 0 0 4px rgba(0, 123, 255, 0.2),
+            0 0 20px rgba(0, 123, 255, 0.3),
+            inset 0 0 0 2000px rgba(255, 255, 255, 0.1);
+    }
+    50% {
+        box-shadow:
+            0 0 0 8px rgba(0, 123, 255, 0.4),
+            0 0 30px rgba(0, 123, 255, 0.5),
+            inset 0 0 0 2000px rgba(255, 255, 255, 0.15);
+    }
+}
+
+@keyframes tooltipAttention {
+    0%, 100% {
+        transform: translateY(0) scale(1);
+    }
+    25% {
+        transform: translateY(-5px) scale(1.02);
+    }
+    75% {
+        transform: translateY(2px) scale(0.98);
+    }
+}
+
+.tutorial-tooltip.tooltip-attention {
+    animation: tooltipAttention 0.6s ease-in-out;
+}
+
+/* ===== 响应式设计 ===== */
+@media (max-width: 768px) {
+    .tutorial-tooltip {
+        max-width: calc(100vw - 32px);
+        min-width: calc(100vw - 32px);
+        left: 16px !important;
+        right: 16px;
+    }
+    
+    .tooltip-header {
+        padding: 12px 16px 8px;
+    }
+    
+    .tooltip-content {
+        padding: 12px 16px;
+    }
+    
+    .tooltip-actions {
+        padding: 12px 16px;
+        flex-direction: column;
+    }
+    
+    .btn-tutorial {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .tooltip-title {
+        font-size: 16px;
+    }
+    
+    .tooltip-description {
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    .tutorial-tooltip {
+        border-radius: 8px;
+    }
+    
+    .tooltip-actions {
+        border-radius: 0 0 8px 8px;
+    }
+    
+    .step-counter {
+        font-size: 13px;
+    }
+    
+    .progress-bar {
+        height: 3px;
+    }
+}
+
+/* ===== 深色模式支持 ===== */
+@media (prefers-color-scheme: dark) {
+    .tutorial-tooltip {
+        background: #2d3748;
+        border-color: rgba(255, 255, 255, 0.1);
+        color: #e2e8f0;
+    }
+    
+    .tutorial-tooltip::before {
+        background: #2d3748;
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .tooltip-header {
+        border-bottom-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .tooltip-title {
+        color: #f7fafc;
+    }
+    
+    .tooltip-description {
+        color: #cbd5e0;
+    }
+    
+    .tooltip-tips {
+        background: rgba(0, 123, 255, 0.1);
+        color: #a0aec0;
+    }
+    
+    .tooltip-actions {
+        background: rgba(45, 55, 72, 0.8);
+        border-top-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .tooltip-close {
+        color: #a0aec0;
+    }
+    
+    .tooltip-close:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: #e2e8f0;
+    }
+}
+
+/* ===== 高对比度模式支持 ===== */
+@media (prefers-contrast: high) {
+    .tutorial-highlight {
+        border-width: 4px;
+        border-color: #000;
+    }
+    
+    .tutorial-tooltip {
+        border: 2px solid #000;
+    }
+    
+    .btn-tutorial {
+        border: 1px solid currentColor;
+    }
+}
+
+/* ===== 减少动画模式支持 ===== */
+@media (prefers-reduced-motion: reduce) {
+    .tutorial-highlight,
+    .progress-fill,
+    .btn-tutorial,
+    .tooltip-close {
+        transition: none;
+    }
+    
+    .tutorial-tooltip {
+        animation: none;
+    }
+    
+    .tutorial-backdrop {
+        animation: none;
+    }
+    
+    .tutorial-highlight.highlight-pulse {
+        animation: none;
+    }
+}
+
+/* ===== 打印样式 ===== */
+@media print {
+    .tutorial-overlay,
+    .tutorial-tooltip {
+        display: none !important;
+    }
+}
+
+/* ===== 智能提示系统样式 ===== */
+.smart-tips-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 8888;
+    pointer-events: none;
+}
+
+.smart-tip {
+    display: none;
+    align-items: flex-start;
+    gap: 12px;
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.12),
+        0 4px 16px rgba(0, 0, 0, 0.08);
+    max-width: 320px;
+    min-width: 280px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    pointer-events: auto;
+    transform: translateX(100%);
+    opacity: 0;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.smart-tip.tip-show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.tip-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 14px;
+    color: white;
+}
+
+.smart-tip.tip-high .tip-icon {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+}
+
+.smart-tip.tip-medium .tip-icon {
+    background: linear-gradient(135deg, #4ecdc4, #44a08d);
+}
+
+.smart-tip.tip-low .tip-icon {
+    background: linear-gradient(135deg, #feca57, #ff9ff3);
+}
+
+.tip-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.tip-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #212529;
+    margin-bottom: 4px;
+    line-height: 1.3;
+}
+
+.tip-message {
+    font-size: 13px;
+    color: #495057;
+    line-height: 1.4;
+}
+
+.tip-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.tip-action-btn {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #6c757d;
+    font-size: 11px;
+    transition: all 0.2s ease;
+}
+
+.tip-action-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+    color: #495057;
+    transform: scale(1.1);
+}
+
+/* ===== 智能提示动画 ===== */
+@keyframes tipSlideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes tipPulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.02);
+    }
+}
+
+.smart-tip.tip-high {
+    animation: tipPulse 2s ease-in-out infinite;
+}
+
+/* ===== 响应式设计 ===== */
+@media (max-width: 768px) {
+    .smart-tips-container {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+    }
+
+    .smart-tip {
+        max-width: none;
+        min-width: auto;
+    }
+}
+
+@media (max-width: 480px) {
+    .smart-tips-container {
+        top: 5px;
+        right: 5px;
+        left: 5px;
+    }
+
+    .smart-tip {
+        padding: 12px;
+        border-radius: 8px;
+    }
+
+    .tip-icon {
+        width: 28px;
+        height: 28px;
+        font-size: 12px;
+    }
+
+    .tip-title {
+        font-size: 13px;
+    }
+
+    .tip-message {
+        font-size: 12px;
+    }
+}
+
+/* ===== 深色模式支持 ===== */
+@media (prefers-color-scheme: dark) {
+    .smart-tip {
+        background: #2d3748;
+        border-color: rgba(255, 255, 255, 0.1);
+        color: #e2e8f0;
+    }
+
+    .tip-title {
+        color: #f7fafc;
+    }
+
+    .tip-message {
+        color: #cbd5e0;
+    }
+
+    .tip-action-btn {
+        background: rgba(255, 255, 255, 0.1);
+        color: #a0aec0;
+    }
+
+    .tip-action-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+        color: #e2e8f0;
+    }
+}
+
+/* ===== 减少动画模式支持 ===== */
+@media (prefers-reduced-motion: reduce) {
+    .smart-tip {
+        transition: none;
+    }
+
+    .smart-tip.tip-high {
+        animation: none;
+    }
+
+    .tip-action-btn:hover {
+        transform: none;
+    }
+}
+
+/* ===== 引导设置界面样式 ===== */
+.settings-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.settings-toggle input[type="checkbox"] {
+    display: none;
+}
+
+.toggle-slider {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background: #ccc;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.settings-toggle input[type="checkbox"]:checked + .toggle-slider {
+    background: var(--primary-color, #007bff);
+}
+
+.settings-toggle input[type="checkbox"]:checked + .toggle-slider::before {
+    transform: translateX(20px);
+}
+
+.settings-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid var(--border-color, #dee2e6);
+    color: var(--text-secondary, #6c757d);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-outline:hover {
+    background: var(--bg-hover, #f8f9fa);
+    border-color: var(--primary-color, #007bff);
+    color: var(--primary-color, #007bff);
+}
+
+.tutorial-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    background: var(--bg-secondary, #f8f9fa);
+    border-radius: 8px;
+    border: 1px solid var(--border-light, #e9ecef);
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+}
+
+.stat-label {
+    color: var(--text-secondary, #6c757d);
+}
+
+.stat-value {
+    font-weight: 600;
+    color: var(--primary-color, #007bff);
+    background: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border-light, #e9ecef);
+}
+
+.settings-section {
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-light, #e9ecef);
+}
+
+.settings-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.settings-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary, #212529);
+    margin-bottom: 16px;
+}
+
+.settings-title i {
+    color: var(--primary-color, #007bff);
+}
+
+.settings-item {
+    margin-bottom: 16px;
+}
+
+.settings-item:last-child {
+    margin-bottom: 0;
+}
+
+.settings-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 14px;
+    color: var(--text-primary, #212529);
+}
+
+.settings-label > span {
+    flex: 1;
+    line-height: 1.4;
+}
+
+.settings-select {
+    padding: 6px 12px;
+    border: 1px solid var(--border-color, #dee2e6);
+    border-radius: 6px;
+    background: white;
+    font-size: 13px;
+    color: var(--text-primary, #212529);
+    cursor: pointer;
+    min-width: 140px;
+}
+
+.settings-select:focus {
+    outline: none;
+    border-color: var(--primary-color, #007bff);
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+/* ===== 响应式设计 ===== */
+@media (max-width: 768px) {
+    .settings-label {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .settings-actions {
+        justify-content: stretch;
+    }
+
+    .btn-outline {
+        flex: 1;
+        justify-content: center;
+    }
+
+    .tutorial-stats {
+        padding: 8px;
+    }
+
+    .stat-item {
+        font-size: 12px;
+    }
+}
+
+/* ===== 深色模式支持 ===== */
+@media (prefers-color-scheme: dark) {
+    .toggle-slider {
+        background: #4a5568;
+    }
+
+    .btn-outline {
+        border-color: rgba(255, 255, 255, 0.2);
+        color: #a0aec0;
+    }
+
+    .btn-outline:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: var(--primary-color, #007bff);
+        color: var(--primary-color, #007bff);
+    }
+
+    .tutorial-stats {
+        background: #2d3748;
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .stat-value {
+        background: #4a5568;
+        border-color: rgba(255, 255, 255, 0.1);
+        color: #e2e8f0;
+    }
+
+    .settings-select {
+        background: #2d3748;
+        border-color: rgba(255, 255, 255, 0.2);
+        color: #e2e8f0;
+    }
+
+    .settings-title {
+        color: #f7fafc;
+    }
+
+    .settings-label {
+        color: #e2e8f0;
+    }
+
+    .stat-label {
+        color: #a0aec0;
+    }
+}

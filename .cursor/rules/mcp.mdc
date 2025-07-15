@@ -5,6 +5,11 @@ alwaysApply: true
 ---
 # MCP (Message Control & Processing) 服务调用规范
 
+
+## 重要：用户身份标识
+当前用户ID: 588ac5c2268187ce
+**调用任何smart-promptor-mcp服务时，必须在context参数中包含用户ID！**
+
 **当你修改代码的时候，需要按照code_modification_plan.md的规划进行修改（如果存在）**
 ## 引言
 本规范旨在明确 MCP (Message Control & Processing) 服务的统一调用标准与 SOP（Standard Operating Procedure），确保 Cursor 在与 MCP 服务交互过程中的一致性、可靠性与合规性。所有涉及 MCP 服务的开发与集成工作，均须严格遵守本规范。
