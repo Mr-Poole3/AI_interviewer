@@ -600,8 +600,13 @@ class TutorialGuideSystem {
     /**
      * 跳过引导
      */
-    skipTutorial() {
-        if (confirm('确定要跳过新手引导吗？您可以稍后在设置中重新开启。')) {
+    async skipTutorial() {
+        const confirmed = await notificationSystem.confirm(
+            '跳过引导',
+            '确定要跳过新手引导吗？您可以稍后在设置中重新开启。',
+            { type: 'info', confirmText: '跳过', cancelText: '继续引导' }
+        );
+        if (confirmed) {
             this.endTutorial();
             localStorage.setItem(this.STORAGE_KEYS.SKIP_TUTORIALS, 'true');
         }
@@ -624,16 +629,6 @@ class TutorialGuideSystem {
         
         // 清除进度
         localStorage.removeItem(this.STORAGE_KEYS.TUTORIAL_PROGRESS);
-    }
-    
-    /**
-     * 显示完成消息
-     */
-    showCompletionMessage() {
-        // 这里可以显示一个漂亮的完成动画或消息
-        setTimeout(() => {
-            alert('🎉 恭喜！您已完成新手引导。现在可以开始使用AI面试系统了！');
-        }, 500);
     }
     
     /**

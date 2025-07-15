@@ -955,7 +955,7 @@ class AzureVoiceChat {
         
         // 检查连接状态
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-            alert('正在连接语音服务，请稍候...');
+            notificationSystem.serviceConnecting('语音');
             return;
         }
         
@@ -1575,7 +1575,7 @@ class AzureVoiceChat {
         if (typeof showNotification === 'function') {
             showNotification('错误', message, 'error');
         } else {
-            alert(message);
+            notificationSystem.error('错误', message);
         }
     }
 
@@ -2014,7 +2014,7 @@ class AzureVoiceChat {
      */
     showFullHtmlReport(evaluation) {
         if (!evaluation.full_evaluation_html) {
-            alert('完整HTML报告不可用');
+            notificationSystem.error('报告不可用', '完整HTML报告不可用');
             return;
         }
 
@@ -2035,7 +2035,7 @@ class AzureVoiceChat {
      */
     downloadHtmlReport(evaluation) {
         if (!evaluation.full_evaluation_html) {
-            alert('HTML报告不可用');
+            notificationSystem.error('报告不可用', 'HTML报告不可用');
             return;
         }
 
@@ -2097,7 +2097,7 @@ class AzureVoiceChat {
         try {
             // 检查PDF导出器是否可用
             if (!window.pdfExporter) {
-                alert('PDF导出功能未初始化，请刷新页面重试。');
+                notificationSystem.error('功能异常', 'PDF导出功能未初始化，请刷新页面重试。');
                 return;
             }
 
@@ -2662,17 +2662,21 @@ class HistoryManager {
 
 
 
-    deleteInterview(id) {
-        if (confirm('确定要删除这条面试记录吗？')) {
+    async deleteInterview(id) {
+        const confirmed = await notificationSystem.confirmDelete('这条面试记录');
+        if (confirmed) {
             this.storageManager.deleteInterview(id);
             this.refreshHistoryList();
+            notificationSystem.operationSuccess('删除面试记录');
         }
     }
 
-    clearHistory() {
-        if (confirm('确定要清空所有面试记录吗？此操作不可恢复。')) {
+    async clearHistory() {
+        const confirmed = await notificationSystem.confirmClear('所有面试记录');
+        if (confirmed) {
             this.storageManager.clearInterviews();
             this.refreshHistoryList();
+            notificationSystem.operationSuccess('清空面试记录');
         }
     }
     async startEvaluation(interviewId) {
@@ -2680,7 +2684,7 @@ class HistoryManager {
         let interviewToEvaluate = interviews.find(item => item.id === interviewId);
 
         if (!interviewToEvaluate || !interviewToEvaluate.messages) {
-            alert("错误：未找到面试记录或对话消息。");
+            notificationSystem.error("数据错误", "未找到面试记录或对话消息。");
             return;
         }
 
@@ -2702,7 +2706,7 @@ class HistoryManager {
                 }
                 this.displayCompleteEvaluation(interviewToEvaluate);
             } else {
-                alert(`该面试记录已评估，评分：${interviewToEvaluate.score || '未知'}分`);
+                notificationSystem.info('已评估', `该面试记录已评估，评分：${interviewToEvaluate.score || '未知'}分`);
             }
             return;
         }
@@ -4177,12 +4181,12 @@ class ResumeManager {
         const maxSize = 10 * 1024 * 1024; // 10MB
 
         if (!allowedTypes.includes(file.type)) {
-            alert('请选择PDF或Word文档格式的文件');
+            notificationSystem.error('文件格式错误', '请选择PDF或Word文档格式的文件');
             return false;
         }
 
         if (file.size > maxSize) {
-            alert('文件大小不能超过10MB');
+            notificationSystem.error('文件过大', '文件大小不能超过10MB');
             return false;
         }
 
@@ -4298,24 +4302,25 @@ class ResumeManager {
             successMessage += `\n已设置意向岗位：${jobInfo.fullLabel}`;
         }
 
-        alert(successMessage);
+        notificationSystem.success('上传成功', successMessage);
     }
 
     handleUploadError(errorMessage) {
-        alert(`简历上传失败: ${errorMessage}`);
+        notificationSystem.fileUploadError(errorMessage);
     }
 
-    removeResume() {
-        if (confirm('确定要删除当前简历吗？')) {
+    async removeResume() {
+        const confirmed = await notificationSystem.confirmDelete('当前简历');
+        if (confirmed) {
             this.storageManager.removeCurrentResume();
             // 清除缓存的完整内容
             this.cachedFullContent = null;
             this.refreshResumeInfo();
-            
+
             // 通知主应用简历已删除
             window.dispatchEvent(new CustomEvent('resumeRemoved'));
-            
-            alert('简历已删除');
+
+            notificationSystem.operationSuccess('删除简历');
         }
     }
 
@@ -5239,9 +5244,9 @@ function initializeApp() {
     // 网络状态监听
     onNetworkChange((isOnline) => {
         if (isOnline) {
-            showNotification('网络连接', '网络连接已恢复', 'success', 3000);
+            notificationSystem.networkOnline();
         } else {
-            showNotification('网络断开', '网络连接已断开，请检查网络设置', 'warning', 0);
+            notificationSystem.networkOffline();
         }
     });
     

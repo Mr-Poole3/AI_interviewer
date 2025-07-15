@@ -8,9 +8,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#667eea">
     <title>AI智能面试官 - 专业语音面试系统</title>
-    <link rel="stylesheet" href="/static/style.css?v=2024010103">
-    <link rel="stylesheet" href="/static/evaluation-styles.css?v=2024010103">
-    <link rel="stylesheet" href="/static/tutorial-guide.css?v=2024010103">
+    <link rel="stylesheet" href="/static/css/style.css?v=2024010103">
+    <link rel="stylesheet" href="/static/css/evaluation-styles.css?v=2024010103">
+    <link rel="stylesheet" href="/static/css/tutorial-guide.css?v=2024010103">
+    <link rel="stylesheet" href="/static/css/notification-system.css?v=2024010103">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💼</text></svg>">
     <!-- Lottie动画库 -->
     <script
@@ -795,7 +796,7 @@
         }, 1000);
     </script>
     <!-- PDF导出模块 -->
-    <script src="/static/pdf-export.js"></script>
+    <script src="/static/js/modules/pdf-export.js"></script>
     <!-- 新手引导系统 -->
     <!-- 简历详情抽屉Modal -->
     <div class="resume-drawer-modal" id="resumeDrawerModal" style="display: none;">
@@ -830,11 +831,13 @@
 
     <!-- Markdown解析库 -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    
-    <script src="/static/tutorial-guide.js?v=2024010103"></script>
+
+    <!-- 统一通知系统 -->
+    <script src="/static/js/core/notification-system.js?v=2024010103"></script>
+    <script src="/static/js/modules/tutorial-guide.js?v=2024010103"></script>
     <!-- 智能提示系统 -->
-    <script src="/static/smart-tips.js?v=2024010103"></script>
-    <script src="/static/voice-call.js?v=2024010103"></script>
-    <script src="/static/app.js?v=2024010103"></script>
+    <script src="/static/js/modules/smart-tips.js?v=2024010103"></script>
+    <script src="/static/js/core/voice-call.js?v=2024010103"></script>
+    <script src="/static/js/core/app.js?v=2024010103"></script>
 </body>
 </html> 
