@@ -447,6 +447,10 @@ class TutorialGuideSystem {
      */
     updateTooltipPosition(step) {
         if (!step) {
+            if (!this.currentTutorial) {
+                console.warn('⚠️ 没有活动的教程，无法更新工具栏位置');
+                return;
+            }
             step = this.currentTutorial.steps[this.currentStep];
         }
         
@@ -500,6 +504,11 @@ class TutorialGuideSystem {
      * 更新进度显示
      */
     updateProgress() {
+        if (!this.currentTutorial) {
+            console.warn('⚠️ 没有活动的教程，无法更新进度显示');
+            return;
+        }
+        
         const stepCounter = this.tooltip.querySelector('.step-counter');
         const progressFill = this.tooltip.querySelector('.progress-fill');
         
@@ -515,6 +524,11 @@ class TutorialGuideSystem {
      * 更新按钮状态
      */
     updateButtonStates() {
+        if (!this.currentTutorial) {
+            console.warn('⚠️ 没有活动的教程，无法更新按钮状态');
+            return;
+        }
+        
         const prevBtn = this.tooltip.querySelector('[data-action="prev"]');
         const nextBtn = this.tooltip.querySelector('[data-action="next"]');
         const completeBtn = this.tooltip.querySelector('[data-action="complete"]');
@@ -561,6 +575,11 @@ class TutorialGuideSystem {
      * 下一步
      */
     nextStep() {
+        if (!this.currentTutorial) {
+            console.warn('⚠️ 没有活动的教程，无法执行下一步');
+            return;
+        }
+        
         if (this.currentStep < this.currentTutorial.steps.length - 1) {
             this.showStep(this.currentStep + 1);
         }
@@ -570,16 +589,25 @@ class TutorialGuideSystem {
      * 完成引导
      */
     completeTutorial() {
+        // 保存当前教程信息，避免 endTutorial() 后丢失
+        const currentTutorial = this.currentTutorial;
+        
+        // 检查当前教程是否存在
+        if (!currentTutorial) {
+            console.warn('⚠️ 没有活动的教程可以完成');
+            return;
+        }
+        
         this.endTutorial();
         
         // 标记为已完成
         localStorage.setItem(this.STORAGE_KEYS.TUTORIAL_COMPLETED, 'true');
-        localStorage.setItem(`tutorial_${this.currentTutorial.id}_completed`, 'true');
+        localStorage.setItem(`tutorial_${currentTutorial.id}_completed`, 'true');
         
         // 显示完成提示
         this.showCompletionMessage();
         
-        console.log(`✅ 引导教程完成: ${this.currentTutorial.title}`);
+        console.log(`✅ 引导教程完成: ${currentTutorial.title}`);
     }
     
     /**
@@ -626,6 +654,11 @@ class TutorialGuideSystem {
      * 保存引导进度
      */
     saveProgress() {
+        if (!this.currentTutorial) {
+            console.warn('⚠️ 没有活动的教程，无法保存进度');
+            return;
+        }
+        
         const progress = {
             tutorialId: this.currentTutorial.id,
             currentStep: this.currentStep,

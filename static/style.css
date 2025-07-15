@@ -21,6 +21,15 @@
     --error-color: #ef4444;
     --error-light: #fee2e2;
     
+    /* 信息色 - 蓝色 */
+    --info-color: #3b82f6;
+    --info-light: #eff6ff;
+    --info-dark: #1e40af;
+    
+    /* 禁用状态 */
+    --bg-disabled: #f3f4f6;
+    --text-disabled: #9ca3af;
+    
     /* 中性色 */
     --gray-50: #f9fafb;
     --gray-100: #f3f4f6;
@@ -84,11 +93,15 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-light) var(--bg-secondary);
 }
 
 html {
     font-size: 16px;
     scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%; /* 防止iOS Safari自动调整文字大小 */
+    -ms-text-size-adjust: 100%;
 }
 
 body {
@@ -1249,10 +1262,129 @@ body {
     gap: var(--spacing-xl);
 }
 
+/* 岗位意向容器样式 */
+.job-preference-container {
+    background: var(--bg-primary);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--border-light);
+    overflow: hidden;
+}
+
+.job-preference-container .preference-header {
+    padding: var(--spacing-lg);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    text-align: center;
+}
+
+.job-preference-container .preference-header h2 {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-md);
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0 0 var(--spacing-sm) 0;
+}
+
+.job-preference-container .preference-header p {
+    margin: 0;
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.job-preference-container .preference-content {
+    padding: var(--spacing-xl);
+}
+
+.job-preference-container .preference-selectors {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+.job-preference-container .selector-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.job-preference-container .selector-group label {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.job-preference-container .selector-group label i {
+    color: var(--primary-color);
+    font-size: 0.875rem;
+}
+
+.job-preference-container .preference-select {
+    padding: var(--spacing-md);
+    border: 2px solid var(--border-light);
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
+    background: white;
+    color: var(--text-primary);
+    transition: all var(--transition-normal);
+}
+
+.job-preference-container .preference-select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.job-preference-container .preference-select:disabled {
+    background: var(--bg-disabled);
+    color: var(--text-disabled);
+    cursor: not-allowed;
+}
+
+.job-preference-container .preference-tips {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    background: var(--info-light);
+    border-radius: var(--radius-md);
+    color: var(--info-dark);
+    font-size: 0.875rem;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.job-preference-container .preference-tips i {
+    color: var(--info-color);
+    font-size: 1rem;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .job-preference-container .preference-selectors {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+    
+    .job-preference-container .preference-content {
+        padding: var(--spacing-lg);
+    }
+    
+    .job-preference-container .preference-header {
+        padding: var(--spacing-md);
+    }
+}
+
 .resume-section {
     background: var(--bg-primary);
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-md);
+    border: 1px solid var(--border-light);
     overflow: hidden;
 }
 
@@ -1470,118 +1602,115 @@ body {
 .tool-link-btn i {
     margin-right: var(--spacing-sm);
     font-size: 0.875rem;
-/* 岗位意向选择区域 */
-.job-preference-section {
-    padding: var(--spacing-lg);
-    border-bottom: 1px solid var(--border-light);
-    background: var(--bg-secondary);
 }
 
-.preference-header {
-    margin-bottom: var(--spacing-lg);
+/* ===== 已移除旧的岗位意向样式，现在使用独立的job-preference-container样式 ===== */
+
+/* 上传进度样式 */
+.upload-progress {
+    text-align: center;
+    padding: var(--spacing-2xl);
+    background: var(--bg-primary);
+    border-radius: var(--radius-lg);
 }
 
-.preference-header h3 {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin: 0 0 var(--spacing-sm) 0;
+.loading-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid var(--border-light);
+    border-top: 4px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto var(--spacing-lg);
 }
 
-.preference-header h3 i {
-    color: var(--primary-color);
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
-.preference-header p {
+.upload-progress p {
     color: var(--text-secondary);
-    font-size: 0.9rem;
-    margin: 0;
-    line-height: 1.5;
+    font-size: 1rem;
 }
 
-.preference-selectors {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-lg);
-    margin-bottom: var(--spacing-md);
+/* 简历操作按钮 */
+.resume-actions {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-lg);
+    justify-content: flex-end;
 }
 
+.preview-expand {
+    margin-top: var(--spacing-md);
+    text-align: center;
+}
+
+.expand-btn {
+    background: none;
+    border: 1px solid var(--primary-color);
+    color: var(--primary-color);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.expand-btn:hover {
+    background: var(--primary-color);
+    color: white;
+}
+
+/* 文件输入隐藏 */
+.file-input {
+    position: absolute;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    z-index: 1;
+}
+
+/* 响应式调整 */
 @media (max-width: 768px) {
-    .preference-selectors {
+    .job-categories {
         grid-template-columns: 1fr;
         gap: var(--spacing-md);
     }
+    
+    .job-positions {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: var(--spacing-xs);
+    }
+    
+    .job-position {
+        padding: var(--spacing-xs) var(--spacing-sm);
+        font-size: 0.8rem;
+    }
+    
+    .category-header {
+        flex-direction: column;
+        text-align: center;
+        gap: var(--spacing-sm);
+    }
+    
+    .category-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 1.25rem;
+    }
 }
 
-.selector-group {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
+@media (max-width: 480px) {
+    .resume-actions {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
 }
 
-.selector-group label {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    font-weight: 500;
-    color: var(--text-primary);
-    font-size: 0.9rem;
-}
-
-.selector-group label i {
-    color: var(--primary-color);
-    font-size: 0.8rem;
-}
-
-.preference-select {
-    padding: var(--spacing-md);
-    border: 1px solid var(--border-medium);
-    border-radius: var(--radius-md);
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    font-size: 0.9rem;
-    transition: all var(--transition-normal);
-    cursor: pointer;
-}
-
-.preference-select:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px var(--primary-light);
-}
-
-.preference-select:disabled {
-    background: var(--bg-disabled);
-    color: var(--text-disabled);
-    cursor: not-allowed;
-    opacity: 0.6;
-}
-
-.preference-select option {
-    padding: var(--spacing-sm);
-    background: var(--bg-primary);
-    color: var(--text-primary);
-}
-
-.preference-tips {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-md);
-    background: var(--info-light);
-    border: 1px solid var(--info-color);
-    border-radius: var(--radius-md);
-    font-size: 0.85rem;
-    color: var(--info-dark);
-}
-
-.preference-tips i {
-    color: var(--info-color);
-    flex-shrink: 0;
-}
+/* 已移除旧的preference-tips样式，现在使用job-preference-container内的样式 */
 
 /* 上传区域 */
 .upload-zone {
@@ -2761,11 +2890,6 @@ body {
 }
 
 /* Firefox */
-* {
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-light) var(--bg-secondary);
-}
-
 /* ===== 设置面板通用样式 ===== */
 .voice-control-btn.settings-btn {
     background: var(--gray-600);
@@ -4802,11 +4926,7 @@ body {
 
 /* ===== 移动端响应式优化 ===== */
 
-/* 移动端基础修复 */
-html {
-    -webkit-text-size-adjust: 100%; /* 防止iOS Safari自动调整文字大小 */
-    -ms-text-size-adjust: 100%;
-}
+/* 移动端基础修复已合并到主html选择器中 */
 
 /* 安全区域支持 */
 .app-container {
@@ -5486,3 +5606,4 @@ html {
         -webkit-tap-highlight-color: transparent;
     }
 }
+

@@ -3561,25 +3561,28 @@ class ResumeManager {
     }
 
     init() {
-        // 来自 07.09_TEST 分支的初始化
+        // 基本元素初始化
         this.resumeContent = document.getElementById('resumeContent');
         this.resumeSectionTitle = document.getElementById('resumeSectionTitle');
         this.sectionActions = document.getElementById('sectionActions');
         this.uploadTips = document.getElementById('uploadTips');
 
-        // 来自 add_evaluation 分支的初始化
-        this.fileInput = document.getElementById('resumeFileInput');
-        this.uploadArea = document.getElementById('resumeFileUploadArea');
-        this.resumeInfo = document.getElementById('resumeInfo');
+        // 岗位意向元素初始化（现在是固定的HTML元素）
         this.jobCategory = document.getElementById('jobCategory');
         this.jobPosition = document.getElementById('jobPosition');
 
+        // 动态元素引用（这些元素会在showNoResume()中创建）
+        this.fileInput = null;
+        this.uploadArea = null;
+        this.resumeInfo = null;
+
         // 绑定事件方法
         this.bindDrawerEvents();
-        this.bindResumeEvents();
+        
+        // 绑定岗位意向事件（现在岗位意向元素是固定的）
         this.bindJobPreferenceEvents();
-
-        // 加载保存的作业偏好
+        
+        // 加载保存的岗位偏好
         this.loadSavedJobPreference();
 
         // 刷新简历信息
@@ -3771,12 +3774,8 @@ class ResumeManager {
     createResumeInfoHTML(resumeData) {
         const uploadDate = new Date(resumeData.uploadedAt).toLocaleString('zh-CN');
 
-        // 获取当前岗位偏好信息
-        const currentJobInfo = this.getSelectedJobInfo();
-        const jobPreferenceFromResume = resumeData.jobPreference;
-
-        // 优先使用当前选择的岗位偏好，其次使用简历中保存的
-        const jobPreference = currentJobInfo.fullLabel ? currentJobInfo : jobPreferenceFromResume;
+        // 显示简历信息时，直接使用简历中保存的岗位偏好
+        const jobPreference = resumeData.jobPreference;
 
         let jobPreferenceHTML = '';
         if (jobPreference && (jobPreference.full_label || jobPreference.fullLabel)) {
@@ -3862,11 +3861,17 @@ class ResumeManager {
             drawerContainer.addEventListener('click', (e) => {
                 e.stopPropagation();
             });
+        }
+    }
           
     /**
      * 绑定岗位偏好事件
      */
     bindJobPreferenceEvents() {
+        // 动态获取岗位选择元素
+        this.jobCategory = document.getElementById('jobCategory');
+        this.jobPosition = document.getElementById('jobPosition');
+
         // 行业大类选择事件
         if (this.jobCategory) {
             this.jobCategory.addEventListener('change', (e) => {

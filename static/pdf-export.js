@@ -308,17 +308,6 @@ class PDFExporter {
 
         const html2canvasAvailable = typeof window.html2canvas !== 'undefined' || typeof html2canvas !== 'undefined';
 
-        console.log('PDF库状态检查:');
-        console.log('- window.jsPDF:', typeof window.jsPDF);
-        console.log('- window.jspdf:', typeof window.jspdf);
-        console.log('- window.JSPDF:', typeof window.JSPDF);
-        console.log('- global jsPDF:', typeof jsPDF);
-        console.log('- global jspdf:', typeof jspdf);
-        console.log('- window.html2canvas:', typeof window.html2canvas);
-        console.log('- global html2canvas:', typeof html2canvas);
-        console.log('- jsPDFAvailable:', jsPDFAvailable);
-        console.log('- html2canvasAvailable:', html2canvasAvailable);
-        console.log('- isLibrariesLoaded:', this.isLibrariesLoaded);
 
         if (jsPDFAvailable && jsPDFRef) {
             try {

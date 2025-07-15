@@ -13,7 +13,6 @@
     <link rel="stylesheet" href="/static/tutorial-guide.css?v=2024010103">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💼</text></svg>">
     <!-- Lottie动画库 -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script
       src="https://unpkg.com/@dotlottie/player-component@2.7.12/dist/dotlottie-player.mjs"
       type="module"
@@ -390,39 +389,17 @@
                     
                     <!-- 统一的简历管理界面 -->
                     <div class="resume-manager">
-                        <!-- 合并后的简历区域 -->
-                        <div class="resume-section">
-                            <div class="section-header">
-                                 <div class="section-title">
-                                    <h2>
-                                        <i class="fas fa-file-check"></i>
-                                        <span id="resumeSectionTitle">简历管理</span>
-                                    </h2>
-                                </div>
-                                <div class="section-actions" id="sectionActions">
-                                    <!-- 动态操作按钮将在这里显示 -->
-                            </div>
-                        </div>
-
-                        <!-- 简历上传区域 -->
-                        <div class="resume-section">
-                            <div class="section-header">
+                        <!-- 岗位意向容器 - 独立的容器 -->
+                        <div class="job-preference-container">
+                            <div class="preference-header">
                                 <h2>
-                                    <i class="fas fa-cloud-upload-alt"></i>
-                                    上传简历
+                                    <i class="fas fa-bullseye"></i>
+                                    岗位意向设置
                                 </h2>
+                                <p>选择您的意向岗位类别，让AI面试官为您提供更精准的面试体验</p>
                             </div>
 
-                            <!-- 岗位意向选择 -->
-                            <div class="job-preference-section">
-                                <div class="preference-header">
-                                    <h3>
-                                        <i class="fas fa-bullseye"></i>
-                                        岗位意向
-                                    </h3>
-                                    <p>请选择您的意向岗位类别，以便AI面试官为您提供更精准的面试体验</p>
-                                </div>
-
+                            <div class="preference-content">
                                 <div class="preference-selectors">
                                     <div class="selector-group">
                                         <label for="jobCategory">
@@ -465,29 +442,27 @@
                                     <span>选择岗位意向后，AI面试官将根据该岗位的要求进行针对性面试</span>
                                 </div>
                             </div>
-
-                            <div class="upload-zone" id="resumeFileUploadArea">
-                                <div class="upload-content">
-                                    <div class="upload-icon">
-                                        <i class="fas fa-cloud-upload-alt"></i>
-                                    </div>
-                                    <div class="upload-text">
-                                        <h3>拖拽简历文件到此处</h3>
-                                        <p>或点击选择文件上传</p>
-                                        <div class="upload-formats">
-                                            <span class="format-tag">PDF</span>
-                                            <span class="format-tag">DOC</span>
-                                            <span class="format-tag">DOCX</span>
-                                        </div>
-                                    </div>
-                                    <input type="file" id="resumeFileInput" class="file-input" accept=".pdf,.doc,.docx" />
+                        </div>
+                        
+                        <!-- 简历状态显示区域 -->
+                        <div class="resume-section">
+                            <div class="section-header">
+                                <div class="section-title">
+                                    <h2>
+                                        <i class="fas fa-file-check"></i>
+                                        <span id="resumeSectionTitle">简历管理</span>
+                                    </h2>
+                                </div>
+                                <div class="section-actions" id="sectionActions">
+                                    <!-- 动态操作按钮将在这里显示 -->
                                 </div>
                             </div>
+                            
                             <div class="resume-content" id="resumeContent">
                                 <!-- 动态内容将在这里显示 -->
                             </div>
                         </div>
-                        
+
                         <!-- 上传提示 -->
                         <div class="upload-tips" id="uploadTips">
                             <h4>
@@ -853,7 +828,7 @@
     
     <script src="/static/tutorial-guide.js?v=2024010103"></script>
     <!-- 智能提示系统 -->
-    <script src="/static/smart-tips.js?v=2024010103"></script></script>
+    <script src="/static/smart-tips.js?v=2024010103"></script>
     <script src="/static/voice-call.js?v=2024010103"></script>
     <script src="/static/app.js?v=2024010103"></script>
 </body>
