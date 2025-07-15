@@ -610,10 +610,7 @@
                     <i class="fas fa-microphone-slash mic-off-icon" style="display: none;"></i>
                 </button>
                 
-                <!-- VAD设置按钮 -->
-                <button class="voice-control-btn settings-btn" id="vadSettingsButton" title="语音检测设置">
-                    <i class="fas fa-cog"></i>
-                </button>
+
                 
                 <!-- 结束通话按钮 -->
                 <button class="voice-control-btn end-btn" id="endCallButton" title="结束通话">
@@ -622,48 +619,7 @@
             </div>
             </div>
             
-            <!-- VAD设置面板 -->
-            <div class="vad-settings-panel" id="vadSettingsPanel" style="display: none;">
-                <div class="settings-header">
-                    <h3>语音检测设置</h3>
-                    <button class="close-settings" id="closeVadSettings">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="settings-content">
-                    <div class="setting-group">
-                    <label for="vadThreshold">检测敏感度</label>
-                        <div class="slider-container">
-                        <input type="range" id="vadThreshold" min="0.1" max="1.0" step="0.1" value="0.5">
-                        <span class="slider-value" id="vadThresholdValue">0.5</span>
-                    </div>
-                    <p class="setting-description">调整语音检测的敏感度，值越小越敏感</p>
-                    </div>
-                    
-                    <div class="setting-group">
-                    <label for="vadSilenceDuration">静音检测时长</label>
-                        <div class="slider-container">
-                        <input type="range" id="vadSilenceDuration" min="500" max="3000" step="100" value="1000">
-                        <span class="slider-value" id="vadSilenceDurationValue">1000ms</span>
-                    </div>
-                    <p class="setting-description">检测到静音后等待多长时间停止录音</p>
-                    </div>
-                    
-                    <div class="setting-group">
-                    <label for="vadPrefixPadding">前缀填充时长</label>
-                        <div class="slider-container">
-                        <input type="range" id="vadPrefixPadding" min="100" max="1000" step="50" value="300">
-                        <span class="slider-value" id="vadPrefixPaddingValue">300ms</span>
-                    </div>
-                    <p class="setting-description">在检测到语音前包含的音频时长</p>
-                    </div>
-                    
-                    <div class="settings-actions">
-                        <button class="btn-secondary" id="resetVadSettings">重置默认</button>
-                        <button class="btn-primary" id="applyVadSettings">应用设置</button>
-                </div>
-            </div>
-        </div>
+
     </div>
     <div id="evaluationModal" class="modal" style="display: none;">
         <div class="modal-content">

@@ -3425,6 +3425,20 @@ body {
     animation: spin 1s linear infinite;
 }
 
+/* 🔥 关键修复：确保disabled按钮不响应hover和点击 */
+.evaluating-btn:disabled,
+.evaluating-btn[disabled] {
+    pointer-events: none;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.evaluating-btn:disabled:hover,
+.evaluating-btn[disabled]:hover {
+    background: rgba(245, 158, 11, 0.1) !important;
+    transform: none !important;
+}
+
 .retry-evaluation-btn {
     background: rgba(239, 68, 68, 0.1);
     color: #ef4444;
@@ -3462,6 +3476,16 @@ body {
     }
     100% {
         transform: rotate(360deg);
+    }
+}
+
+/* 🔥 新增：shimmer动画用于evaluating按钮 */
+@keyframes shimmer {
+    0% {
+        left: -100%;
+    }
+    100% {
+        left: 100%;
     }
 }
 

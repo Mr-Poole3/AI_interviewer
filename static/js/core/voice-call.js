@@ -1761,6 +1761,11 @@ class VoiceCallManager {
                 interview.evaluationStartTime = new Date().toISOString();
                 this.storageManager.saveInterview(interview);
                 this.logMessage(`面试记录 ${interviewId} 标记为评分中`);
+                
+                // 🔥 关键修复：立即刷新历史记录显示，禁用按钮
+                if (window.app && window.app.historyManager) {
+                    window.app.historyManager.refreshHistoryList();
+                }
             }
         } catch (error) {
             this.logMessage(`标记评分状态失败: ${error.message}`);
@@ -1780,6 +1785,11 @@ class VoiceCallManager {
                 interview.evaluationEndTime = new Date().toISOString();
                 this.storageManager.saveInterview(interview);
                 this.logMessage(`面试记录 ${interviewId} 标记为评分失败`);
+                
+                // 🔥 关键修复：刷新历史记录显示，显示重试按钮
+                if (window.app && window.app.historyManager) {
+                    window.app.historyManager.refreshHistoryList();
+                }
             }
         } catch (error) {
             this.logMessage(`标记评分失败状态失败: ${error.message}`);
@@ -1811,6 +1821,11 @@ class VoiceCallManager {
                 // 立即刷新历史记录显示
                 if (window.app && window.app.historyManager) {
                     window.app.historyManager.refreshHistoryList();
+                }
+                
+                // 🔥 关键修复：显示评分完成通知
+                if (window.notificationSystem) {
+                    window.notificationSystem.success('评分完成', '面试评分已完成，可在历史记录中查看详细结果');
                 }
             }
         } catch (error) {

@@ -2728,6 +2728,14 @@ class HistoryManager {
             return;
         }
 
+        // 🔥 关键修复：立即设置评估状态为'evaluating'并刷新界面
+        interviewToEvaluate.evaluationStatus = 'evaluating';
+        interviewToEvaluate.evaluationStartTime = new Date().toISOString();
+        this.storageManager.saveInterview(interviewToEvaluate);
+        
+        // 立即刷新历史列表，禁用按钮
+        this.refreshHistoryList();
+        
         // 显示模态窗口
         if (this.evaluationModal) {
             this.evaluationModal.style.display = 'flex'; // 使用 flex 来居中
@@ -2741,6 +2749,11 @@ class HistoryManager {
 
         // 检查是否已缓存完整评估结果（包含HTML和评分）
         if (interviewToEvaluate.evaluationHtml && interviewToEvaluate.evaluationScore) {
+            // 如果有缓存，直接显示并更新状态为completed
+            interviewToEvaluate.evaluationStatus = 'completed';
+            this.storageManager.saveInterview(interviewToEvaluate);
+            this.refreshHistoryList();
+            
             this.displayCompleteEvaluation(interviewToEvaluate);
             if (this.modalLoadingSpinner) {
                 this.modalLoadingSpinner.style.display = 'none';
@@ -2805,6 +2818,10 @@ class HistoryManager {
                     improvements: analysisResult.risks || [],
                 };
 
+                // 🔥 关键修复：设置评估状态为completed
+                interviewToEvaluate.evaluationStatus = 'completed';
+                interviewToEvaluate.evaluationEndTime = new Date().toISOString();
+                
                 this.storageManager.updateInterview(interviewToEvaluate); // 更新 localStorage 中的记录
 
                 // 使用AzureVoiceChat的showEvaluationResult方法显示结构化评分结果
@@ -2830,6 +2847,13 @@ class HistoryManager {
 
         } catch (error) {
             console.error('面试评估失败:', error);
+            
+            // 🔥 关键修复：设置评估状态为failed
+            interviewToEvaluate.evaluationStatus = 'failed';
+            interviewToEvaluate.evaluationEndTime = new Date().toISOString();
+            interviewToEvaluate.evaluationError = error.message;
+            this.storageManager.saveInterview(interviewToEvaluate);
+            
             if (this.modalActualContent) {
                 this.modalActualContent.innerHTML = `
                     <div class="evaluation-error">
@@ -2842,7 +2866,7 @@ class HistoryManager {
                             <strong>错误详情：</strong> ${error.message}
                         </div>
                         <div class="error-actions">
-                            <button class="btn btn-primary" onclick="window.app.historyManager.startEvaluation('${interviewId}')">
+                            <button class="btn btn-primary" onclick="window.app.historyManager.retryEvaluation('${interviewId}')">
                                 <i class="fas fa-redo"></i> 重试评估
                             </button>
                             <button class="btn btn-secondary" onclick="this.closest('.modal').style.display='none'">
@@ -2862,6 +2886,9 @@ class HistoryManager {
             if (this.modalLoadingSpinner) {
                 this.modalLoadingSpinner.style.display = 'none'; // 隐藏加载指示
             }
+            
+            // 🔥 关键修复：无论成功还是失败，都刷新历史列表以更新按钮状态
+            this.refreshHistoryList();
         }
     }
 
@@ -3103,6 +3130,12 @@ class HistoryManager {
      */
     async triggerEvaluationForInterview(interview) {
         try {
+            // 🔥 关键修复：立即设置评估状态为evaluating并刷新界面
+            interview.evaluationStatus = 'evaluating';
+            interview.evaluationStartTime = new Date().toISOString();
+            this.storageManager.saveInterview(interview);
+            this.refreshHistoryList();
+            
             // 获取简历上下文
             const resumeContext = await this.getResumeContext();
             
@@ -3136,6 +3169,7 @@ class HistoryManager {
                     interview.evaluation = result.evaluation;
                     interview.score = result.evaluation.total_score;
                     interview.evaluationStatus = 'completed';
+                    interview.evaluationEndTime = new Date().toISOString();
                     this.storageManager.saveInterview(interview);
 
                     // 刷新显示
@@ -3154,6 +3188,8 @@ class HistoryManager {
 
             // 标记评分失败
             interview.evaluationStatus = 'failed';
+            interview.evaluationEndTime = new Date().toISOString();
+            interview.evaluationError = error.message;
             this.storageManager.saveInterview(interview);
             this.refreshHistoryList();
 
@@ -3808,7 +3844,6 @@ class ResumeManager {
                 </div>
                 ${jobPreferenceHTML}
                 <div class="resume-preview">
-                    <h5><i class="fas fa-eye"></i> 简历预览</h5>
                     <div class="preview-content">
                         <p class="preview-text">${resumeData.preview}</p>
                         <div class="preview-expand">
@@ -5026,7 +5061,6 @@ function generateResumeCard(resume) {
             </div>
             ${resume.preview ? `
                 <div class="resume-preview">
-                    <h5><i class="fas fa-eye"></i> 简历预览</h5>
                     <div class="preview-content">
                         <p class="preview-text">${resume.preview}</p>
                     </div>
