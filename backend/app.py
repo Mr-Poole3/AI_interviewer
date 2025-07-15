@@ -110,6 +110,7 @@ class InterviewEvaluationService:
             messages = interview_data.get('messages', [])
             resume_context = interview_data.get('resume_context', '')
             duration = interview_data.get('duration', 0)
+            job_preference = interview_data.get('job_preference')
             
             # ===== 详细日志输出：打印原始面试数据 =====
             logger.info("=" * 100)
@@ -119,6 +120,7 @@ class InterviewEvaluationService:
             logger.info(f"消息数量: {len(messages)}")
             logger.info(f"面试时长: {duration} 秒")
             logger.info(f"简历上下文长度: {len(resume_context)} 字符")
+            logger.info(f"岗位偏好信息: {job_preference if job_preference else '未设置'}")
             logger.info("原始消息列表:")
             for i, msg in enumerate(messages):
                 logger.info(f"  消息 {i+1}: type={msg.get('type', 'unknown')}, content_length={len(msg.get('content', ''))}")
@@ -140,6 +142,10 @@ class InterviewEvaluationService:
             evaluation_prompt = get_interview_evaluation_prompt(
                 resume_context=resume_context,
                 conversation_history=conversation_analysis['formatted_conversation'],
+                duration=duration,
+                question_count=conversation_analysis['stats']['interviewer_messages'],
+                answer_count=conversation_analysis['stats']['candidate_messages'],
+                job_preference=job_preference
             )
             
             # 调用DeepSeek V3进行评估
@@ -190,7 +196,7 @@ class InterviewEvaluationService:
         提取面试数据
         
         Args:
-            interview_data: 面试数据，包含对话历史、简历信息等
+            interview_data: 面试数据，包含对话历史、简历信息、岗位偏好等
         Returns:
             dict: 评估结果
         """
@@ -200,21 +206,23 @@ class InterviewEvaluationService:
             # 提取面试信息
             messages = interview_data.get('messages', [])
             resume_context = interview_data.get('resume_context', '')
-            # duration = interview_data.get('duration', 0)
+            job_preference = interview_data.get('job_preference')
             
-            # 分析对话内容
-            # conversation_analysis = self._analyze_conversation(messages)
+            # 记录岗位偏好信息
+            if job_preference:
+                logger.info(f"提取过程包含岗位偏好: {job_preference.get('full_label', job_preference.get('fullLabel', 'N/A'))}")
             
-            # 构建评估prompt
+            # 构建提取prompt
             extraction_prompt = get_interview_extraction_prompt(
                 resume_context=resume_context,
                 conversation_history=str(messages),
+                job_preference=job_preference
             )
             
-            # 调用DeepSeek V3进行评估
+            # 调用DeepSeek V3进行提取
             extraction_result = await self._call_deepseek_evaluation(extraction_prompt)
             
-            # 解析评估结果
+            # 解析提取结果
             parsed_result = self._parse_extraction_result(extraction_result)
             
             # 添加统计信息
@@ -338,6 +346,8 @@ class InterviewEvaluationService:
             'answer_count': answer_count,
             'stats': {
                 'total_exchanges': len(messages),
+                'interviewer_messages': question_count,
+                'candidate_messages': answer_count,
                 'user_word_count': total_user_words,
                 'ai_word_count': total_ai_words,
                 'avg_user_response_length': total_user_words / max(answer_count, 1),
@@ -660,70 +670,6 @@ class InterviewEvaluationService:
         if '建议' in text or '改进' in text:
             return ['继续保持', '深入学习']
         return ['持续提升']
-
-    def _get_fallback_evaluation_result(self, error_message: str) -> dict:
-        """当API调用失败时，返回降级的评估结果"""
-        logger.info("使用降级评估结果")
-
-        fallback_markdown = f"""# 面试评估报告
-
-## 总体评分：75分
-
-## 各维度评分
-
-### 技术能力评估：7/10分
-根据面试对话内容，候选人展现了基本的技术理解能力。
-
-### 沟通表达能力：8/10分
-候选人能够清晰地表达自己的想法，回答问题较为完整。
-
-### 问题解决能力：7/10分
-在面试过程中展现了一定的逻辑思维能力。
-
-### 学习适应能力：7/10分
-表现出积极的学习态度和适应能力。
-
-### 职业素养：8/10分
-面试态度积极，表现出良好的职业素养。
-
-## 优势表现
-- 面试态度积极主动
-- 回答问题思路清晰
-- 具备基本的专业素养
-
-## 改进建议
-- 可以进一步深入技术细节
-- 建议多准备一些项目实例
-- 持续学习新技术和方法
-
-## 面试表现总结
-候选人在面试中表现良好，具备基本的专业能力和素养。建议继续保持积极的学习态度，在技术深度和项目经验方面进一步提升。
-
----
-*注：由于评估服务暂时不可用，此为系统生成的基础评估结果。建议稍后重新进行详细评估。*
-
-**错误信息：** {error_message}
-"""
-
-        return {
-            'success': True,
-            'full_evaluation': fallback_markdown,
-            'total_score': 75,
-            'dimension_scores': {
-                'resume_match': 7,
-                'communication': 8,
-                'problem_solving': 7,
-                'growth_potential': 7,
-                'technical_skills': 8
-            },
-            'summary': '候选人在面试中表现良好，具备基本的专业能力和素养。（系统生成的基础评估）',
-            'strengths': ['面试态度积极主动', '回答问题思路清晰', '具备基本的专业素养'],
-            'improvements': ['可以进一步深入技术细节', '建议多准备一些项目实例', '持续学习新技术和方法'],
-            'conversation_stats': {'total_exchanges': 0, 'user_word_count': 0, 'ai_word_count': 0},
-            'evaluation_timestamp': datetime.now().isoformat(),
-            'model_used': 'Fallback System',
-            'is_fallback': True
-        }
 
 
 class AzureVoiceService:
@@ -1433,6 +1379,7 @@ class InterviewExtractionRequest(BaseModel):
     interview_id: str
     messages: list
     resume_context: str = ""
+    job_preference: dict = None
 
 @app.post("/api/interview/extract")
 async def save_interview_extract_data(request: InterviewExtractionRequest) -> JSONResponse:
@@ -1440,14 +1387,27 @@ async def save_interview_extract_data(request: InterviewExtractionRequest) -> JS
     保存面试数据提取结果
     """
     try:
-        logger.info(f"保存面试数据提取结果: ID={request.interview_id}")
+        
+        # 获取岗位偏好信息（如果请求中没有，尝试从文件加载）
+        job_preference = request.job_preference
+        if not job_preference:
+            # 尝试从session_id推导或其他方式获取岗位偏好
+            # 这里可以根据interview_id尝试获取对应的session_id
+            pass
         
         # 构建面试数据
         interview_data = {
             'id': request.interview_id,
             'resume_context': request.resume_context,
-            'messages': request.messages
+            'messages': request.messages,
+            'job_preference': job_preference
         }
+        
+        # 记录岗位偏好信息
+        if job_preference:
+            logger.info(f"面试数据提取包含岗位偏好: {job_preference.get('full_label', job_preference.get('fullLabel', 'N/A'))}")
+        else:
+            logger.info("面试数据提取未包含岗位偏好信息")
         
         # 调用提取服务
         extraction_result = await evaluation_service.extract_interview(interview_data)
@@ -1461,7 +1421,7 @@ async def save_interview_extract_data(request: InterviewExtractionRequest) -> JS
             "message": "面试数据提取完成"
         })
     except Exception as e:
-        logger.error(f"保存面试数据提取结果失败: {e}")
+        logger.error(f"面试数据提取失败: {e}")
         raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
 
 

@@ -1368,11 +1368,23 @@ class VoiceCallManager {
             };
             const resumeContext = await this.getResumeContext();
             try {
+                // 获取岗位偏好信息
+                const jobPreference = await this.getJobPreference();
+                
                 const extractionRequest = {
                     interview_id: interviewRecord.id,
                     messages: interviewRecord.messages,
                     resume_context: resumeContext || '',
-                };          
+                    job_preference: jobPreference
+                };
+                
+                // 记录岗位偏好信息
+                if (jobPreference) {
+                    this.logMessage(`面试数据提取包含岗位偏好: ${jobPreference.full_label || jobPreference.fullLabel || 'N/A'}`);
+                } else {
+                    this.logMessage('面试数据提取未包含岗位偏好信息');
+                }
+                          
                 // 调用提取API
                 const response = await fetch('/api/interview/extract', {
                     method: 'POST',
@@ -1671,13 +1683,17 @@ class VoiceCallManager {
 
             // 获取简历上下文
             const resumeContext = await this.getResumeContext();
+            
+            // 获取岗位偏好信息
+            const jobPreference = await this.getJobPreference();
 
             // 构建评分请求
             const evaluationRequest = {
                 interview_id: latestInterview.id,
                 messages: latestInterview.messages,
                 resume_context: resumeContext || '',
-                duration: latestInterview.duration || 0
+                duration: latestInterview.duration || 0,
+                job_preference: jobPreference
             };
 
             this.logMessage('开始后台评分处理...');

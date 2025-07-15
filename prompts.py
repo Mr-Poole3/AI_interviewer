@@ -730,7 +730,40 @@ def get_notification_message(message_type, category="success"):
     else:
         return "未知消息"
 
-def get_interview_evaluation_prompt(resume_context=None, conversation_history=None, duration=None, question_count=0, answer_count=0):
+def _build_complete_candidate_context(resume_context=None, job_preference=None):
+    """
+    构建完整的候选人信息上下文，包含简历和岗位偏好
+    
+    Args:
+        resume_context: 简历上下文
+        job_preference: 岗位偏好信息
+    
+    Returns:
+        str: 完整的候选人信息
+    """
+    candidate_info = ""
+    
+    # 添加简历信息
+    if resume_context:
+        candidate_info += f"**简历背景：**\n{resume_context}\n\n"
+    else:
+        candidate_info += "**简历背景：**\n未提供简历信息\n\n"
+    
+    # 添加岗位偏好信息
+    if job_preference:
+        candidate_info += "**意向岗位信息：**\n"
+        candidate_info += f"岗位类别: {job_preference.get('category_label', job_preference.get('categoryLabel', job_preference.get('category', '')))}\n"
+        candidate_info += f"具体岗位: {job_preference.get('position_label', job_preference.get('positionLabel', job_preference.get('position', '')))}\n"
+        candidate_info += f"完整岗位: {job_preference.get('full_label', job_preference.get('fullLabel', ''))}\n"
+        if job_preference.get('updated_at') or job_preference.get('updatedAt'):
+            candidate_info += f"设置时间: {job_preference.get('updated_at', job_preference.get('updatedAt', ''))}\n"
+        candidate_info += "\n"
+    else:
+        candidate_info += "**意向岗位信息：**\n未设置具体意向岗位\n\n"
+    
+    return candidate_info.strip()
+
+def get_interview_evaluation_prompt(resume_context=None, conversation_history=None, duration=None, question_count=0, answer_count=0, job_preference=None):
     """
     获取面试评分提示词
 
@@ -740,6 +773,7 @@ def get_interview_evaluation_prompt(resume_context=None, conversation_history=No
         duration: 面试时长
         question_count: 问题数量
         answer_count: 回答数量
+        job_preference: 岗位偏好信息
 
     Returns:
         str: 完整的面试评分提示词
@@ -748,6 +782,9 @@ def get_interview_evaluation_prompt(resume_context=None, conversation_history=No
     system_prompt = InterviewPrompts.BASE_EVALUATION
 
     if conversation_history:
+        # 构建完整的候选人信息，包含简历和岗位偏好
+        candidate_info = _build_complete_candidate_context(resume_context, job_preference)
+        
         # 添加具体的面试数据
         evaluation_content = f"""
 
@@ -783,29 +820,45 @@ def get_quick_evaluation_prompt(conversation_snippet):
         conversation_snippet=conversation_snippet
     ) 
 
-def get_interview_extraction_prompt(resume_context=None, conversation_history=None):
+def get_interview_extraction_prompt(resume_context=None, conversation_history=None, job_preference=None):
     """
     获取面试数据提取提示词
     
     Args:
         resume_context: 简历上下文
         conversation_history: 对话历史
+        job_preference: 岗位偏好信息
     
     Returns:
         str: 完整的面试数据提取提示词
     """
     system_prompt = """
-    请分析以下对话，提取面试数据，并返回json格式数据，返回要求如下：
+    请分析以下面试对话，提取面试数据，并返回json格式数据。
+
+    **提取要求：**
+    1. 结合候选人的简历背景和意向岗位，准确总结面试内容
+    2. 为面试取一个体现岗位特色的标题
+    3. 重点关注岗位匹配度和技能考察情况
+
+    **返回格式：**
     ```json
     {{
-        "summary": "总结此次面试内容，如：这是一场技术面试，面试官主要考察了候选人的技术能力、沟通能力、逻辑思维能力等。",
-        "title": "请为本场面试取一个简洁的标题，如：xxx（面试者姓名）的xxx（岗位名称）面试",
+        "summary": "总结此次面试内容，如：这是一场xxx岗位的技术面试，面试官主要考察了候选人的xxx技能、xxx能力等，重点关注了xxx方面的经验。",
+        "title": "请为本场面试取一个简洁的标题，如：xxx（面试者姓名）的xxx（岗位名称）面试"
     }}
     ```
     """
     
+    # 构建候选人完整信息
+    candidate_info = _build_complete_candidate_context(resume_context, job_preference)
+    
     extraction_content = f"""
-    简历信息：{resume_context}
-    对话历史：{conversation_history}
+    **候选人信息：**
+    {candidate_info}
+
+    **面试对话记录：**
+    {conversation_history}
+
+    请基于以上信息，结合候选人的背景和意向岗位，提取面试数据并返回JSON格式结果。
     """
     return f"{system_prompt}\n\n{extraction_content}"

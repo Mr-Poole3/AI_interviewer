@@ -230,11 +230,11 @@ class EvaluationStatusManager {
             clearInterval(this.statusCheckInterval);
         }
 
-        // 每30秒检查一次状态
+        // 每10秒检查一次状态，提高实时性
         this.statusCheckInterval = setInterval(() => {
             this.cleanupExpiredStatuses();
             this.checkEvaluatingInterviews();
-        }, 30000);
+        }, 10000);
     }
 
     /**
@@ -2335,6 +2335,11 @@ class HistoryManager {
                 this.router.navigateTo('interview');
             });
         }
+
+        // 页面加载时立即检查评分状态
+        if (this.app && this.app.evaluationStatusManager) {
+            this.app.evaluationStatusManager.checkEvaluatingInterviews();
+        }
     }
 
     // 绑定模态窗口的关闭事件
@@ -2380,6 +2385,11 @@ class HistoryManager {
     }
     
     refreshHistoryList() {
+        // 主动检查评分状态，确保显示最新状态
+        if (this.app && this.app.evaluationStatusManager) {
+            this.app.evaluationStatusManager.checkEvaluatingInterviews();
+        }
+
         const interviews = this.storageManager.getInterviews();
 
         // NEW: Filter interviews first
@@ -2688,8 +2698,15 @@ class HistoryManager {
             return;
         }
 
+        // 检查当前评分状态，防止重复评分
+        const currentStatus = interviewToEvaluate.evaluationStatus;
+        if (currentStatus === 'evaluating') {
+            notificationSystem.info("评分进行中", "该面试记录正在评分中，请稍候...");
+            return;
+        }
+
         // 检查是否已经评估过
-        const hasEvaluation = interviewToEvaluate.evaluation || interviewToEvaluate.score || 
+        const hasEvaluation = interviewToEvaluate.evaluation || interviewToEvaluate.score ||
                              interviewToEvaluate.evaluationMarkdown || interviewToEvaluate.evaluationScore;
         
         if (hasEvaluation) {
@@ -3088,13 +3105,17 @@ class HistoryManager {
         try {
             // 获取简历上下文
             const resumeContext = await this.getResumeContext();
+            
+            // 获取岗位偏好信息
+            const jobPreference = this.getSelectedJobInfo();
 
             // 构建评分请求
             const evaluationRequest = {
                 interview_id: interview.id,
                 messages: interview.messages,
                 resume_context: resumeContext || '',
-                duration: interview.duration || 0
+                duration: interview.duration || 0,
+                job_preference: jobPreference.category && jobPreference.position ? jobPreference : null
             };
 
 
@@ -3528,6 +3549,9 @@ class ResumeManager {
         this.uploadArea = null;
         this.resumeInfo = null;
 
+        // 🔥 关键修复：初始化恢复标志位
+        this.isRestoringPreference = false;
+
         // 绑定事件方法
         this.bindDrawerEvents();
         
@@ -3857,6 +3881,20 @@ class ResumeManager {
     }
 
     handleCategoryChange(category) {
+        // 加载岗位选项
+        this.loadPositionOptions(category);
+
+        // 🔥 关键修复：恢复阶段不触发保存
+        if (!this.isRestoringPreference) {
+            this.saveJobPreference();
+        }
+    }
+
+    /**
+     * 🔥 新增方法：手动加载岗位选项（不触发保存）
+     * @param {string} category - 行业大类
+     */
+    loadPositionOptions(category) {
         const positionSelect = this.jobPosition;
 
         // 清空具体岗位选项
@@ -3880,16 +3918,18 @@ class ResumeManager {
             positionSelect.appendChild(option);
         });
 
-        // 保存选择
-        this.saveJobPreference();
+        console.log(`已加载 ${category} 的岗位选项:`, positions.length, '个');
     }
 
     handlePositionChange(position) {
-        // 保存选择
-        this.saveJobPreference();
+        // 🔥 关键修复：恢复阶段不触发保存
+        if (!this.isRestoringPreference) {
+            this.saveJobPreference();
+        }
 
         // 可以在这里添加其他逻辑，比如显示岗位相关信息
         if (position) {
+            console.log('用户选择了具体岗位:', position);
         }
     }
 
@@ -4048,6 +4088,12 @@ class ResumeManager {
     }
 
     saveJobPreference() {
+        // 🔥 关键修复：恢复阶段不执行保存操作
+        if (this.isRestoringPreference) {
+            console.log('正在恢复岗位偏好，跳过保存操作');
+            return;
+        }
+
         const category = this.jobCategory?.value || '';
         const position = this.jobPosition?.value || '';
 
@@ -4069,6 +4115,7 @@ class ResumeManager {
             this.showJobPreferenceStatus('loading', '正在保存岗位偏好...');
 
             localStorage.setItem('job_preference', JSON.stringify(preference));
+            console.log('岗位偏好已保存到localStorage:', preference);
 
             // 🔥 关键修复：同步更新简历数据中的岗位偏好
             this.syncJobPreferenceToResume(preference);
@@ -4133,28 +4180,56 @@ class ResumeManager {
     loadSavedJobPreference() {
         try {
             const saved = localStorage.getItem('job_preference');
+            console.log('尝试加载岗位偏好:', saved); // 添加调试日志
+            
             if (saved) {
                 const preference = JSON.parse(saved);
+                console.log('解析的岗位偏好:', preference); // 添加调试日志
+
+                // 🔥 关键修复：使用标志位防止恢复过程中触发保存
+                this.isRestoringPreference = true;
 
                 // 恢复行业大类选择
                 if (preference.category && this.jobCategory) {
                     this.jobCategory.value = preference.category;
+                    console.log('已恢复行业大类:', preference.category);
 
-                    // 触发行业大类变化事件来加载具体岗位
-                    this.handleCategoryChange(preference.category);
+                    // 手动加载岗位选项（不触发保存）
+                    this.loadPositionOptions(preference.category);
 
                     // 恢复具体岗位选择
                     if (preference.position && this.jobPosition) {
                         // 等待岗位选项加载完成后再设置值
                         setTimeout(() => {
                             this.jobPosition.value = preference.position;
-                        }, 100);
+                            console.log('已恢复具体岗位:', preference.position);
+                            
+                            // 🔥 恢复完成，清除标志位
+                            this.isRestoringPreference = false;
+                            
+                            // 显示恢复成功的状态
+                            if (preference.fullLabel || (preference.categoryLabel && preference.positionLabel)) {
+                                const fullLabel = preference.fullLabel || `${preference.categoryLabel} - ${preference.positionLabel}`;
+                                this.showJobPreferenceStatus('success', `已恢复岗位偏好：${fullLabel}`);
+                            }
+                        }, 150); // 稍微增加延时确保选项加载完成
+                    } else {
+                        // 没有具体岗位，只恢复了行业大类
+                        this.isRestoringPreference = false;
+                        if (preference.categoryLabel) {
+                            this.showJobPreferenceStatus('success', `已恢复行业类别：${preference.categoryLabel}`);
+                        }
                     }
+                } else {
+                    this.isRestoringPreference = false;
+                    console.log('没有有效的岗位偏好数据可恢复');
                 }
-
+            } else {
+                console.log('没有找到保存的岗位偏好');
             }
         } catch (e) {
             console.error('加载岗位偏好失败:', e);
+            this.isRestoringPreference = false;
         }
     }
 
@@ -4222,13 +4297,21 @@ class ResumeManager {
         try {
             this.showJobPreferenceStatus('loading', '正在清除岗位偏好...');
 
+            // 🔥 关键修复：使用标志位防止清除过程中触发保存
+            this.isRestoringPreference = true;
+
             localStorage.removeItem('job_preference');
+            console.log('已从localStorage清除岗位偏好');
+            
             if (this.jobCategory) this.jobCategory.value = '';
             if (this.jobPosition) {
                 this.jobPosition.value = '';
                 this.jobPosition.disabled = true;
                 this.jobPosition.innerHTML = '<option value="">请先选择行业大类</option>';
             }
+
+            // 清除完成，恢复标志位
+            this.isRestoringPreference = false;
 
             // 🔥 关键修复：清除岗位偏好时也要同步更新简历数据和预览
             this.syncJobPreferenceToResume({});
@@ -4237,6 +4320,7 @@ class ResumeManager {
             this.showJobPreferenceStatus('success', '岗位偏好已清除');
         } catch (e) {
             console.error('清除岗位偏好失败:', e);
+            this.isRestoringPreference = false;
             this.showJobPreferenceStatus('error', '清除岗位偏好失败，请重试');
         }
     }
