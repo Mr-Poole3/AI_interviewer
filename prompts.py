@@ -87,6 +87,25 @@ class InterviewPrompts:
 
 请根据简历内容进行针对性的面试提问。"""
 
+    # 带岗位偏好的提示词模板
+    WITH_JOB_PREFERENCE_TEMPLATE = """{base_prompt}
+
+候选人意向岗位：
+{job_preference_info}
+
+请根据以上岗位要求，进行针对性的面试提问和评估。"""
+
+    # 带简历和岗位偏好的完整模板
+    WITH_RESUME_AND_JOB_TEMPLATE = """{base_prompt}
+
+候选人简历信息：
+{resume_context}
+
+候选人意向岗位：
+{job_preference_info}
+
+请结合候选人的简历背景和意向岗位要求，进行全面、深入的面试评估。重点关注候选人的技能与岗位需求的匹配度，以及在该岗位上的发展潜力。"""
+
     # 不同岗位的专业提示词
     POSITION_SPECIFIC = {
         "frontend": """你是一位前端技术面试官，专注于以下技术领域：
@@ -494,14 +513,16 @@ class DebugPrompts:
         "evaluation_complete": "面试评分完成: 总分={total_score}, 用时={duration}ms"
     }
 
-def get_interviewer_prompt(position=None, resume_context=None, evaluation=False):
+def get_interviewer_prompt(position=None, resume_context=None, job_preference=None, evaluation=False):
     """
     获取面试官提示词
-    
+
     Args:
         position: 岗位类型 (frontend/backend/fullstack/ai_ml/data_science)
         resume_context: 简历上下文
-    
+        job_preference: 岗位偏好信息 (dict)
+        evaluation: 是否为评估模式
+
     Returns:
         str: 完整的面试官提示词
     """
@@ -510,35 +531,53 @@ def get_interviewer_prompt(position=None, resume_context=None, evaluation=False)
         base_prompt = InterviewPrompts.POSITION_SPECIFIC[position]
     else:
         base_prompt = InterviewPrompts.BASE_INTERVIEWER
-    
-    # 如果有简历上下文，使用模板
-    if resume_context:
+
+    # 构建岗位偏好信息字符串
+    job_preference_info = ""
+    if job_preference:
+        job_preference_info = f"""
+岗位类别: {job_preference.get('category_label', job_preference.get('category', ''))}
+具体岗位: {job_preference.get('position_label', job_preference.get('position', ''))}
+完整岗位: {job_preference.get('full_label', '')}
+"""
+
+    # 根据可用信息选择合适的模板
+    if resume_context and job_preference:
+        prompt = InterviewPrompts.WITH_RESUME_AND_JOB_TEMPLATE.format(
+            base_prompt=base_prompt,
+            resume_context=resume_context,
+            job_preference_info=job_preference_info
+        )
+        prompt += InterviewPrompts.POSITION_SPECIFIC.get(job_preference.get('position_label'), "")
+        return prompt
+    elif resume_context:
         return InterviewPrompts.WITH_RESUME_TEMPLATE.format(
             base_prompt=base_prompt,
             resume_context=resume_context
         )
-    
+    elif job_preference:
+        return InterviewPrompts.WITH_JOB_PREFERENCE_TEMPLATE.format(
+            base_prompt=base_prompt,
+            job_preference_info=job_preference_info
+        )
+
     return base_prompt
 
-def get_voice_call_prompt(resume_context=None):
+def get_voice_call_prompt(resume_context=None, job_preference=None):
     """
     获取语音通话专用提示词
-    
+
     Args:
         resume_context: 简历上下文
-    
+        job_preference: 岗位偏好信息
+
     Returns:
         str: 语音通话提示词
     """
-    base_prompt = InterviewPrompts.BASE_INTERVIEWER
-    
-    if resume_context:
-        return InterviewPrompts.WITH_RESUME_TEMPLATE.format(
-            base_prompt=base_prompt,
-            resume_context=resume_context
-        )
-    
-    return base_prompt
+    return get_interviewer_prompt(
+        resume_context=resume_context,
+        job_preference=job_preference
+    )
 
 def get_system_message(message_type):
     """

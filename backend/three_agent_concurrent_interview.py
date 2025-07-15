@@ -538,7 +538,7 @@ class LLMService:
             out = out[:-len("```")]
         return out
 
-class ThreeAgentEvaluationService:
+class ConcurrentThreeAgentInterviewSystem:
     """三个Agent协作的评估服务"""
 
     def __init__(self):
@@ -548,53 +548,92 @@ class ThreeAgentEvaluationService:
         self.report_result = None
     
     async def run_three_agent_evaluation(
-        self, 
-        interview_messages: List[Dict[str, str]], 
-        resume_text: str, 
-        job_description: str = ""
+        self,
+        interview_messages: List[Dict[str, str]],
+        resume_text: str,
+        job_description: str = "",
+        job_preference: dict = None
     ) -> Dict[str, Any]:
-        """运行三个Agent的协作评估流程"""
+        """
+        并发执行面试评估
         
-        logger.info("开始三个Agent协作评估流程")
+        Args:
+            interview_messages: 面试对话记录
+            resume_text: 简历文本
+            job_description: 职位描述
+            
+        Returns:
+            包含评估结果的字典
+        """
+        logger.info("开始并发三Agent面试评估...")
         
-        # Stage 1: 分析Agent
-        logger.info("Stage 1: 运行分析Agent")
-        self.analysis_result = await self._run_analysis_agent(
-            interview_messages, resume_text, job_description
-        )
-        
-        # Stage 2: 打分Agent  
-        logger.info("Stage 2: 运行打分Agent")
-        self.scoring_result = await self._run_scoring_agent(
-            interview_messages, resume_text, job_description
-        )
-        
-        # Stage 3: 报告Agent
-        logger.info("Stage 3: 运行报告Agent")
-        raw_report_result = await self._run_report_agent(
-            self.analysis_result, self.scoring_result, job_description, resume_text
-        )
-
-        # 提取纯HTML内容
-        self.report_result = self.llm_service._extract_clean_html(raw_report_result)
-
-        # 保存HTML报告到文件
-        await self._save_html_report()
-
-        logger.info("三个Agent协作评估流程完成")
-
-        return {
+        try:
+            # 阶段1: 并发执行数据提取和分析评分
+            logger.info("🚀 阶段1: 并发执行数据提取Agent和分析评分Agent...")
+            
+            # 创建并发任务
+            analysis_task = asyncio.create_task(
+                self._run_analysis_agent(interview_messages, resume_text, job_description, job_preference)
+            )
+            scoring_task = asyncio.create_task(
+                self._run_scoring_agent(interview_messages, resume_text, job_description, job_preference)
+            )
+            
+            # 等待两个Agent并发完成
+            analysis_result, scoring_result = await asyncio.gather(
+                analysis_task, 
+                scoring_task,
+                return_exceptions=True
+            )
+            
+            # 检查是否有异常
+            if isinstance(scoring_result, Exception):
+                logger.error(f"数据提取Agent失败: {scoring_result}")
+                scoring_result = "数据提取失败"
+            
+            if isinstance(analysis_result, Exception):
+                logger.error(f"分析评分Agent失败: {analysis_result}")
+                analysis_result = "分析评分失败"
+            
+            self.scoring_result = scoring_result
+            self.analysis_result = analysis_result
+            
+            logger.info("✅ 阶段1完成: 数据提取和分析评分并发执行完毕")
+            
+            # 阶段2: 基于前两个Agent的结果生成HTML报告
+            logger.info("🚀 阶段2: 生成HTML报告...")
+            
+            report_result = await self._run_report_agent(
+                analysis_result, scoring_result, job_description, resume_text
+            )
+            
+            logger.info("✅ 阶段2完成: HTML报告生成完毕")
+            
+            # 解析结构化评估数据
+            self.report_result = self.llm_service._extract_clean_html(report_result)
+            
+            # 保存HTML报告
+            await self._save_html_report()
+            
+            logger.info("🎉 并发三Agent评估完成！")
+            
+            return {
             'analysis': self.analysis_result,
             'scoring': self.scoring_result,
             'html_report': self.report_result,
             'evaluation': self._extract_json_from_scoring()
         }
+            
+        except Exception as e:
+            logger.error(f"并发三Agent评估失败: {e}")
+            raise e
 
     async def _run_analysis_agent(
         self,
         interview_messages: List[Dict[str, str]],
         resume_text: str,
-        job_description: str
+        job_description: str,
+        job_preference: dict = None
     ) -> str:
         """运行分析Agent"""
 
@@ -620,10 +659,12 @@ class ThreeAgentEvaluationService:
 **候选人简历：**
 {resume_text}
 
+{self._build_job_preference_section(job_preference)}
+
 **面试对话记录：**
 {interview_text}
 
-请按照指令要求进行分析并输出JSON格式的结果。
+请按照指令要求进行分析并输出JSON格式的结果。特别关注候选人的技能与意向岗位的匹配度。
                 """
             }
         ]
@@ -631,7 +672,7 @@ class ThreeAgentEvaluationService:
         result = await self.llm_service.call_llm(messages, "简历与面试分析专家")
         return result
 
-    async def _run_scoring_agent(self, interview_messages: str, resume_text: str, job_description: str) -> str:
+    async def _run_scoring_agent(self, interview_messages: str, resume_text: str, job_description: str, job_preference: dict = None) -> str:
         """运行打分Agent"""
 
         messages = [
@@ -653,7 +694,9 @@ class ThreeAgentEvaluationService:
 **候选人简历：**
 {resume_text}
 
-请按照评估框架进行打分并输出JSON格式的结果。
+{self._build_job_preference_section(job_preference)}
+
+请按照评估框架进行打分并输出JSON格式的结果。特别关注候选人的技能与意向岗位的匹配度。
                 """
             }
         ]
@@ -726,11 +769,24 @@ class ThreeAgentEvaluationService:
         # 使用DeepSeek服务的JSON解析方法
         return self.llm_service._parse_evaluation_result(self.scoring_result)
 
+    def _build_job_preference_section(self, job_preference: dict = None) -> str:
+        """构建岗位偏好信息部分"""
+        if not job_preference:
+            return ""
+
+        return f"""
+**候选人意向岗位：**
+岗位类别: {job_preference.get('category_label', job_preference.get('category', ''))}
+具体岗位: {job_preference.get('position_label', job_preference.get('position', ''))}
+完整岗位: {job_preference.get('full_label', '')}
+"""
+
 # 主要的接口函数
-async def generate_three_agent_report(
+async def generate_concurrent_three_agent_report(
     interview_messages: List[Dict[str, str]],
     resume_text: str,
-    job_description: str = ""
+    job_description: str = "",
+    job_preference: dict = None
 ) -> Dict[str, Any]:
     """
     使用三个Agent协作生成面试评估报告
@@ -743,9 +799,9 @@ async def generate_three_agent_report(
     Returns:
         包含分析、评分、HTML报告和结构化数据的字典
     """
-    service = ThreeAgentEvaluationService()
+    service = ConcurrentThreeAgentInterviewSystem()
     return await service.run_three_agent_evaluation(
-        interview_messages, resume_text, job_description
+        interview_messages, resume_text, job_description, job_preference
     )
 
 # 示例用法和测试
@@ -813,7 +869,7 @@ async def main():
 
     # 运行三个Agent协作评估
     logger.info("开始运行三个Agent协作评估示例")
-    result = await generate_three_agent_report(
+    result = await generate_concurrent_three_agent_report(
         mock_interview_messages,
         mock_resume_text,
         mock_job_description
