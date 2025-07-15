@@ -5607,3 +5607,78 @@ body {
     }
 }
 
+/* 岗位保存状态反馈 */
+.job-preference-status {
+    margin-top: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border: 1px solid;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.job-preference-status.success {
+    background: var(--success-light);
+    border-color: var(--success-color);
+    color: var(--success-dark);
+}
+
+.job-preference-status.error {
+    background: var(--error-light);
+    border-color: var(--error-color);
+    color: var(--error-color);
+}
+
+.job-preference-status.loading {
+    background: var(--gray-100);
+    border-color: var(--gray-300);
+    color: var(--gray-600);
+}
+
+.job-preference-status .status-content {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.job-preference-status .status-icon {
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+}
+
+.job-preference-status.success .status-icon {
+    color: var(--success-color);
+}
+
+.job-preference-status.error .status-icon {
+    color: var(--error-color);
+}
+
+.job-preference-status.loading .status-icon {
+    color: var(--gray-500);
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+

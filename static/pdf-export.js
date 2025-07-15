@@ -26,45 +26,33 @@ class PDFExporter {
                     return;
                 }
 
-                console.log('开始加载PDF库...');
 
                 // 加载jsPDF
                 try {
                     await this.loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
-                    console.log('jsPDF加载成功');
                 } catch (error) {
                     console.warn('主CDN失败，尝试备用CDN加载jsPDF');
                     await this.loadScript('https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js');
-                    console.log('jsPDF备用CDN加载成功');
                 }
 
                 // 加载html2canvas
                 try {
                     await this.loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
-                    console.log('html2canvas加载成功');
                 } catch (error) {
                     console.warn('主CDN失败，尝试备用CDN加载html2canvas');
                     await this.loadScript('https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js');
-                    console.log('html2canvas备用CDN加载成功');
                 }
 
                 // 等待一小段时间让库完全初始化
                 await new Promise(resolve => setTimeout(resolve, 100));
 
                 // 验证库是否正确加载
-                console.log('验证库加载状态:', {
-                    'window.jsPDF': typeof window.jsPDF,
-                    'window.jspdf': typeof window.jspdf,
-                    'window.html2canvas': typeof window.html2canvas,
-                    'global html2canvas': typeof html2canvas
-                });
 
                 // 使用testLibraries方法进行验证
                 const librariesReady = this.testLibraries();
 
                 if (librariesReady) {
                     this.isLibrariesLoaded = true;
-                    console.log('PDF库全部加载完成');
                     resolve();
                 } else {
                     throw new Error(`库加载后仍然不可用`);
@@ -97,25 +85,16 @@ class PDFExporter {
      */
     async exportToPDF(element, filename = 'document.pdf') {
         try {
-            console.log('开始PDF导出...');
 
             // 确保库已加载
             if (!this.isLibrariesLoaded) {
-                console.log('库未加载，开始加载...');
                 await this.loadLibraries();
             }
 
             // 检查库是否可用 - 使用testLibraries的结果
             const librariesReady = this.testLibraries();
 
-            console.log('检查库可用性:', {
-                'window.jsPDF': typeof window.jsPDF,
-                'window.jspdf': typeof window.jspdf,
-                'window.html2canvas': typeof window.html2canvas,
-                'global html2canvas': typeof html2canvas,
-                'librariesReady': librariesReady,
-                'jsPDFRef': !!this.jsPDFRef
-            });
+
 
             if (!librariesReady) {
                 throw new Error(`PDF库未正确加载 - 请检查网络连接`);
@@ -298,7 +277,6 @@ class PDFExporter {
                 if (ref && typeof ref === 'object') {
                     jsPDFRef = ref;
                     jsPDFAvailable = true;
-                    console.log('找到jsPDF引用:', method.toString());
                     break;
                 }
             } catch (e) {
@@ -320,7 +298,6 @@ class PDFExporter {
                 } else {
                     testPdf = new jsPDFRef.default();
                 }
-                console.log('- jsPDF实例化测试: 成功');
 
                 // 保存正确的引用
                 this.jsPDFRef = jsPDFRef;
@@ -488,10 +465,8 @@ window.pdfExporter = new PDFExporter();
 document.addEventListener('DOMContentLoaded', () => {
     // 等待一下让库完全加载
     setTimeout(() => {
-        console.log('检查PDF库加载状态...');
         if (window.pdfExporter) {
             const isReady = window.pdfExporter.testLibraries();
-            console.log('PDF库就绪状态:', isReady);
             if (isReady) {
                 window.pdfExporter.isLibrariesLoaded = true;
             }

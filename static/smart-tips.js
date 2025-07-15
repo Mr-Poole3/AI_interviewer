@@ -42,7 +42,6 @@ class SmartTipsSystem {
         this.createTipContainer();
         this.bindContextListeners();
         this.startContextMonitoring();
-        console.log('🧠 智能提示系统已初始化');
     }
     
     /**
@@ -159,8 +158,7 @@ class SmartTipsSystem {
     handleContextChange(type, value) {
         const newContext = { type, value, timestamp: Date.now() };
         this.currentContext = newContext;
-        
-        console.log(`📍 上下文变化: ${type} -> ${value}`);
+            
         
         // 延迟显示提示，等待页面稳定
         setTimeout(() => {
@@ -299,8 +297,6 @@ class SmartTipsSystem {
         setTimeout(() => {
             this.hideTip();
         }, this.config.tipDisplayDuration);
-        
-        console.log(`💡 显示智能提示: ${tip.title}`);
     }
     
     /**
@@ -429,7 +425,7 @@ class SmartTipsSystem {
      * 辅助方法
      */
     hasResume() {
-        return localStorage.getItem('current_resume') !== null;
+        return localStorage.getItem('azure_current_resume') !== null;
     }
     
     hasInterviewHistory() {
@@ -489,8 +485,6 @@ class SmartTipsSystem {
         if (!enabled) {
             this.hideTip();
         }
-        
-        console.log(`🧠 智能提示系统${enabled ? '已启用' : '已禁用'}`);
     }
     
     /**
@@ -501,7 +495,6 @@ class SmartTipsSystem {
         this.dismissedTips = [];
         localStorage.removeItem(this.STORAGE_KEYS.TIPS_HISTORY);
         localStorage.removeItem(this.STORAGE_KEYS.DISMISSED_TIPS);
-        console.log('🔄 智能提示历史已重置');
     }
     
     /**

@@ -511,7 +511,6 @@ class VoiceCallManager {
     logMessage(message) {
         const timestamp = new Date().toLocaleTimeString();
         const logEntry = `[${timestamp}] ${message}`;
-        console.log(logEntry);
         
         if (this.logContainer) {
             const p = document.createElement('p');
@@ -1373,8 +1372,7 @@ class VoiceCallManager {
                     interview_id: interviewRecord.id,
                     messages: interviewRecord.messages,
                     resume_context: resumeContext || '',
-                };
-                console.log(extractionRequest);                
+                };          
                 // 调用提取API
                 const response = await fetch('/api/interview/extract', {
                     method: 'POST',
@@ -1386,7 +1384,6 @@ class VoiceCallManager {
                 
                 if (response.ok) {
                     const result = await response.json();
-                    console.log('面试数据提取完成:', result);
                     if (result.success) {
                         interviewRecord.title = result.extraction.title;
                         interviewRecord.summary = result.extraction.summary;
@@ -1572,7 +1569,6 @@ class VoiceCallManager {
             // 立即刷新历史记录显示
             if (window.app && window.app.historyManager) {
                 window.app.historyManager.refreshHistoryList();
-                console.log('历史记录已刷新');
             }
 
             // 显示后台评分处理提示
@@ -1799,7 +1795,6 @@ class VoiceCallManager {
                 // 立即刷新历史记录显示
                 if (window.app && window.app.historyManager) {
                     window.app.historyManager.refreshHistoryList();
-                    console.log('评分完成后历史记录已刷新');
                 }
             }
         } catch (error) {

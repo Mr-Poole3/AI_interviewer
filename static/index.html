@@ -393,10 +393,9 @@
                         <div class="job-preference-container">
                             <div class="preference-header">
                                 <h2>
-                                    <i class="fas fa-bullseye"></i>
-                                    岗位意向设置
+                                    🧑‍💼岗位意向
                                 </h2>
-                                <p>选择您的意向岗位类别，让AI面试官为您提供更精准的面试体验</p>
+                                <p>选择您的意向岗位，让AI面试官为您提供更精准的面试体验</p>
                             </div>
 
                             <div class="preference-content">
@@ -440,6 +439,14 @@
                                 <div class="preference-tips">
                                     <i class="fas fa-info-circle"></i>
                                     <span>选择岗位意向后，AI面试官将根据该岗位的要求进行针对性面试</span>
+                                </div>
+                                 
+                                <!-- 岗位保存状态反馈 -->
+                                <div class="job-preference-status" id="jobPreferenceStatus" style="display: none;">
+                                    <div class="status-content">
+                                        <i class="status-icon"></i>
+                                        <span class="status-text"></span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -773,11 +780,9 @@
         // 检查jsPDF是否加载成功，如果没有则尝试备用CDN
         setTimeout(() => {
             if (typeof window.jsPDF === 'undefined') {
-                console.log('主CDN失败，加载备用jsPDF...');
                 const script = document.createElement('script');
                 script.src = 'https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js';
                 script.onload = () => {
-                    console.log('备用jsPDF加载成功');
                     if (window.pdfExporter) {
                         window.pdfExporter.isLibrariesLoaded = window.pdfExporter.testLibraries();
                     }

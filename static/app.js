@@ -181,7 +181,6 @@ class EvaluationStatusManager {
             ...metadata
         };
         this.saveStatuses();
-        console.log(`评分状态已更新: ${interviewId} -> ${status}`);
     }
 
     /**
@@ -283,7 +282,6 @@ class EvaluationStatusManager {
      * 评分完成回调
      */
     onEvaluationCompleted(interviewId, evaluation) {
-        console.log(`面试 ${interviewId} 评分完成:`, evaluation);
 
         // 触发自定义事件
         window.dispatchEvent(new CustomEvent('evaluationCompleted', {
@@ -329,21 +327,18 @@ class LocalStorageManager {
                     const existingInterview = interviews[existingIndex];
                     interview.createdAt = existingInterview.createdAt || interview.createdAt;
                     interviews[existingIndex] = interview;
-                    console.log('更新现有面试记录:', interview.id);
                 } else {
                     // ID存在但找不到记录，作为新记录处理
                     if (!interview.createdAt) {
                         interview.createdAt = new Date().toISOString();
                     }
                     interviews.unshift(interview);
-                    console.log('保存新面试记录:', interview.id);
                 }
             } else {
                 // 没有ID，创建新记录
                 interview.id = Date.now().toString();
                 interview.createdAt = new Date().toISOString();
                 interviews.unshift(interview);
-                console.log('创建新面试记录:', interview.id);
             }
 
             // 限制最大数量，防止占用过多空间
@@ -385,7 +380,6 @@ class LocalStorageManager {
                 // 更新记录
                 interviews[existingIndex] = interview;
                 localStorage.setItem(this.KEYS.INTERVIEWS, JSON.stringify(interviews));
-                console.log('面试记录已更新:', interview.id);
                 return true;
             } else {
                 console.warn('未找到要更新的面试记录:', interview.id);
@@ -434,8 +428,12 @@ class LocalStorageManager {
                 version: '2.0'
             };
             
+            // 保存岗位偏好信息（如果存在）
+            if (resumeData.jobPreference) {
+                enhancedResumeData.jobPreference = resumeData.jobPreference;
+            }
+            
             localStorage.setItem(this.KEYS.CURRENT_RESUME, JSON.stringify(enhancedResumeData));
-            console.log('简历信息已保存到本地存储');
             return true;
         } catch (e) {
             console.error('保存简历信息失败:', e);
@@ -447,6 +445,7 @@ class LocalStorageManager {
     getCurrentResume() {
         try {
             const data = localStorage.getItem(this.KEYS.CURRENT_RESUME);
+            
             if (!data) return null;
             
             const resumeData = JSON.parse(data);
@@ -735,7 +734,6 @@ class AzureVoiceChat {
         if (this.preparationSettingsPanel) {
             this.preparationSettingsPanel.style.display = 'block';
             this.loadSettingsToUI();
-            console.log('显示面试设置面板');
         }
     }
 
@@ -745,7 +743,6 @@ class AzureVoiceChat {
     hidePreparationSettings() {
         if (this.preparationSettingsPanel) {
             this.preparationSettingsPanel.style.display = 'none';
-            console.log('隐藏面试设置面板');
         }
     }
 
@@ -789,7 +786,6 @@ class AzureVoiceChat {
     resetSettingsToDefaults() {
         this.settingsManager.resetToDefaults();
         this.loadSettingsToUI();
-        console.log('设置已重置为默认值');
     }
 
     /**
@@ -809,7 +805,6 @@ class AzureVoiceChat {
         };
 
         if (this.settingsManager.updateSettings(newSettings)) {
-            console.log('设置已保存:', newSettings);
 
             // 如果有活跃的语音通话，更新配置
             if (this.voiceCallManager) {
@@ -845,14 +840,12 @@ class AzureVoiceChat {
             this.onEvaluationCompleted(interviewId, evaluation);
         });
 
-        console.log('评分状态管理器已初始化');
     }
 
     /**
      * 评分完成处理
      */
     onEvaluationCompleted(interviewId, evaluation) {
-        console.log(`面试 ${interviewId} 评分完成`, evaluation);
 
         // 更新本地存储中的面试记录
         if (this.app && this.app.storageManager) {
@@ -869,7 +862,6 @@ class AzureVoiceChat {
                 }
 
                 this.app.storageManager.saveInterview(interview);
-                console.log('面试记录评分信息已更新');
 
                 // 如果当前在历史记录页面，刷新显示
                 if (this.app.router.currentPage === 'history') {
@@ -960,11 +952,9 @@ class AzureVoiceChat {
     }
     
     startInterview() {
-        console.log('开始面试按钮被点击');
         
         // 检查连接状态
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-            console.log('WebSocket未连接，显示连接提示');
             alert('正在连接语音服务，请稍候...');
             return;
         }
@@ -974,14 +964,12 @@ class AzureVoiceChat {
     }
     
     showPreparationStage() {
-        console.log('显示面试准备页面');
         
         // 切换到聊天界面但保持在准备状态
         const welcomeSection = document.querySelector('.interview-welcome');
         const chatSection = document.querySelector('.interview-chat');
         
         if (welcomeSection && chatSection) {
-            console.log('切换到准备界面');
             welcomeSection.style.display = 'none';
             chatSection.style.display = 'flex';
             chatSection.classList.add('preparation-mode');
@@ -1006,7 +994,6 @@ class AzureVoiceChat {
     }
     
     startActualInterview() {
-        console.log('确认开始实际面试');
         
         // 移除准备模式样式
         const chatSection = document.querySelector('.interview-chat');
@@ -1032,17 +1019,13 @@ class AzureVoiceChat {
         
         // 启动语音通话
         if (this.app && this.app.voiceCallManager) {
-            console.log('启动语音通话管理器');
             this.app.voiceCallManager.startVoiceCall();
         } else {
-            console.log('语音通话管理器未初始化，等待初始化完成...');
             // 等待语音通话管理器初始化完成
             const checkVoiceManager = () => {
                 if (this.app && this.app.voiceCallManager) {
-                    console.log('语音通话管理器已初始化，启动语音通话');
                     this.app.voiceCallManager.startVoiceCall();
                 } else {
-                    console.log('继续等待语音通话管理器初始化...');
                     setTimeout(checkVoiceManager, 100);
                 }
             };
@@ -1061,7 +1044,6 @@ class AzureVoiceChat {
                 await this.audioContext.resume();
             }
             
-            console.log('音频上下文初始化成功, 采样率:', this.audioContext.sampleRate);
         } catch (error) {
             console.error('音频初始化失败:', error);
         }
@@ -1071,11 +1053,9 @@ class AzureVoiceChat {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/ws/voice`;
         
-        console.log('正在连接Azure语音服务:', wsUrl);
         this.ws = new WebSocket(wsUrl);
         
         this.ws.onopen = () => {
-            console.log('Azure语音WebSocket连接已建立');
             this.setStatus('已连接 - Azure语音服务', 'connected');
             this.enableInput();
             this.hideLoadingOverlay();
@@ -1089,7 +1069,6 @@ class AzureVoiceChat {
         };
         
         this.ws.onclose = () => {
-            console.log('Azure语音WebSocket连接已断开');
             this.setStatus('连接断开', 'error');
             this.disableInput();
             this.showLoadingOverlay('连接断开，正在重连...');
@@ -1155,7 +1134,6 @@ class AzureVoiceChat {
             }
         }
         
-        console.log('状态更新:', text, className);
     }
     
     showLoadingOverlay(text = '正在连接天汇AI面试官') {
@@ -1266,7 +1244,6 @@ class AzureVoiceChat {
                 this.handleAudioDelta(data.audio_data);
                 break;
             case 'transcript_delta':
-                console.log('音频转录:', data.content);
                 break;
             case 'audio_done':
                 this.handleAudioDone();
@@ -1379,7 +1356,6 @@ class AzureVoiceChat {
                     }
                 };
                 
-                console.log(`播放音频块 - 长度: ${audioBuffer.duration.toFixed(3)}秒, 开始时间: ${startTime.toFixed(3)}, 队列长度: ${this.audioQueue.length}`);
             }
             
         } catch (error) {
@@ -1415,7 +1391,6 @@ class AzureVoiceChat {
         // 触发音频播放结束事件
         this.dispatchAudioPlaybackEvent('end');
         
-        console.log('音频流播放完成');
     }
     
     handleResponseDone() {
@@ -1426,7 +1401,6 @@ class AzureVoiceChat {
     }
     
     handleInterruptAcknowledged() {
-        console.log('服务器确认打断请求');
         
         // 立即停止音频播放
         this.resetAudioState();
@@ -1449,7 +1423,6 @@ class AzureVoiceChat {
             }
         });
         window.dispatchEvent(event);
-        console.log(`触发AI回复${type === 'start' ? '开始' : '结束'}事件`);
     }
     
     /**
@@ -1465,7 +1438,6 @@ class AzureVoiceChat {
             }
         });
         window.dispatchEvent(event);
-        console.log(`触发音频播放${type === 'start' ? '开始' : '结束'}事件`);
     }
 
     async createReplayAudio(messageElement) {
@@ -1497,7 +1469,6 @@ class AzureVoiceChat {
             `;
             messageElement.appendChild(audioContainer);
             
-            console.log(`创建重播音频 - 总长度: ${totalLength} 字节`);
             
         } catch (error) {
             console.error('创建重播音频错误:', error);
@@ -1596,7 +1567,6 @@ class AzureVoiceChat {
     
     setSessionId(sessionId) {
         this.currentSessionId = sessionId || '';
-        console.log('设置会话ID:', this.currentSessionId);
     }
     
     showError(message) {
@@ -1619,7 +1589,6 @@ class AzureVoiceChat {
         this.currentInterviewId = Date.now().toString();
         this.currentInterviewMessages = [];
         
-        console.log('开始面试记录:', this.currentInterviewId);
         
         // 添加欢迎消息
         this.recordMessage('欢迎参加AI智能面试！我是您的面试官，将为您提供专业的面试体验。请告诉我您应聘的岗位，我们开始面试吧！', 'assistant');
@@ -1636,7 +1605,6 @@ class AzureVoiceChat {
         this.isInterviewActive = false;
         const duration = Math.floor((Date.now() - this.interviewStartTime) / 1000);
         
-        console.log('结束面试记录，时长:', duration, '秒');
         
         // 保存面试记录到本地存储
         const interview = {
@@ -1677,7 +1645,6 @@ class AzureVoiceChat {
         };
         
         this.currentInterviewMessages.push(message);
-        console.log('记录消息:', type, content.substring(0, 50) + '...');
     }
     
     // /**
@@ -1685,7 +1652,6 @@ class AzureVoiceChat {
     //  */
     // async triggerInterviewEvaluation(interview) {
     //     try {
-    //         console.log('开始面试评分...');
             
     //         // 获取简历上下文
     //         const resumeContext = await this.getResumeContext();
@@ -1713,7 +1679,6 @@ class AzureVoiceChat {
             
     //         if (response.ok) {
     //             const result = await response.json();
-    //             console.log('面试评分完成:', result);
                 
     //             // 显示评分结果
     //             this.showEvaluationResult(result.evaluation);
@@ -2136,8 +2101,6 @@ class AzureVoiceChat {
                 return;
             }
 
-            // 测试PDF库状态
-            console.log('测试PDF库状态...');
             const isReady = window.pdfExporter.testLibraries();
 
             if (!isReady) {
@@ -2145,7 +2108,6 @@ class AzureVoiceChat {
                 this.showNotification('正在加载PDF库', '请稍等片刻...', 'info');
                 try {
                     await window.pdfExporter.loadLibraries();
-                    console.log('PDF库重新加载完成');
                 } catch (loadError) {
                     console.error('PDF库重新加载失败:', loadError);
                     this.showNotification('加载失败', 'PDF库加载失败，请检查网络连接', 'error');
@@ -2282,7 +2244,6 @@ class AzureVoiceChat {
 
                 // 重新保存
                 this.app.storageManager.saveInterview(interview);
-                console.log('面试记录已更新评分信息');
             }
         }
     }
@@ -2728,7 +2689,6 @@ class HistoryManager {
                              interviewToEvaluate.evaluationMarkdown || interviewToEvaluate.evaluationScore;
         
         if (hasEvaluation) {
-            console.log(`面试记录 ${interviewId} 已经评估过，直接显示评估结果`);
             // 如果已评估，直接显示评估结果而不是重新评估
             if (interviewToEvaluate.evaluation && window.app && window.app.voiceChat) {
                 window.app.voiceChat.showEvaluationResult(interviewToEvaluate.evaluation);
@@ -2760,7 +2720,6 @@ class HistoryManager {
 
         // 检查是否已缓存完整评估结果（包含HTML和评分）
         if (interviewToEvaluate.evaluationHtml && interviewToEvaluate.evaluationScore) {
-            console.log(`从缓存加载完整评估结果，面试ID: ${interviewId}`);
             this.displayCompleteEvaluation(interviewToEvaluate);
             if (this.modalLoadingSpinner) {
                 this.modalLoadingSpinner.style.display = 'none';
@@ -2770,13 +2729,11 @@ class HistoryManager {
 
         // 如果没有缓存，则并行调用后端生成评估和提取数据
         try {
-            console.log(`调用后端生成完整评估结果，面试ID: ${interviewId}`);
 
             const resumeData = this.storageManager.getCurrentResume();
             const resumeText = resumeData ? resumeData.fullText : '';
 
             // 先尝试调用评估API
-            console.log('正在调用评估API...');
             const evaluationResponse = await fetch('/api/evaluate-interview', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -2921,7 +2878,6 @@ class HistoryManager {
             if (match) {
                 const score = parseInt(match[1]);
                 if (score >= 0 && score <= 100) {
-                    console.log(`从新格式中提取到评分: ${score}`);
                     return score;
                 }
             }
@@ -2939,13 +2895,11 @@ class HistoryManager {
             if (match) {
                 const score = parseInt(match[1]);
                 if (score >= 0 && score <= 100) {
-                    console.log(`从兼容格式中提取到评分: ${score}`);
                     return score;
                 }
             }
         }
 
-        console.log('未能提取到有效评分，使用默认值75');
         return 75; // 默认分数
     }
 
@@ -2970,7 +2924,6 @@ class HistoryManager {
             if (match && match[1]) {
                 const summary = match[1].trim().replace(/\n+/g, ' ').substring(0, 200);
                 if (summary.length > 10) {
-                    console.log(`提取到评估总结: ${summary.substring(0, 50)}...`);
                     return summary;
                 }
             }
@@ -2981,7 +2934,6 @@ class HistoryManager {
         if (firstParagraphMatch && firstParagraphMatch[1]) {
             const firstParagraph = firstParagraphMatch[1].trim().replace(/\n+/g, ' ').substring(0, 150);
             if (firstParagraph.length > 20) {
-                console.log(`使用第一段作为总结: ${firstParagraph.substring(0, 50)}...`);
                 return firstParagraph;
             }
         }
@@ -3141,7 +3093,6 @@ class HistoryManager {
                 duration: interview.duration || 0
             };
 
-            console.log('开始评分处理...');
 
             // 调用评分API
             const response = await fetch('/api/interview/evaluate', {
@@ -3154,7 +3105,6 @@ class HistoryManager {
 
             if (response.ok) {
                 const result = await response.json();
-                console.log('评分完成');
 
                 if (result.success) {
                     // 更新面试记录的评分信息
@@ -3287,7 +3237,6 @@ class HistoryManager {
             this.updateScrollIndicator();
         }, 200);
 
-        console.log('显示面试对话详情:', interview.id);
     }
     
     /**
@@ -3469,7 +3418,6 @@ class HistoryManager {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             
-            console.log('对话记录导出成功');
             alert('对话记录导出成功！');
         } catch (error) {
             console.error('导出对话记录失败:', error);
@@ -3921,7 +3869,6 @@ class ResumeManager {
 
         // 可以在这里添加其他逻辑，比如显示岗位相关信息
         if (position) {
-            console.log('用户选择了岗位:', this.getSelectedJobInfo());
         }
     }
 
@@ -4092,10 +4039,23 @@ class ResumeManager {
         };
 
         try {
+            // 显示保存中状态
+            this.showJobPreferenceStatus('loading', '正在保存岗位偏好...');
+            
             localStorage.setItem('job_preference', JSON.stringify(preference));
-            console.log('岗位偏好已保存:', preference);
+            
+            // 显示成功状态
+            if (category && position) {
+                this.showJobPreferenceStatus('success', `已保存岗位偏好：${preference.categoryLabel} - ${preference.positionLabel}`);
+            } else if (category) {
+                this.showJobPreferenceStatus('success', `已保存行业类别：${preference.categoryLabel}`);
+            } else {
+                this.showJobPreferenceStatus('success', '岗位偏好已清除');
+            }
+            
         } catch (e) {
             console.error('保存岗位偏好失败:', e);
+            this.showJobPreferenceStatus('error', '保存岗位偏好失败，请重试');
         }
     }
 
@@ -4121,7 +4081,6 @@ class ResumeManager {
                     }
                 }
 
-                console.log('已加载保存的岗位偏好:', preference);
             }
         } catch (e) {
             console.error('加载岗位偏好失败:', e);
@@ -4143,8 +4102,55 @@ class ResumeManager {
         };
     }
 
+    /**
+     * 显示岗位偏好保存状态反馈
+     * @param {string} type - 状态类型：'loading', 'success', 'error'
+     * @param {string} message - 状态消息
+     */
+    showJobPreferenceStatus(type, message) {
+        const statusElement = document.getElementById('jobPreferenceStatus');
+        const statusIcon = statusElement.querySelector('.status-icon');
+        const statusText = statusElement.querySelector('.status-text');
+        
+        if (!statusElement) return;
+
+        // 清除之前的状态类
+        statusElement.classList.remove('success', 'error', 'loading');
+        
+        // 添加新的状态类
+        statusElement.classList.add(type);
+        
+        // 设置图标
+        switch (type) {
+            case 'loading':
+                statusIcon.className = 'status-icon fas fa-spinner';
+                break;
+            case 'success':
+                statusIcon.className = 'status-icon fas fa-check-circle';
+                break;
+            case 'error':
+                statusIcon.className = 'status-icon fas fa-exclamation-circle';
+                break;
+        }
+        
+        // 设置文本
+        statusText.textContent = message;
+        
+        // 显示状态元素
+        statusElement.style.display = 'block';
+        
+        // 如果是成功或错误状态，3秒后自动隐藏
+        if (type === 'success' || type === 'error') {
+            setTimeout(() => {
+                statusElement.style.display = 'none';
+            }, 3000);
+        }
+    }
+
     clearJobPreference() {
         try {
+            this.showJobPreferenceStatus('loading', '正在清除岗位偏好...');
+            
             localStorage.removeItem('job_preference');
             if (this.jobCategory) this.jobCategory.value = '';
             if (this.jobPosition) {
@@ -4152,9 +4158,11 @@ class ResumeManager {
                 this.jobPosition.disabled = true;
                 this.jobPosition.innerHTML = '<option value="">请先选择行业大类</option>';
             }
-            console.log('岗位偏好已清除');
+            
+            this.showJobPreferenceStatus('success', '岗位偏好已清除');
         } catch (e) {
             console.error('清除岗位偏好失败:', e);
+            this.showJobPreferenceStatus('error', '清除岗位偏好失败，请重试');
         }
     }
 
@@ -4244,11 +4252,17 @@ class ResumeManager {
     }
 
     hideUploadProgress() {
-        // 恢复无简历状态的完整内容
-        this.showNoResume();
+        // 根据是否有简历数据来决定显示什么
+        const resumeData = this.storageManager.getCurrentResume();
+        if (resumeData) {
+            this.showResumeInfo(resumeData);
+        } else {
+            this.showNoResume();
+        }
     }
 
     handleUploadSuccess(response, fileName) {
+        
         const resumeData = {
             fileName: fileName,
             sessionId: response.session_id,
@@ -4262,7 +4276,9 @@ class ResumeManager {
             resumeData.jobPreference = response.job_preference;
         }
 
-        this.storageManager.saveCurrentResume(resumeData);
+        
+        const saveResult = this.storageManager.saveCurrentResume(resumeData);
+        
         // 清除之前的缓存内容，因为是新的简历
         this.cachedFullContent = null;
         this.refreshResumeInfo();
@@ -4351,7 +4367,6 @@ class ResumeManager {
                 this.cachedFullContent = fullContent;
                 // 渲染Markdown格式的简历内容
                 this.renderResumeContent(contentContainer, fullContent);
-                console.log('成功获取完整简历内容，长度:', fullContent.length);
             } else {
                 console.warn('获取完整简历内容失败，使用预览内容');
                 // 清除缓存
@@ -4419,7 +4434,6 @@ class ResumeManager {
                 container.className = 'resume-full-content markdown-content';
                 container.innerHTML = htmlContent;
                 
-                console.log('简历内容已渲染为Markdown格式');
             } else {
                 // 显示为纯文本
                 container.className = 'resume-full-content';
@@ -4557,7 +4571,6 @@ class AzureVoiceInterviewApp {
         // 监听连接成功事件，初始化语音通话管理器
         this.waitForConnection();
         
-        console.log('Azure语音面试系统初始化完成');
     }
     
     waitForConnection() {
@@ -4566,7 +4579,6 @@ class AzureVoiceInterviewApp {
                 // 连接成功，初始化语音通话管理器
                 this.initVoiceCallManager();
                 
-                console.log('Azure语音服务连接成功');
             } else {
                 // 继续等待连接
                 setTimeout(checkConnection, 100);
@@ -4590,7 +4602,6 @@ class AzureVoiceInterviewApp {
             }
 
             // 浏览器兼容性检查现在在startVoiceCall方法中进行
-            console.log('语音通话管理器初始化完成');
 
 
         } catch (error) {
@@ -4621,7 +4632,6 @@ class AzureVoiceInterviewApp {
         const resumeData = this.storageManager.getCurrentResume();
         if (resumeData && resumeData.sessionId) {
             this.voiceChat.setSessionId(resumeData.sessionId);
-            console.log('已加载保存的简历会话');
         }
     }
 
@@ -4647,7 +4657,6 @@ document.addEventListener('DOMContentLoaded', () => {
         voiceCallManager = this.voiceCallManager;
     };
     
-    console.log('Azure语音面试官应用已启动');
 });
 
 // 拖拽上传功能
@@ -4704,7 +4713,6 @@ function initDragAndDrop() {
 
     function uploadFile(file) {
         // 这里可以添加文件上传逻辑
-        console.log('上传文件:', file.name);
         
         // 显示上传进度
         showUploadProgress(file.name);
@@ -4726,7 +4734,6 @@ function showUploadProgress(fileName) {
     `;
     
     // 可以添加到适当的容器中显示进度
-    console.log('上传进度:', fileName);
 }
 
 // 语音状态动画增强
@@ -4963,7 +4970,6 @@ function showSettingsPanel() {
         // 其他页面显示通用设置
         showNotification('设置', '更多设置功能开发中，敬请期待！', 'info', 3000);
     }
-    console.log('显示设置面板');
 }
 
 // 页面加载完成后初始化
@@ -5242,15 +5248,12 @@ function initializeApp() {
     // 页面可见性监听
     onVisibilityChange((isVisible) => {
         if (isVisible) {
-            console.log('页面变为可见');
             // 可以在这里刷新数据
         } else {
-            console.log('页面变为隐藏');
             // 可以在这里暂停某些操作
         }
     });
     
-    console.log('AI智能面试官应用已完全初始化');
 
     // 初始化新手引导系统集成
     initTutorialIntegration();
@@ -5265,7 +5268,6 @@ function initTutorialIntegration() {
         if (window.tutorialGuide) {
             // 绑定引导触发事件
             bindTutorialTriggers();
-            console.log('✅ 新手引导系统集成完成');
         } else {
             setTimeout(checkTutorialSystem, 100);
         }

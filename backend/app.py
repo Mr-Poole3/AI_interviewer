@@ -1069,7 +1069,6 @@ def save_job_preference_to_file(job_preference: dict, session_id: str) -> bool:
         preference_file = RESUME_STORAGE_DIR / f"{session_id}_job_preference.json"
         with open(preference_file, 'w', encoding='utf-8') as f:
             json.dump(job_preference, f, ensure_ascii=False, indent=2)
-        logger.info(f"岗位偏好已保存到文件: {preference_file}")
         return True
     except Exception as e:
         logger.error(f"保存岗位偏好文件失败: {e}")
