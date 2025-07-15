@@ -2357,8 +2357,29 @@ body {
 
 .preference-content {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
     gap: var(--spacing-sm);
+}
+
+/* 🔥 新增：岗位偏好实时同步提示样式 */
+.preference-note {
+    display: flex;
+    align-items: center;
+    color: #10b981;
+    font-size: 12px;
+    font-weight: 500;
+    margin-top: 4px;
+}
+
+.preference-note i {
+    margin-right: 4px;
+    animation: sync-spin 2s linear infinite;
+}
+
+@keyframes sync-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
 .job-badge {

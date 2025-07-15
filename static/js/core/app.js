@@ -3726,23 +3726,46 @@ class ResumeManager {
     createResumeInfoHTML(resumeData) {
         const uploadDate = new Date(resumeData.uploadedAt).toLocaleString('zh-CN');
 
-        // 显示简历信息时，直接使用简历中保存的岗位偏好
-        const jobPreference = resumeData.jobPreference;
+        // 🔥 关键修复：优先使用当前选择的岗位意向，而不是简历中保存的旧数据
+        const currentJobInfo = this.getSelectedJobInfo();
+        const savedJobPreference = resumeData.jobPreference;
+
+        // 如果当前有选择岗位意向，使用当前的；否则使用简历中保存的
+        let jobPreference = null;
+        if (currentJobInfo.category && currentJobInfo.position) {
+            jobPreference = {
+                ...currentJobInfo,
+                fullLabel: currentJobInfo.fullLabel,
+                full_label: currentJobInfo.fullLabel // 向后兼容
+            };
+        } else if (savedJobPreference) {
+            jobPreference = savedJobPreference;
+        }
 
         let jobPreferenceHTML = '';
-        if (jobPreference && (jobPreference.full_label || jobPreference.fullLabel)) {
-            const fullLabel = jobPreference.full_label || jobPreference.fullLabel ||
-                             (jobPreference.categoryLabel && jobPreference.positionLabel ?
-                              `${jobPreference.categoryLabel} - ${jobPreference.positionLabel}` : '');
+        if (jobPreference) {
+            // 🔥 改进：更灵活的标签生成逻辑
+            let fullLabel = '';
+            if (jobPreference.fullLabel) {
+                fullLabel = jobPreference.fullLabel;
+            } else if (jobPreference.full_label) {
+                fullLabel = jobPreference.full_label;
+            } else if (jobPreference.categoryLabel && jobPreference.positionLabel) {
+                fullLabel = `${jobPreference.categoryLabel} - ${jobPreference.positionLabel}`;
+            } else if (jobPreference.category_label && jobPreference.position_label) {
+                fullLabel = `${jobPreference.category_label} - ${jobPreference.position_label}`;
+            }
 
-            jobPreferenceHTML = `
-                <div class="job-preference-info">
-                    <h5><i class="fas fa-bullseye"></i> 意向岗位</h5>
-                    <div class="preference-content">
-                        <span class="job-badge">${fullLabel}</span>
+            if (fullLabel) {
+                jobPreferenceHTML = `
+                    <div class="job-preference-info">
+                        <h5><i class="fas fa-bullseye"></i> 意向岗位</h5>
+                        <div class="preference-content">
+                            <span class="job-badge">${fullLabel}</span>
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            }
         }
 
         return `
@@ -3756,12 +3779,6 @@ class ResumeManager {
                         <div class="resume-meta">
                             <span><i class="fas fa-calendar"></i> ${uploadDate}</span>
                             <span><i class="fas fa-file-text"></i> ${resumeData.textLength} 字符</span>
-                        </div>
-                        <div class="resume-status">
-                            <span class="status-badge success">
-                                <i class="fas fa-check"></i>
-                                已解析
-                            </span>
                         </div>
                     </div>
                 </div>
@@ -4042,12 +4059,23 @@ class ResumeManager {
             updatedAt: new Date().toISOString()
         };
 
+        // 添加完整标签
+        if (category && position) {
+            preference.fullLabel = `${preference.categoryLabel} - ${preference.positionLabel}`;
+        }
+
         try {
             // 显示保存中状态
             this.showJobPreferenceStatus('loading', '正在保存岗位偏好...');
-            
+
             localStorage.setItem('job_preference', JSON.stringify(preference));
-            
+
+            // 🔥 关键修复：同步更新简历数据中的岗位偏好
+            this.syncJobPreferenceToResume(preference);
+
+            // 🔥 关键修复：刷新简历预览以显示最新的岗位信息
+            this.refreshResumePreview();
+
             // 显示成功状态
             if (category && position) {
                 this.showJobPreferenceStatus('success', `已保存岗位偏好：${preference.categoryLabel} - ${preference.positionLabel}`);
@@ -4056,10 +4084,49 @@ class ResumeManager {
             } else {
                 this.showJobPreferenceStatus('success', '岗位偏好已清除');
             }
-            
+
         } catch (e) {
             console.error('保存岗位偏好失败:', e);
             this.showJobPreferenceStatus('error', '保存岗位偏好失败，请重试');
+        }
+    }
+
+    /**
+     * 🔥 新增方法：同步岗位偏好到简历数据
+     * 当用户更改岗位偏好时，同步更新已保存的简历数据
+     */
+    syncJobPreferenceToResume(preference) {
+        try {
+            const resumeData = this.storageManager.getCurrentResume();
+            if (resumeData) {
+                // 更新简历数据中的岗位偏好
+                resumeData.jobPreference = {
+                    ...preference,
+                    // 保持向后兼容性
+                    full_label: preference.fullLabel,
+                    category_label: preference.categoryLabel,
+                    position_label: preference.positionLabel
+                };
+
+                // 保存更新后的简历数据
+                this.storageManager.saveCurrentResume(resumeData);
+
+                console.log('已同步岗位偏好到简历数据:', preference);
+            }
+        } catch (e) {
+            console.error('同步岗位偏好到简历数据失败:', e);
+        }
+    }
+
+    /**
+     * 🔥 新增方法：刷新简历预览
+     * 只更新简历预览部分，不重新加载整个简历信息
+     */
+    refreshResumePreview() {
+        const resumeData = this.storageManager.getCurrentResume();
+        if (resumeData && this.resumeContent) {
+            // 只刷新简历信息显示，保持当前的DOM结构
+            this.refreshResumeInfo();
         }
     }
 
@@ -4154,7 +4221,7 @@ class ResumeManager {
     clearJobPreference() {
         try {
             this.showJobPreferenceStatus('loading', '正在清除岗位偏好...');
-            
+
             localStorage.removeItem('job_preference');
             if (this.jobCategory) this.jobCategory.value = '';
             if (this.jobPosition) {
@@ -4162,7 +4229,11 @@ class ResumeManager {
                 this.jobPosition.disabled = true;
                 this.jobPosition.innerHTML = '<option value="">请先选择行业大类</option>';
             }
-            
+
+            // 🔥 关键修复：清除岗位偏好时也要同步更新简历数据和预览
+            this.syncJobPreferenceToResume({});
+            this.refreshResumePreview();
+
             this.showJobPreferenceStatus('success', '岗位偏好已清除');
         } catch (e) {
             console.error('清除岗位偏好失败:', e);
