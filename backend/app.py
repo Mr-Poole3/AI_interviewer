@@ -1824,6 +1824,7 @@ class LegacyInterviewEvaluationRequest(BaseModel):
     interviewMessages: List[Dict]
     resumeText: Optional[str]
     interviewId: Optional[str]
+    jobPreference: Optional[Any]
 
 
 @app.post("/api/evaluate-interview", response_model=dict)
@@ -1834,6 +1835,7 @@ async def evaluate_interview(request_body: LegacyInterviewEvaluationRequest):
     interview_messages = request_body.interviewMessages
     resume_text = request_body.resumeText
     interview_id = request_body.interviewId
+    job_preference = request_body.jobPreference
 
     if not interview_messages:
         raise HTTPException(status_code=400, detail="请提供有效的面试对话消息。")
@@ -1843,11 +1845,12 @@ async def evaluate_interview(request_body: LegacyInterviewEvaluationRequest):
     logger.info(f"简历文本长度: {len(resume_text)}")
 
     try:
-        from backend.three_agent_interview import generate_three_agent_report
-        result = await generate_three_agent_report(
+        from backend.three_agent_concurrent_interview import generate_concurrent_three_agent_report
+        result = await generate_concurrent_three_agent_report(
             interview_messages,
             resume_text,
-            job_description="请从简历中提取或了解猜测岗位信息"
+            job_description="请从简历中提取或了解猜测岗位信息",
+            job_preference=job_preference
         )
         # {
         #     'analysis': self.analysis_result,

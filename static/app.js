@@ -2774,6 +2774,7 @@ class HistoryManager {
 
             const resumeData = this.storageManager.getCurrentResume();
             const resumeText = resumeData ? resumeData.fullText : '';
+            const jobPreference = resumeData ? resumeData.jobPreference : '';
 
             // 先尝试调用评估API
             console.log('正在调用评估API...');
@@ -2783,7 +2784,8 @@ class HistoryManager {
                 body: JSON.stringify({
                     interviewMessages: interviewToEvaluate.messages,
                     resumeText: resumeText,
-                    interviewId: interviewToEvaluate.id
+                    interviewId: interviewToEvaluate.id,
+                    jobPreference: jobPreference
                 })
             });
 
