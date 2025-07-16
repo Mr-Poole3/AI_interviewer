@@ -8,9 +8,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#667eea">
     <title>AI智能面试官 - 专业语音面试系统</title>
-    <link rel="stylesheet" href="/static/style.css?v=2024010103">
-    <link rel="stylesheet" href="/static/evaluation-styles.css?v=2024010103">
-    <link rel="stylesheet" href="/static/tutorial-guide.css?v=2024010103">
+    <link rel="stylesheet" href="/static/css/style.css?v=2024010103">
+    <link rel="stylesheet" href="/static/css/evaluation-styles.css?v=2024010103">
+    <link rel="stylesheet" href="/static/css/tutorial-guide.css?v=2024010103">
+    <link rel="stylesheet" href="/static/css/notification-system.css?v=2024010103">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💼</text></svg>">
     <!-- Lottie动画库 -->
     <script
@@ -393,10 +394,9 @@
                         <div class="job-preference-container">
                             <div class="preference-header">
                                 <h2>
-                                    <i class="fas fa-bullseye"></i>
-                                    岗位意向设置
+                                    🧑‍💼岗位意向
                                 </h2>
-                                <p>选择您的意向岗位类别，让AI面试官为您提供更精准的面试体验</p>
+                                <p>选择您的意向岗位，让AI面试官为您提供更精准的面试体验</p>
                             </div>
 
                             <div class="preference-content">
@@ -440,6 +440,14 @@
                                 <div class="preference-tips">
                                     <i class="fas fa-info-circle"></i>
                                     <span>选择岗位意向后，AI面试官将根据该岗位的要求进行针对性面试</span>
+                                </div>
+                                 
+                                <!-- 岗位保存状态反馈 -->
+                                <div class="job-preference-status" id="jobPreferenceStatus" style="display: none;">
+                                    <div class="status-content">
+                                        <i class="status-icon"></i>
+                                        <span class="status-text"></span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -602,10 +610,7 @@
                     <i class="fas fa-microphone-slash mic-off-icon" style="display: none;"></i>
                 </button>
                 
-                <!-- VAD设置按钮 -->
-                <button class="voice-control-btn settings-btn" id="vadSettingsButton" title="语音检测设置">
-                    <i class="fas fa-cog"></i>
-                </button>
+
                 
                 <!-- 结束通话按钮 -->
                 <button class="voice-control-btn end-btn" id="endCallButton" title="结束通话">
@@ -614,48 +619,7 @@
             </div>
             </div>
             
-            <!-- VAD设置面板 -->
-            <div class="vad-settings-panel" id="vadSettingsPanel" style="display: none;">
-                <div class="settings-header">
-                    <h3>语音检测设置</h3>
-                    <button class="close-settings" id="closeVadSettings">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="settings-content">
-                    <div class="setting-group">
-                    <label for="vadThreshold">检测敏感度</label>
-                        <div class="slider-container">
-                        <input type="range" id="vadThreshold" min="0.1" max="1.0" step="0.1" value="0.5">
-                        <span class="slider-value" id="vadThresholdValue">0.5</span>
-                    </div>
-                    <p class="setting-description">调整语音检测的敏感度，值越小越敏感</p>
-                    </div>
-                    
-                    <div class="setting-group">
-                    <label for="vadSilenceDuration">静音检测时长</label>
-                        <div class="slider-container">
-                        <input type="range" id="vadSilenceDuration" min="500" max="3000" step="100" value="1000">
-                        <span class="slider-value" id="vadSilenceDurationValue">1000ms</span>
-                    </div>
-                    <p class="setting-description">检测到静音后等待多长时间停止录音</p>
-                    </div>
-                    
-                    <div class="setting-group">
-                    <label for="vadPrefixPadding">前缀填充时长</label>
-                        <div class="slider-container">
-                        <input type="range" id="vadPrefixPadding" min="100" max="1000" step="50" value="300">
-                        <span class="slider-value" id="vadPrefixPaddingValue">300ms</span>
-                    </div>
-                    <p class="setting-description">在检测到语音前包含的音频时长</p>
-                    </div>
-                    
-                    <div class="settings-actions">
-                        <button class="btn-secondary" id="resetVadSettings">重置默认</button>
-                        <button class="btn-primary" id="applyVadSettings">应用设置</button>
-                </div>
-            </div>
-        </div>
+
     </div>
     <div id="evaluationModal" class="modal" style="display: none;">
         <div class="modal-content">
@@ -773,11 +737,9 @@
         // 检查jsPDF是否加载成功，如果没有则尝试备用CDN
         setTimeout(() => {
             if (typeof window.jsPDF === 'undefined') {
-                console.log('主CDN失败，加载备用jsPDF...');
                 const script = document.createElement('script');
                 script.src = 'https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js';
                 script.onload = () => {
-                    console.log('备用jsPDF加载成功');
                     if (window.pdfExporter) {
                         window.pdfExporter.isLibrariesLoaded = window.pdfExporter.testLibraries();
                     }
@@ -790,7 +752,7 @@
         }, 1000);
     </script>
     <!-- PDF导出模块 -->
-    <script src="/static/pdf-export.js"></script>
+    <script src="/static/js/modules/pdf-export.js"></script>
     <!-- 新手引导系统 -->
     <!-- 简历详情抽屉Modal -->
     <div class="resume-drawer-modal" id="resumeDrawerModal" style="display: none;">
@@ -825,11 +787,13 @@
 
     <!-- Markdown解析库 -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    
-    <script src="/static/tutorial-guide.js?v=2024010103"></script>
+
+    <!-- 统一通知系统 -->
+    <script src="/static/js/core/notification-system.js?v=2024010103"></script>
+    <script src="/static/js/modules/tutorial-guide.js?v=2024010103"></script>
     <!-- 智能提示系统 -->
-    <script src="/static/smart-tips.js?v=2024010103"></script>
-    <script src="/static/voice-call.js?v=2024010103"></script>
-    <script src="/static/app.js?v=2024010103"></script>
+    <script src="/static/js/modules/smart-tips.js?v=2024010103"></script>
+    <script src="/static/js/core/voice-call.js?v=2024010103"></script>
+    <script src="/static/js/core/app.js?v=2024010103"></script>
 </body>
 </html> 

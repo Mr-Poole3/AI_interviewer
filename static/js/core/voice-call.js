@@ -511,7 +511,6 @@ class VoiceCallManager {
     logMessage(message) {
         const timestamp = new Date().toLocaleTimeString();
         const logEntry = `[${timestamp}] ${message}`;
-        console.log(logEntry);
         
         if (this.logContainer) {
             const p = document.createElement('p');
@@ -933,7 +932,7 @@ class VoiceCallManager {
     async buildInstructions(resumeContext, jobPreference) {
         try {
             // 从后端获取prompt配置
-            const response = await fetch('/api/prompts/voice-call', {
+            const response = await fetch('/interview/api/prompts/voice-call', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -967,7 +966,7 @@ class VoiceCallManager {
     async getDefaultInstructions(resumeContext, jobPreference) {
         try {
             // 尝试从API获取默认prompt
-            const response = await fetch('/api/prompts/voice-call-default');
+            const response = await fetch('/interview/api/prompts/voice-call-default');
             if (response.ok) {
                 const data = await response.json();
                 this.logMessage(`✅ 从API获取默认prompt成功: ${data.source}`);
@@ -1075,7 +1074,7 @@ class VoiceCallManager {
                 
                 // 通过API获取完整简历内容
                 try {
-                    const response = await fetch(`/api/resume/${resumeSessionId}`);
+                    const response = await fetch(`/interview/api/resume/${resumeSessionId}`);
                     if (response.ok) {
                         const data = await response.json();
                         this.logMessage(`成功获取简历内容，长度: ${data.content.length}`);
@@ -1096,7 +1095,7 @@ class VoiceCallManager {
             } else {
                 // 会话ID匹配，获取完整简历内容
                 try {
-                    const response = await fetch(`/api/resume/${sessionId}`);
+                    const response = await fetch(`/interview/api/resume/${sessionId}`);
                     if (response.ok) {
                         const data = await response.json();
                         this.logMessage(`成功获取简历内容，长度: ${data.content.length}`);
@@ -1369,14 +1368,25 @@ class VoiceCallManager {
             };
             const resumeContext = await this.getResumeContext();
             try {
+                // 获取岗位偏好信息
+                const jobPreference = await this.getJobPreference();
+                
                 const extractionRequest = {
                     interview_id: interviewRecord.id,
                     messages: interviewRecord.messages,
                     resume_context: resumeContext || '',
+                    job_preference: jobPreference
                 };
-                console.log(extractionRequest);                
+                
+                // 记录岗位偏好信息
+                if (jobPreference) {
+                    this.logMessage(`面试数据提取包含岗位偏好: ${jobPreference.full_label || jobPreference.fullLabel || 'N/A'}`);
+                } else {
+                    this.logMessage('面试数据提取未包含岗位偏好信息');
+                }
+                          
                 // 调用提取API
-                const response = await fetch('/api/interview/extract', {
+                const response = await fetch('/interview/api/extract', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1386,7 +1396,6 @@ class VoiceCallManager {
                 
                 if (response.ok) {
                     const result = await response.json();
-                    console.log('面试数据提取完成:', result);
                     if (result.success) {
                         interviewRecord.title = result.extraction.title;
                         interviewRecord.summary = result.extraction.summary;
@@ -1572,7 +1581,6 @@ class VoiceCallManager {
             // 立即刷新历史记录显示
             if (window.app && window.app.historyManager) {
                 window.app.historyManager.refreshHistoryList();
-                console.log('历史记录已刷新');
             }
 
             // 显示后台评分处理提示
@@ -1675,13 +1683,17 @@ class VoiceCallManager {
 
             // 获取简历上下文
             const resumeContext = await this.getResumeContext();
+            
+            // 获取岗位偏好信息
+            const jobPreference = await this.getJobPreference();
 
             // 构建评分请求
             const evaluationRequest = {
                 interview_id: latestInterview.id,
                 messages: latestInterview.messages,
                 resume_context: resumeContext || '',
-                duration: latestInterview.duration || 0
+                duration: latestInterview.duration || 0,
+                job_preference: jobPreference
             };
 
             this.logMessage('开始后台评分处理...');
@@ -1702,7 +1714,7 @@ class VoiceCallManager {
         try {
             this.logMessage('发送评分请求到后台...');
 
-            const response = await fetch('/api/interview/evaluate', {
+            const response = await fetch('/interview/api/evaluate', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1749,6 +1761,11 @@ class VoiceCallManager {
                 interview.evaluationStartTime = new Date().toISOString();
                 this.storageManager.saveInterview(interview);
                 this.logMessage(`面试记录 ${interviewId} 标记为评分中`);
+                
+                // 🔥 关键修复：立即刷新历史记录显示，禁用按钮
+                if (window.app && window.app.historyManager) {
+                    window.app.historyManager.refreshHistoryList();
+                }
             }
         } catch (error) {
             this.logMessage(`标记评分状态失败: ${error.message}`);
@@ -1768,6 +1785,11 @@ class VoiceCallManager {
                 interview.evaluationEndTime = new Date().toISOString();
                 this.storageManager.saveInterview(interview);
                 this.logMessage(`面试记录 ${interviewId} 标记为评分失败`);
+                
+                // 🔥 关键修复：刷新历史记录显示，显示重试按钮
+                if (window.app && window.app.historyManager) {
+                    window.app.historyManager.refreshHistoryList();
+                }
             }
         } catch (error) {
             this.logMessage(`标记评分失败状态失败: ${error.message}`);
@@ -1799,7 +1821,11 @@ class VoiceCallManager {
                 // 立即刷新历史记录显示
                 if (window.app && window.app.historyManager) {
                     window.app.historyManager.refreshHistoryList();
-                    console.log('评分完成后历史记录已刷新');
+                }
+                
+                // 🔥 关键修复：显示评分完成通知
+                if (window.notificationSystem) {
+                    window.notificationSystem.success('评分完成', '面试评分已完成，可在历史记录中查看详细结果');
                 }
             }
         } catch (error) {

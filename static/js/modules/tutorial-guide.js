@@ -34,7 +34,6 @@ class TutorialGuideSystem {
         this.createOverlayElements();
         this.bindEvents();
         this.checkFirstVisit();
-        console.log('🎯 新手引导系统已初始化');
     }
     
     /**
@@ -113,7 +112,6 @@ class TutorialGuideSystem {
                 prevBtn.addEventListener('click', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log('🎯 点击上一步按钮');
                     this.prevStep();
                 });
             }
@@ -122,7 +120,6 @@ class TutorialGuideSystem {
                 nextBtn.addEventListener('click', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log('🎯 点击下一步按钮');
                     this.nextStep();
                 });
             }
@@ -131,7 +128,6 @@ class TutorialGuideSystem {
                 completeBtn.addEventListener('click', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log('🎯 点击完成按钮');
                     this.completeTutorial();
                 });
             }
@@ -140,12 +136,10 @@ class TutorialGuideSystem {
                 closeBtn.addEventListener('click', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log('🎯 点击关闭按钮');
                     this.skipTutorial();
                 });
             }
 
-            console.log('🎯 引导按钮事件绑定完成');
         }, 100);
     }
     
@@ -159,7 +153,6 @@ class TutorialGuideSystem {
             const actionButton = e.target.closest('[data-action]');
             if (actionButton) {
                 const action = actionButton.dataset.action;
-                console.log(`🎯 引导操作: ${action}`);
                 this.handleAction(action);
             }
         });
@@ -168,7 +161,6 @@ class TutorialGuideSystem {
         this.tooltip.addEventListener('click', (e) => {
             if (e.target.closest('.tooltip-close')) {
                 e.stopPropagation();
-                console.log('🎯 关闭引导');
                 this.skipTutorial();
             }
         });
@@ -310,7 +302,6 @@ class TutorialGuideSystem {
         // 记录开始时间
         this.tutorialStartTime = Date.now();
         
-        console.log(`🎯 开始引导教程: ${tutorial.title}`);
     }
     
     /**
@@ -342,7 +333,6 @@ class TutorialGuideSystem {
         // 保存进度
         this.saveProgress();
         
-        console.log(`📍 显示引导步骤 ${stepIndex + 1}/${this.currentTutorial.steps.length}: ${step.title}`);
     }
     
     /**
@@ -545,8 +535,6 @@ class TutorialGuideSystem {
      * 处理用户操作
      */
     handleAction(action) {
-        console.log(`🎯 处理引导操作: ${action}`);
-
         switch (action) {
             case 'prev':
                 this.prevStep();
@@ -606,18 +594,44 @@ class TutorialGuideSystem {
         
         // 显示完成提示
         this.showCompletionMessage();
-        
-        console.log(`✅ 引导教程完成: ${currentTutorial.title}`);
+
+    }
+    
+    /**
+     * 显示引导完成提示
+     */
+    async showCompletionMessage() {
+        try {
+            // 使用通知系统显示完成消息
+            if (typeof notificationSystem !== 'undefined') {
+                await notificationSystem.success(
+                    '🎉 新手引导完成！',
+                    '恭喜您完成了系统引导！现在您可以开始使用AI语音面试系统了。建议先上传简历以获得更好的面试体验。',
+                    { duration: 5000 }
+                );
+            } else {
+                // 回退方案：使用浏览器原生alert
+                alert('🎉 恭喜您完成了新手引导！现在可以开始使用AI语音面试系统了。');
+            }
+        } catch (error) {
+            console.warn('显示完成消息失败:', error);
+            // 使用浏览器原生alert作为最后的回退
+            alert('🎉 恭喜您完成了新手引导！');
+        }
     }
     
     /**
      * 跳过引导
      */
-    skipTutorial() {
-        if (confirm('确定要跳过新手引导吗？您可以稍后在设置中重新开启。')) {
+    async skipTutorial() {
+        const confirmed = await notificationSystem.confirm(
+            '跳过引导',
+            '确定要跳过新手引导吗？您可以稍后在设置中重新开启。',
+            { type: 'info', confirmText: '跳过', cancelText: '继续引导' }
+        );
+        if (confirmed) {
             this.endTutorial();
             localStorage.setItem(this.STORAGE_KEYS.SKIP_TUTORIALS, 'true');
-            console.log('⏭️ 用户跳过了引导教程');
         }
     }
     
@@ -638,16 +652,6 @@ class TutorialGuideSystem {
         
         // 清除进度
         localStorage.removeItem(this.STORAGE_KEYS.TUTORIAL_PROGRESS);
-    }
-    
-    /**
-     * 显示完成消息
-     */
-    showCompletionMessage() {
-        // 这里可以显示一个漂亮的完成动画或消息
-        setTimeout(() => {
-            alert('🎉 恭喜！您已完成新手引导。现在可以开始使用AI面试系统了！');
-        }, 500);
     }
     
     /**
@@ -675,8 +679,6 @@ class TutorialGuideSystem {
         if (progressData) {
             try {
                 const progress = JSON.parse(progressData);
-                // 可以在这里实现进度恢复逻辑
-                console.log('📂 发现未完成的引导进度:', progress);
             } catch (e) {
                 console.warn('引导进度数据解析失败:', e);
             }
