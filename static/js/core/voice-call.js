@@ -932,7 +932,7 @@ class VoiceCallManager {
     async buildInstructions(resumeContext, jobPreference) {
         try {
             // 从后端获取prompt配置
-            const response = await fetch('/api/prompts/voice-call', {
+            const response = await fetch('/interview/api/prompts/voice-call', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -966,7 +966,7 @@ class VoiceCallManager {
     async getDefaultInstructions(resumeContext, jobPreference) {
         try {
             // 尝试从API获取默认prompt
-            const response = await fetch('/api/prompts/voice-call-default');
+            const response = await fetch('/interview/api/prompts/voice-call-default');
             if (response.ok) {
                 const data = await response.json();
                 this.logMessage(`✅ 从API获取默认prompt成功: ${data.source}`);
@@ -1074,7 +1074,7 @@ class VoiceCallManager {
                 
                 // 通过API获取完整简历内容
                 try {
-                    const response = await fetch(`/api/resume/${resumeSessionId}`);
+                    const response = await fetch(`/interview/api/resume/${resumeSessionId}`);
                     if (response.ok) {
                         const data = await response.json();
                         this.logMessage(`成功获取简历内容，长度: ${data.content.length}`);
@@ -1095,7 +1095,7 @@ class VoiceCallManager {
             } else {
                 // 会话ID匹配，获取完整简历内容
                 try {
-                    const response = await fetch(`/api/resume/${sessionId}`);
+                    const response = await fetch(`/interview/api/resume/${sessionId}`);
                     if (response.ok) {
                         const data = await response.json();
                         this.logMessage(`成功获取简历内容，长度: ${data.content.length}`);
@@ -1386,7 +1386,7 @@ class VoiceCallManager {
                 }
                           
                 // 调用提取API
-                const response = await fetch('/api/interview/extract', {
+                const response = await fetch('/interview/api/extract', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1714,7 +1714,7 @@ class VoiceCallManager {
         try {
             this.logMessage('发送评分请求到后台...');
 
-            const response = await fetch('/api/interview/evaluate', {
+            const response = await fetch('/interview/api/evaluate', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

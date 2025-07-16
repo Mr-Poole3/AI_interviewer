@@ -37,8 +37,11 @@ from config import get_model_temperature, get_max_tokens, get_top_p
 # 导入提示词配置
 from prompts import get_interviewer_prompt, get_voice_call_prompt, get_interview_evaluation_prompt, get_interview_extraction_prompt
 
-from dotenv import load_dotenv
-load_dotenv()
+from dotenv import load_dotenv, find_dotenv
+
+dotenv_path = find_dotenv()
+load_dotenv(dotenv_path)
+logger_temp_msg = f"✅ 自动加载 .env 文件: {dotenv_path}"
 
 # 配置日志
 logging.basicConfig(
@@ -46,6 +49,9 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# 输出 .env 文件加载状态
+logger.info(logger_temp_msg)
 
 app = FastAPI(title="Azure语音面试官系统", description="基于Azure OpenAI实时语音模型的智能面试系统")
 
@@ -1290,7 +1296,7 @@ async def validate_prompt_management() -> JSONResponse:
         logger.error(f"Prompt管理验证失败: {e}")
         raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
 
-@app.post("/api/interview/evaluate")
+@app.post("/api/evaluate")
 async def evaluate_interview_api(request: InterviewEvaluationRequest) -> JSONResponse:
     """
     评估面试表现
@@ -1381,7 +1387,7 @@ class InterviewExtractionRequest(BaseModel):
     resume_context: str = ""
     job_preference: dict = None
 
-@app.post("/api/interview/extract")
+@app.post("/api/extract")
 async def save_interview_extract_data(request: InterviewExtractionRequest) -> JSONResponse:
     """
     保存面试数据提取结果
@@ -1631,6 +1637,7 @@ async def upload_resume(
         raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
 
 @app.websocket("/ws/voice")
+@app.websocket("/interview/ws/voice")  # 添加带路径前缀的WebSocket路由，适配nginx代理
 async def websocket_voice_endpoint(websocket: WebSocket):
     """Azure语音聊天WebSocket端点 - FastRTC增强版"""
     await websocket.accept()
@@ -1952,7 +1959,7 @@ if __name__ == "__main__":
     uvicorn.run(
         app,
         host="localhost",
-        port=8000,
+        port=9000,
         reload=True,
         log_level="info"
     ) 

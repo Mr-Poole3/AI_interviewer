@@ -23,33 +23,36 @@ def print_banner():
 
 def check_env_config():
     """检查环境变量配置"""
-    api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("ARK_API_KEY")
-    if not api_key:
-        print("⚠️  警告：未检测到API密钥")
-        print("   请设置环境变量 OPENAI_API_KEY 或 ARK_API_KEY")
-        print("   或创建 .env 文件配置")
-        
-        # 检查是否存在 .env 文件
-        if Path(".env").exists():
-            print("✅ 发现 .env 文件，将尝试加载配置")
-        else:
+    # 自动加载 .env 文件
+    env_file = Path(".env")
+    if env_file.exists():
+        try:
+            from dotenv import load_dotenv
+            load_dotenv(env_file)
+            print("✅ 自动加载 .env 文件配置")
+        except ImportError:
+            print("⚠️  未安装 python-dotenv，无法加载 .env 文件")
+        except Exception as e:
+            print(f"⚠️  加载 .env 文件失败: {e}")
+    
+    # 检查关键环境变量（检查但不强制要求）
+    api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("ARK_API_KEY") or os.environ.get("AZURE_OPENAI_API_KEY")
+    if api_key:
+        print("✅ API密钥配置检查通过")
+    else:
+        print("ℹ️  未检测到API密钥，将尝试使用其他配置")
+        if not env_file.exists():
             print("💡 提示：您可以创建 .env 文件来配置API密钥")
             print("   示例内容：")
-            print("   OPENAI_API_KEY=your_api_key_here")
-            print("   OPENAI_BASE_URL=your_base_url_here")
-            
-        choice = input("\n是否继续启动？(y/N): ").lower().strip()
-        if choice not in ['y', 'yes']:
-            return False
-    else:
-        print("✅ API密钥配置检查通过")
+            print("   AZURE_OPENAI_API_KEY=your_api_key_here")
     
+    # 总是返回 True，让系统自动启动
     return True
 
 def start_server():
     """启动服务器"""
     print("\n🚀 正在启动LLM面试官系统...")
-    print("   服务地址：http://localhost:8000")
+    print("   服务地址：http://localhost:9000")
     print("   按 Ctrl+C 停止服务\n")
     
     try:
@@ -58,7 +61,7 @@ def start_server():
             sys.executable, "-m", "uvicorn", 
             "backend.app:app", 
             "--host", "localhost",
-            "--port", "8000",
+            "--port", "9000",
             "--reload"
         ])
     except KeyboardInterrupt:

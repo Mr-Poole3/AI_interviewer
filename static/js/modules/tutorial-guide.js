@@ -598,6 +598,29 @@ class TutorialGuideSystem {
     }
     
     /**
+     * 显示引导完成提示
+     */
+    async showCompletionMessage() {
+        try {
+            // 使用通知系统显示完成消息
+            if (typeof notificationSystem !== 'undefined') {
+                await notificationSystem.success(
+                    '🎉 新手引导完成！',
+                    '恭喜您完成了系统引导！现在您可以开始使用AI语音面试系统了。建议先上传简历以获得更好的面试体验。',
+                    { duration: 5000 }
+                );
+            } else {
+                // 回退方案：使用浏览器原生alert
+                alert('🎉 恭喜您完成了新手引导！现在可以开始使用AI语音面试系统了。');
+            }
+        } catch (error) {
+            console.warn('显示完成消息失败:', error);
+            // 使用浏览器原生alert作为最后的回退
+            alert('🎉 恭喜您完成了新手引导！');
+        }
+    }
+    
+    /**
      * 跳过引导
      */
     async skipTutorial() {

@@ -256,7 +256,7 @@ class EvaluationStatusManager {
         for (const interview of evaluatingInterviews) {
             try {
                 // 检查评分是否完成
-                const response = await fetch(`/api/interview/evaluation-status/${interview.id}`);
+                const response = await fetch(`/interview/api/evaluation-status/${interview.id}`);
                 if (response.ok) {
                     const result = await response.json();
                     if (result.status === 'completed') {
@@ -1051,7 +1051,15 @@ class AzureVoiceChat {
     
     connect() {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws/voice`;
+        
+        // 根据当前路径构建正确的WebSocket URL
+        let wsPath = '/ws/voice';
+        if (window.location.pathname.startsWith('/interview/')) {
+            // 如果是通过 /interview/ 路径访问，使用相同的路径前缀
+            wsPath = '/interview/ws/voice';
+        }
+        
+        const wsUrl = `${protocol}//${window.location.host}${wsPath}`;
         
         this.ws = new WebSocket(wsUrl);
         
@@ -1669,7 +1677,7 @@ class AzureVoiceChat {
     //         this.showEvaluationProgress();
             
     //         // 调用评分API
-    //         const response = await fetch('/api/interview/evaluate', {
+    //         const response = await fetch('/interview/api/evaluate', {
     //             method: 'POST',
     //             headers: {
     //                 'Content-Type': 'application/json'
@@ -1708,7 +1716,7 @@ class AzureVoiceChat {
                 return null;
             }
             
-            const response = await fetch(`/api/resume/${this.currentSessionId}`);
+            const response = await fetch(`/interview/api/resume/${this.currentSessionId}`);
             if (response.ok) {
                 const data = await response.json();
                 return data.content;
@@ -2768,7 +2776,7 @@ class HistoryManager {
             const resumeText = resumeData ? resumeData.fullText : '';
 
             // 先尝试调用评估API
-            const evaluationResponse = await fetch('/api/evaluate-interview', {
+            const evaluationResponse = await fetch('/interview/api/evaluate-interview', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -3153,7 +3161,7 @@ class HistoryManager {
 
 
             // 调用评分API
-            const response = await fetch('/api/interview/evaluate', {
+            const response = await fetch('/interview/api/evaluate', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -3204,7 +3212,7 @@ class HistoryManager {
         try {
             const resumeData = this.storageManager.getCurrentResume();
             if (resumeData && resumeData.sessionId) {
-                const response = await fetch(`/api/resume/${resumeData.sessionId}`);
+                const response = await fetch(`/interview/api/resume/${resumeData.sessionId}`);
                 if (response.ok) {
                     const data = await response.json();
                     return data.content;
@@ -3953,7 +3961,6 @@ class ResumeManager {
             positionSelect.appendChild(option);
         });
 
-        console.log(`已加载 ${category} 的岗位选项:`, positions.length, '个');
     }
 
     handlePositionChange(position) {
@@ -3964,7 +3971,6 @@ class ResumeManager {
 
         // 可以在这里添加其他逻辑，比如显示岗位相关信息
         if (position) {
-            console.log('用户选择了具体岗位:', position);
         }
     }
 
@@ -4125,7 +4131,6 @@ class ResumeManager {
     saveJobPreference() {
         // 🔥 关键修复：恢复阶段不执行保存操作
         if (this.isRestoringPreference) {
-            console.log('正在恢复岗位偏好，跳过保存操作');
             return;
         }
 
@@ -4150,8 +4155,6 @@ class ResumeManager {
             this.showJobPreferenceStatus('loading', '正在保存岗位偏好...');
 
             localStorage.setItem('job_preference', JSON.stringify(preference));
-            console.log('岗位偏好已保存到localStorage:', preference);
-
             // 🔥 关键修复：同步更新简历数据中的岗位偏好
             this.syncJobPreferenceToResume(preference);
 
@@ -4193,7 +4196,6 @@ class ResumeManager {
                 // 保存更新后的简历数据
                 this.storageManager.saveCurrentResume(resumeData);
 
-                console.log('已同步岗位偏好到简历数据:', preference);
             }
         } catch (e) {
             console.error('同步岗位偏好到简历数据失败:', e);
@@ -4215,11 +4217,9 @@ class ResumeManager {
     loadSavedJobPreference() {
         try {
             const saved = localStorage.getItem('job_preference');
-            console.log('尝试加载岗位偏好:', saved); // 添加调试日志
             
             if (saved) {
                 const preference = JSON.parse(saved);
-                console.log('解析的岗位偏好:', preference); // 添加调试日志
 
                 // 🔥 关键修复：使用标志位防止恢复过程中触发保存
                 this.isRestoringPreference = true;
@@ -4227,7 +4227,6 @@ class ResumeManager {
                 // 恢复行业大类选择
                 if (preference.category && this.jobCategory) {
                     this.jobCategory.value = preference.category;
-                    console.log('已恢复行业大类:', preference.category);
 
                     // 手动加载岗位选项（不触发保存）
                     this.loadPositionOptions(preference.category);
@@ -4237,7 +4236,6 @@ class ResumeManager {
                         // 等待岗位选项加载完成后再设置值
                         setTimeout(() => {
                             this.jobPosition.value = preference.position;
-                            console.log('已恢复具体岗位:', preference.position);
                             
                             // 🔥 恢复完成，清除标志位
                             this.isRestoringPreference = false;
@@ -4257,10 +4255,8 @@ class ResumeManager {
                     }
                 } else {
                     this.isRestoringPreference = false;
-                    console.log('没有有效的岗位偏好数据可恢复');
                 }
             } else {
-                console.log('没有找到保存的岗位偏好');
             }
         } catch (e) {
             console.error('加载岗位偏好失败:', e);
@@ -4336,7 +4332,6 @@ class ResumeManager {
             this.isRestoringPreference = true;
 
             localStorage.removeItem('job_preference');
-            console.log('已从localStorage清除岗位偏好');
             
             if (this.jobCategory) this.jobCategory.value = '';
             if (this.jobPosition) {
@@ -4399,7 +4394,7 @@ class ResumeManager {
         try {
             this.showUploadProgress();
 
-            const response = await fetch('/api/upload-resume', {
+            const response = await fetch('/interview/api/upload-resume', {
                 method: 'POST',
                 body: formData
             });
@@ -4554,7 +4549,7 @@ class ResumeManager {
 
         try {
             // 通过API获取完整简历内容
-            const response = await fetch(`/api/resume/${resumeData.sessionId}`);
+            const response = await fetch(`/interview/api/resume/${resumeData.sessionId}`);
             if (response.ok) {
                 const data = await response.json();
                 const fullContent = data.content || '无法获取简历内容';
@@ -4693,7 +4688,7 @@ class ResumeManager {
             // 尝试通过API获取完整内容
             try {
                 showNotification('获取中', '正在获取完整简历内容...', 'info', 1000);
-                const response = await fetch(`/api/resume/${resumeData.sessionId}`);
+                const response = await fetch(`/interview/api/resume/${resumeData.sessionId}`);
                 if (response.ok) {
                     const data = await response.json();
                     content = data.content;
