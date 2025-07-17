@@ -2646,6 +2646,10 @@ class HistoryManager {
                             <i class="fas fa-chart-bar"></i>
                             <span class="btn-label">评分</span>
                         </button>
+                        <button class="history-action-btn report-btn" onclick="historyManager.generateDetailedReport('${interview.id}')" title="生成详细报告">
+                            <i class="fas fa-file-alt"></i>
+                            <span class="btn-label">报告</span>
+                        </button>
                     `;
                 } else {
                     return `
@@ -2777,7 +2781,7 @@ class HistoryManager {
             const jobPreference = resumeData ? resumeData.jobPreference : '';
 
             // 先尝试调用评估API
-            const evaluationResponse = await fetch('/interview/api/evaluate-interview', {
+            const evaluationResponse = await fetch('/interview/api/evaluate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -3150,20 +3154,21 @@ class HistoryManager {
             const resumeContext = await this.getResumeContext();
             
             // 获取岗位偏好信息
-            const jobPreference = this.getSelectedJobInfo();
-
+            const jobPreference = this.getJobPreference();
+            // const resumeData = this.storageManager.getCurrentResume();
+            // const jobPreference = resumeData.job_preference
             // 构建评分请求
             const evaluationRequest = {
                 interview_id: interview.id,
                 messages: interview.messages,
                 resume_context: resumeContext || '',
                 duration: interview.duration || 0,
-                job_preference: jobPreference.category && jobPreference.position ? jobPreference : null
+                job_preference: jobPreference || null
             };
 
 
             // 调用评分API
-            const response = await fetch('/interview/api/evaluate', {
+            const response = await fetch('', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -3224,6 +3229,205 @@ class HistoryManager {
         } catch (error) {
             console.error('获取简历上下文失败:', error);
             return null;
+        }
+    }
+
+    /**
+     * 生成详细报告
+     */
+    async generateDetailedReport(interviewId) {
+        const interviews = this.storageManager.getInterviews();
+        const interview = interviews.find(item => item.id === interviewId);
+
+        if (!interview || !interview.messages) {
+            notificationSystem.error("数据错误", "未找到面试记录或对话消息。");
+            return;
+        }
+
+        try {
+            // 显示加载状态
+            notificationSystem.info("生成报告", "正在生成详细评估报告，请稍候...");
+
+            // 获取简历上下文
+            const resumeContext = await this.getResumeContext();
+
+            // 获取岗位偏好
+            const jobPreference = this.getJobPreference();
+
+            // 构建详细报告请求
+            const reportRequest = {
+                messages: interview.messages,
+                resume_context: resumeContext || '',
+                interview_id: interview.id,
+                duration: interview.duration || 0,
+                job_preference: jobPreference
+            };
+            console.log('发送详细报告请求:', reportRequest);
+
+            // 调用详细报告API
+            const response = await fetch('/interview/api/evaluate-interview', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(reportRequest)
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+
+                if (result.success) {
+                    // 保存详细报告到面试记录
+                    interview.detailedReport = result.evaluationHtml;
+                    interview.detailedReportData = result.evaluation;
+                    interview.detailedReportGeneratedAt = new Date().toISOString();
+                    this.storageManager.saveInterview(interview);
+
+                    // 显示详细报告
+                    this.showDetailedReport(result.evaluationHtml, interview);
+
+                    notificationSystem.operationSuccess('详细报告生成完成！');
+                } else {
+                    throw new Error(result.message || '详细报告生成失败');
+                }
+            } else {
+                throw new Error(`详细报告API调用失败: ${response.status}`);
+            }
+
+        } catch (error) {
+            console.error('详细报告生成失败:', error);
+            notificationSystem.error("报告生成失败", error.message || "生成详细报告时发生错误，请稍后重试。");
+        }
+    }
+
+    /**
+     * 获取岗位偏好信息
+     */
+    getJobPreference() {
+        try {
+            // 从localStorage获取岗位偏好
+            const jobPreference = localStorage.getItem('job_preference');
+            if (jobPreference) {
+                return JSON.parse(jobPreference);
+            }
+            return null;
+        } catch (error) {
+            console.error('获取岗位偏好失败:', error);
+            return null;
+        }
+    }
+
+    /**
+     * 显示详细报告
+     */
+    showDetailedReport(htmlContent, interview) {
+        // 创建详细报告模态框
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay detailed-report-modal';
+        modal.innerHTML = `
+            <div class="modal-content detailed-report-content">
+                <div class="modal-header">
+                    <h3>
+                        <i class="fas fa-file-alt"></i>
+                        详细评估报告
+                    </h3>
+                    <div class="modal-header-actions">
+                        <button class="btn-secondary btn-sm" onclick="this.closest('.modal-overlay').querySelector('.detailed-report-body').style.fontSize = 'smaller'">
+                            <i class="fas fa-search-minus"></i>
+                        </button>
+                        <button class="btn-secondary btn-sm" onclick="this.closest('.modal-overlay').querySelector('.detailed-report-body').style.fontSize = 'larger'">
+                            <i class="fas fa-search-plus"></i>
+                        </button>
+                        <button class="btn-secondary btn-sm" onclick="historyManager.exportDetailedReport('${interview.id}')">
+                            <i class="fas fa-download"></i> 导出
+                        </button>
+                        <button class="btn-close" onclick="this.closest('.modal-overlay').remove()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="modal-body detailed-report-body">
+                    ${htmlContent}
+                </div>
+            </div>
+        `;
+
+        // 添加到页面
+        document.body.appendChild(modal);
+
+        // 添加点击外部关闭功能
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+    }
+
+    /**
+     * 导出详细报告
+     */
+    exportDetailedReport(interviewId) {
+        const interviews = this.storageManager.getInterviews();
+        const interview = interviews.find(item => item.id === interviewId);
+
+        if (!interview || !interview.detailedReport) {
+            notificationSystem.error("导出失败", "未找到详细报告数据。");
+            return;
+        }
+
+        try {
+            // 创建完整的HTML文档
+            const fullHtml = `
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>面试详细评估报告 - ${interview.title || '面试记录'}</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; margin: 40px; }
+        .report-header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 20px; }
+        .report-meta { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        h1, h2, h3 { color: #333; }
+        .score { font-size: 1.2em; font-weight: bold; color: #007bff; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f8f9fa; font-weight: 600; }
+        .highlight { background-color: #fff3cd; padding: 10px; border-left: 4px solid #ffc107; margin: 10px 0; }
+        @media print { body { margin: 20px; } }
+    </style>
+</head>
+<body>
+    <div class="report-header">
+        <h1>AI面试详细评估报告</h1>
+        <div class="report-meta">
+            <p><strong>面试时间:</strong> ${new Date(interview.createdAt).toLocaleString('zh-CN')}</p>
+            <p><strong>面试时长:</strong> ${interview.duration ? `${Math.floor(interview.duration / 60)}分${interview.duration % 60}秒` : '未知'}</p>
+            <p><strong>对话轮数:</strong> ${interview.messages?.length || 0}轮</p>
+            <p><strong>报告生成时间:</strong> ${new Date().toLocaleString('zh-CN')}</p>
+        </div>
+    </div>
+    ${interview.detailedReport}
+</body>
+</html>`;
+
+            // 创建下载链接
+            const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `面试详细报告_${interview.id}_${new Date().toISOString().slice(0, 10)}.html`;
+
+            // 触发下载
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            notificationSystem.operationSuccess('详细报告已导出！');
+        } catch (error) {
+            console.error('导出详细报告失败:', error);
+            notificationSystem.error("导出失败", "导出详细报告时发生错误。");
         }
     }
     
